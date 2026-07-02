@@ -145,6 +145,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Tin tức", href: "/content/news" },
       { name: "Danh mục bài viết", href: "/content/categories" },
+      { name: "Banner", href: "/content/banners" },
     ],
   },
 

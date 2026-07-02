@@ -107,6 +107,8 @@ const moduleTitleMap: Record<string, string> = {
   "/content/articles": "Bài viết",
   "/content/news": "Tin tức",
   "/content/videos": "Video",
+  "/content/categories": "Danh mục bài viết",
+  "/content/banners": "Banner",
   "/promotions": "Khuyến mãi",
   "/payments": "Thanh toán",
   "/reviews": "Đánh giá",
@@ -133,6 +135,8 @@ const moduleSectionMap: Record<string, string> = {
   "/content/articles": "Nội dung",
   "/content/news": "Nội dung",
   "/content/videos": "Nội dung",
+  "/content/categories": "Nội dung",
+  "/content/banners": "Nội dung",
 };
 
 function getPageInfo(pathname: string): { title: string; section: string | null } {
