@@ -11,11 +11,59 @@ import { createApi } from "./createApi";
 // ─── HIS Doctor Type (khớp api.md) ────────────────────────────────────────
 
 export interface HisDoctor {
+  /** UUID nội bộ nếu API trả về; fallback về doctorid với response HIS cũ. */
   id: string;
+  /** Mã bác sĩ HIS, normalize từ doctor_id/doctorid. */
   doctorid: string;
+  /** Tên bác sĩ, normalize từ doctor_name/doctorname. */
   doctorname: string;
   description: string | null;
   updatetime: string;
+  facility_id?: string | null;
+  specialty_id?: string | null;
+  avatar_url?: string | null;
+  his_updated_at?: string | null;
+  synced_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  raw_data?: Record<string, unknown> | null;
+}
+
+type DoctorApiItem = Partial<HisDoctor> & {
+  doctor_id?: string | null;
+  doctor_name?: string | null;
+  raw_data?: Record<string, unknown> | null;
+};
+
+type DoctorsListResponse =
+  | DoctorApiItem[]
+  | {
+      count: number;
+      rows: DoctorApiItem[];
+      totalPages: number;
+      currentPage: number;
+    };
+
+function normalizeDoctor(item: DoctorApiItem): HisDoctor {
+  const raw = item.raw_data ?? null;
+  const rawDoctorId = typeof raw?.doctorid === "string" ? raw.doctorid : undefined;
+  const rawDoctorName = typeof raw?.doctorname === "string" ? raw.doctorname : undefined;
+  const rawUpdateTime = typeof raw?.updatetime === "string" ? raw.updatetime : undefined;
+  const doctorid = item.doctorid ?? item.doctor_id ?? rawDoctorId ?? item.id ?? "";
+  return {
+    ...item,
+    id: item.id ?? doctorid,
+    doctorid,
+    doctorname: item.doctorname ?? item.doctor_name ?? rawDoctorName ?? "—",
+    description: item.description ?? (typeof raw?.description === "string" ? raw.description : null),
+    updatetime: item.updatetime ?? rawUpdateTime ?? item.updated_at ?? item.synced_at ?? "",
+    raw_data: raw,
+  };
+}
+
+function normalizeDoctorList(data: DoctorsListResponse): HisDoctor[] {
+  const rows = Array.isArray(data) ? data : data.rows;
+  return rows.map(normalizeDoctor);
 }
 
 export interface DoctorImportResult {
@@ -48,47 +96,41 @@ export const doctorsService = {
   ...baseService,
 
   getList: async (params?: DoctorListParams): Promise<HisDoctor[]> => {
-    const res = await apiGet<HisDoctor[]>("/doctors", { params });
+    const res = await apiGet<DoctorsListResponse>("/doctors", { params });
     if (res.data.status === "success" && res.data.responseData) {
-      return res.data.responseData.map((item) => ({
-        ...item,
-        id: item.doctorid,
-      }));
+      return normalizeDoctorList(res.data.responseData);
     }
     throw new Error(res.data.message || "Không thể lấy danh sách bác sĩ");
   },
 
   getById: async (id: string): Promise<HisDoctor> => {
-    const res = await apiGet<HisDoctor>(`/doctors/${id}`);
+    const res = await apiGet<DoctorApiItem>(`/doctors/${id}`);
     if (res.data.status === "success" && res.data.responseData) {
-      const item = res.data.responseData;
-      return { ...item, id: item.doctorid };
+      return normalizeDoctor(res.data.responseData);
     }
     throw new Error(res.data.message || "Không thể lấy thông tin bác sĩ");
   },
 
   create: async (data: Partial<HisDoctor>): Promise<HisDoctor> => {
-    const res = await apiPost<HisDoctor>("/doctors", {
+    const res = await apiPost<DoctorApiItem>("/doctors", {
       doctor_id: data.doctorid,
       doctor_name: data.doctorname,
       description: data.description,
     });
     if (res.data.status === "success" && res.data.responseData) {
-      const item = res.data.responseData;
-      return { ...item, id: item.doctorid };
+      return normalizeDoctor(res.data.responseData);
     }
     throw new Error(res.data.message || "Tạo bác sĩ thất bại");
   },
 
   update: async (id: string, data: Partial<HisDoctor>): Promise<HisDoctor> => {
-    const res = await apiPut<HisDoctor>(`/doctors/${id}`, {
-      doctor_id: id,
+    const res = await apiPut<DoctorApiItem>(`/doctors/${id}`, {
+      doctor_id: data.doctorid ?? id,
       doctor_name: data.doctorname,
       description: data.description,
     });
     if (res.data.status === "success" && res.data.responseData) {
-      const item = res.data.responseData;
-      return { ...item, id: item.doctorid };
+      return normalizeDoctor(res.data.responseData);
     }
     throw new Error(res.data.message || "Cập nhật bác sĩ thất bại");
   },

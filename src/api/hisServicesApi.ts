@@ -15,20 +15,83 @@ import { apiGet, apiPost, apiPut, apiDelete, api } from "@/lib/axios";
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface HisService {
-  id: string; // alias của serviceid
+  /** UUID nội bộ nếu API trả về; fallback về serviceid với response HIS cũ. */
+  id: string;
+  /** Mã dịch vụ HIS, normalize từ service_id/serviceid. */
   serviceid: string;
   servicetype: string;
+  /** Tên dịch vụ, normalize từ service_name/servicename. */
   servicename: string;
   price: string;
   fromdate: string;
   insurancetype: string;
   description: string | null;
   updatetime: string;
+  facility_id?: string | null;
+  specialty_id?: string | null;
+  synced_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  raw_data?: Record<string, unknown> | null;
 }
 
 export interface HisServiceParams {
   ip?: string;
   idbv?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+type HisServiceApiItem = Partial<HisService> & {
+  service_id?: string | null;
+  service_name?: string | null;
+  raw_data?: Record<string, unknown> | null;
+};
+
+export interface PaginatedHisServices {
+  count: number;
+  rows: HisService[];
+  totalPages: number;
+  currentPage: number;
+}
+
+type HisServicesListResponse =
+  | HisServiceApiItem[]
+  | {
+      count: number;
+      rows: HisServiceApiItem[];
+      totalPages: number;
+      currentPage: number;
+    };
+
+function normalizeHisService(item: HisServiceApiItem): HisService {
+  const raw = item.raw_data ?? null;
+  const rawServiceId = typeof raw?.serviceid === "string" ? raw.serviceid : undefined;
+  const rawServiceName = typeof raw?.servicename === "string" ? raw.servicename : undefined;
+  const rawServiceType = typeof raw?.servicetype === "string" ? raw.servicetype : undefined;
+  const rawPrice = typeof raw?.price === "string" ? raw.price : undefined;
+  const rawFromDate = typeof raw?.fromdate === "string" ? raw.fromdate : undefined;
+  const rawInsuranceType = typeof raw?.insurancetype === "string" ? raw.insurancetype : undefined;
+  const rawUpdateTime = typeof raw?.updatetime === "string" ? raw.updatetime : undefined;
+  const serviceid = item.serviceid ?? item.service_id ?? rawServiceId ?? item.id ?? "";
+  return {
+    ...item,
+    id: item.id ?? serviceid,
+    serviceid,
+    servicename: item.servicename ?? item.service_name ?? rawServiceName ?? "—",
+    servicetype: item.servicetype ?? rawServiceType ?? "—",
+    price: item.price ?? rawPrice ?? "0",
+    fromdate: item.fromdate ?? rawFromDate ?? "",
+    insurancetype: item.insurancetype ?? rawInsuranceType ?? "—",
+    description: item.description ?? (typeof raw?.description === "string" ? raw.description : null),
+    updatetime: item.updatetime ?? rawUpdateTime ?? item.updated_at ?? item.synced_at ?? "",
+    raw_data: raw,
+  };
+}
+
+function normalizeHisServiceList(data: HisServicesListResponse): HisService[] {
+  const rows = Array.isArray(data) ? data : data.rows;
+  return rows.map(normalizeHisService);
 }
 
 export type CreateHisServicePayload = {
@@ -57,36 +120,59 @@ export const hisServicesKeys = {
 export const hisServicesService = {
   /** Lấy danh sách dịch vụ từ HIS */
   getList: async (params?: HisServiceParams): Promise<HisService[]> => {
-    const res = await apiGet<HisService[]>("/his-services", { params });
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
     if (res.data.status === "success" && res.data.responseData) {
-      return res.data.responseData.map((item) => ({ ...item, id: item.serviceid }));
+      return normalizeHisServiceList(res.data.responseData);
+    }
+    throw new Error(res.data.message || "Không thể lấy danh sách dịch vụ");
+  },
+
+  /** Lấy danh sách dịch vụ từ HIS kèm thông tin phân trang */
+  getPaginatedList: async (params?: HisServiceParams): Promise<PaginatedHisServices> => {
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
+    if (res.data.status === "success" && res.data.responseData) {
+      if (Array.isArray(res.data.responseData)) {
+        const rows = normalizeHisServiceList(res.data.responseData);
+        return {
+          count: rows.length,
+          rows,
+          totalPages: 1,
+          currentPage: 1,
+        };
+      }
+      return {
+        count: res.data.responseData.count,
+        rows: res.data.responseData.rows.map(normalizeHisService),
+        totalPages: res.data.responseData.totalPages,
+        currentPage: res.data.responseData.currentPage,
+      };
     }
     throw new Error(res.data.message || "Không thể lấy danh sách dịch vụ");
   },
 
   /** Lấy chi tiết một dịch vụ theo ID */
   getById: async (id: string, params?: HisServiceParams): Promise<HisService> => {
-    const res = await apiGet<HisService>(`/his-services/${id}`, { params });
+    const res = await apiGet<HisServiceApiItem>(`/his-services/${id}`, { params });
     if (res.data.status === "success" && res.data.responseData) {
-      return { ...res.data.responseData, id: res.data.responseData.serviceid };
+      return normalizeHisService(res.data.responseData);
     }
     throw new Error(res.data.message || "Không thể lấy thông tin dịch vụ");
   },
 
   /** Tạo mới dịch vụ trên HIS */
   create: async (data: CreateHisServicePayload): Promise<HisService> => {
-    const res = await apiPost<HisService>("/his-services", data);
+    const res = await apiPost<HisServiceApiItem>("/his-services", data);
     if (res.data.status === "success" && res.data.responseData) {
-      return { ...res.data.responseData, id: res.data.responseData.serviceid };
+      return normalizeHisService(res.data.responseData);
     }
     throw new Error(res.data.message || "Tạo dịch vụ thất bại");
   },
 
   /** Cập nhật dịch vụ theo ID */
   update: async (id: string, data: UpdateHisServicePayload): Promise<HisService> => {
-    const res = await apiPut<HisService>(`/his-services/${id}`, data);
+    const res = await apiPut<HisServiceApiItem>(`/his-services/${id}`, data);
     if (res.data.status === "success" && res.data.responseData) {
-      return { ...res.data.responseData, id: res.data.responseData.serviceid };
+      return normalizeHisService(res.data.responseData);
     }
     throw new Error(res.data.message || "Cập nhật dịch vụ thất bại");
   },
@@ -119,6 +205,19 @@ export const hisServicesHooks = {
     return useQuery<HisService[], Error>({
       queryKey: hisServicesKeys.list(params),
       queryFn: () => hisServicesService.getList(params),
+      staleTime: 1000 * 60 * 2,
+      enabled: options?.enabled ?? true,
+      ...options,
+    });
+  },
+
+  usePaginatedList: (
+    params?: HisServiceParams,
+    options?: { enabled?: boolean; staleTime?: number }
+  ): UseQueryResult<PaginatedHisServices, Error> => {
+    return useQuery<PaginatedHisServices, Error>({
+      queryKey: hisServicesKeys.list(params),
+      queryFn: () => hisServicesService.getPaginatedList(params),
       staleTime: 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
       ...options,

@@ -50,7 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: "dashboard", label: "Tổng quan", icon: Home,
     children: [
       { name: "Dashboard", href: "/" },
-      { name: "Báo cáo", href: "/reports" },
+      // { name: "Báo cáo", href: "/reports" },
     ],
   },
 
@@ -89,15 +89,15 @@ const NAV_GROUPS: NavGroup[] = [
   },
 
   // Marketing (marketing=true) - Chương trình KM, quảng cáo, gói khám
-  {
-    id: "marketing", label: "Marketing", icon: Tag,
-    roles: ["marketing", "admin"],
-    children: [
-      { name: "Chương trình KM", href: "/promotions" },
-      // TODO: { name: "Quảng cáo", href: "/marketing/ads" },
-      // TODO: { name: "Gói khám", href: "/marketing/packages" },
-    ],
-  },
+  // {
+  //   id: "marketing", label: "Marketing", icon: Tag,
+  //   roles: ["marketing", "admin"],
+  //   children: [
+  //     { name: "Chương trình KM", href: "/promotions" },
+  //     // TODO: { name: "Quảng cáo", href: "/marketing/ads" },
+  //     // TODO: { name: "Gói khám", href: "/marketing/packages" },
+  //   ],
+  // },
 
   // Kế toán (accountant=true) - Thanh toán, đối soát
   {
