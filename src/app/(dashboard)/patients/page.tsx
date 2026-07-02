@@ -58,7 +58,7 @@ function getSyncStatus(p: Patient): { label: string; className: string } {
 }
 
 export default function PatientsPage() {
-  const [page, setPage] = useState(1);
+  const [, setPage] = useState(1);
   const [searchValue, setSearchValue] = useState("");
   const [gender, setGender] = useState("all");
   const [source, setSource] = useState("all");
@@ -67,7 +67,7 @@ export default function PatientsPage() {
 
   const { data: patientsData, isLoading } = useSearchPatients(searchParams);
 
-  const patients = patientsData?.rows ?? [];
+  const patients = useMemo(() => patientsData?.rows ?? [], [patientsData]);
   const total = patientsData?.count ?? 0;
   const totalPages = patientsData?.totalPages ?? 1;
   const currentPage = patientsData?.currentPage ?? 1;
@@ -299,7 +299,7 @@ export default function PatientsPage() {
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex items-center justify-center gap-1">
-                              <Link href={`/patients/${p.his_patient_id}`}>
+                              <Link href={`/patients/${p.id}`}>
                                 <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-primary-600">
                                   <FiEye className="h-3.5 w-3.5" /> Chi tiết
                                 </Button>
