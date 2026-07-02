@@ -49,7 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: "dashboard", label: "Tổng quan", icon: Home,
     children: [
       { name: "Dashboard", href: "/" },
-      { name: "Báo cáo", href: "/reports" },
+      // { name: "Báo cáo", href: "/reports" },
     ],
   },
 
@@ -144,6 +144,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Tin tức", href: "/content/news" },
       { name: "Danh mục bài viết", href: "/content/categories" },
+      { name: "Banner", href: "/content/banners" },
     ],
   },
 

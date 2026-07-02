@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { postCategoriesHooks, type PostCategory } from "@/api/postCategoriesApi";
 import { toast } from "@/components/ui/Toast";
 import { formatDate } from "@/lib/utils";
@@ -13,8 +13,17 @@ import {
   X,
   Check,
   FolderOpen,
+  ArrowUpDown,
+  RefreshCw,
+  Copy,
+  MoreVertical,
+  FileText,
+  CheckCircle2,
+  PauseCircle,
+  Info,
 } from "lucide-react";
 import { LoadingSection, Spinner } from "@/components/ui/Spinner";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { ConfirmDialog } from "@/components/shares/dialog-confirm";
 
 const PAGE_SIZE = 10;
@@ -39,17 +48,85 @@ const EMPTY_FORM: CategoryForm = {
   is_active: true,
 };
 
+type SortOrder = "asc" | "desc";
+
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 
 function slugify(text: string): string {
   return text
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .trim();
+}
+
+/** Số bài viết của danh mục — đọc mềm nếu backend có trả field. */
+function getPostCount(cat: PostCategory): number | null {
+  const c = cat as unknown as Record<string, unknown>;
+  const v = c.post_count ?? c.posts_count ?? c.postCount ?? c.total_posts;
+  return typeof v === "number" ? v : null;
+}
+
+/* ─── Row action menu ───────────────────────────────────────────────────── */
+
+function RowMenu({
+  onEdit,
+  onDelete,
+  disabled,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative flex justify-end" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+        title="Thao tác"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 z-20 w-40 rounded-xl border border-slate-100 bg-white shadow-lg py-1">
+          <button
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Chỉnh sửa
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            disabled={disabled}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Xóa
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
@@ -58,6 +135,8 @@ export default function CategoriesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,16 +153,37 @@ export default function CategoriesPage() {
   const totalPages = data?.totalPages ?? (Math.ceil(total / PAGE_SIZE) || 1);
 
   const filteredRows = useMemo(() => {
-    const rows = data?.rows ?? [];
-    if (!search.trim()) return rows;
-    const q = search.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.slug.toLowerCase().includes(q) ||
-        (r.description ?? "").toLowerCase().includes(q)
-    );
-  }, [data, search]);
+    let rows = [...(data?.rows ?? [])];
+    const q = search.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.slug.toLowerCase().includes(q) ||
+          (r.description ?? "").toLowerCase().includes(q)
+      );
+    }
+    rows.sort((a, b) => {
+      const diff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      return sortOrder === "asc" ? diff : -diff;
+    });
+    return rows;
+  }, [data, search, sortOrder]);
+
+  /* ── Stats (tính từ dữ liệu thật) ─────────────────────────────────────── */
+  const allRows = data?.rows ?? [];
+  const activeCount = allRows.filter((r) => r.is_active).length;
+  const inactiveCount = allRows.filter((r) => !r.is_active).length;
+  const totalPosts = allRows.reduce((sum, r) => sum + (getPostCount(r) ?? 0), 0);
+  const activePct = total > 0 ? Math.round((activeCount / total) * 100) : 0;
+  const inactivePct = total > 0 ? Math.round((inactiveCount / total) * 100) : 0;
+
+  const stats = [
+    { label: "Tổng danh mục", value: total, sub: "Danh mục", icon: FolderOpen, tone: "bg-primary-100 text-primary-600" },
+    { label: "Đang hoạt động", value: activeCount, sub: `${activePct}%`, icon: CheckCircle2, tone: "bg-success-light text-success" },
+    { label: "Đã tắt", value: inactiveCount, sub: `${inactivePct}%`, icon: PauseCircle, tone: "bg-warning-light text-warning" },
+    { label: "Tổng bài viết", value: totalPosts, sub: "Bài viết", icon: FileText, tone: "bg-purple-100 text-purple-600" },
+  ];
 
   /* ── Mutations ────────────────────────────────────────────────────────── */
 
@@ -158,6 +258,19 @@ export default function CategoriesPage() {
     });
   }
 
+  function copySlug(slug: string) {
+    navigator.clipboard?.writeText(slug);
+    setCopiedSlug(slug);
+    setTimeout(() => setCopiedSlug((s) => (s === slug ? null : s)), 1500);
+  }
+
+  function resetFilters() {
+    setSearch("");
+    setFilterActive(null);
+    setSortOrder("asc");
+    setPage(1);
+  }
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -182,74 +295,112 @@ export default function CategoriesPage() {
     deleteMutation.isPending;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Danh mục bài viết</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Danh mục bài viết</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Quản lý danh mục tin tức và bài viết
-            {total > 0 && (
-              <span className="ml-1.5 text-slate-400">({total} danh mục)</span>
-            )}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Thêm danh mục
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setSortOrder((s) => (s === "asc" ? "desc" : "asc"))}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface-secondary"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            Sắp xếp danh mục
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Thêm danh mục
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stat cards ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <div
+              key={s.label}
+              className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]"
+            >
+              <div className="flex items-start gap-4">
+                <div className={cn("flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl", s.tone)}>
+                  <Icon className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">{s.label}</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">{s.value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{s.sub}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Filters ────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Tìm theo tên, slug..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {(
-            [
-              { label: "Tất cả", value: null },
-              { label: "Đang hoạt động", value: true },
-              { label: "Đã tắt", value: false },
-            ] as { label: string; value: boolean | null }[]
-          ).map((f) => (
-            <button
-              key={String(f.value)}
-              onClick={() => {
-                setFilterActive(f.value);
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Tìm theo tên, slug, mô tả..."
+                className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary pl-10 pr-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
+              />
+            </div>
+          </div>
+
+          <div className="min-w-[160px]">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Trạng thái</label>
+            <select
+              value={filterActive === null ? "all" : filterActive ? "active" : "inactive"}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFilterActive(v === "all" ? null : v === "active");
                 setPage(1);
               }}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-lg transition-colors",
-                filterActive === f.value
-                  ? "bg-primary text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              )}
+              className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             >
-              {f.label}
-            </button>
-          ))}
+              <option value="all">Tất cả</option>
+              <option value="active">Đang hoạt động</option>
+              <option value="inactive">Đã tắt</option>
+            </select>
+          </div>
+
+          <div className="min-w-[170px]">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Sắp xếp</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
+            >
+              <option value="asc">Thứ tự tăng dần</option>
+              <option value="desc">Thứ tự giảm dần</option>
+            </select>
+          </div>
+
+          <button
+            onClick={resetFilters}
+            className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Đặt lại
+          </button>
         </div>
       </div>
 
@@ -276,116 +427,127 @@ export default function CategoriesPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5">
                     Danh mục
                   </th>
-                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3 hidden md:table-cell">
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5 hidden md:table-cell">
                     Slug
                   </th>
-                  <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3 hidden lg:table-cell">
-                    Thứ tự
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5 hidden lg:table-cell">
+                    Số bài viết
                   </th>
-                  <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5 hidden lg:table-cell">
+                    <span className="inline-flex items-center gap-1">
+                      Thứ tự <Info className="w-3 h-3 text-slate-400" />
+                    </span>
+                  </th>
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5">
                     Trạng thái
                   </th>
-                  <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3 hidden sm:table-cell">
+                  <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5 hidden sm:table-cell">
                     Ngày tạo
                   </th>
-                  <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">
+                  <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3.5">
                     Thao tác
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRows.map((cat) => (
-                  <tr
-                    key={cat.id}
-                    className="hover:bg-slate-50/60 transition-colors group"
-                  >
-                    {/* Name + Description */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FolderOpen className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate max-w-[200px]">
-                            {cat.name}
-                          </p>
-                          {cat.description && (
-                            <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[200px]">
-                              {cat.description}
+                {filteredRows.map((cat) => {
+                  const postCount = getPostCount(cat);
+                  return (
+                    <tr key={cat.id} className="hover:bg-slate-50/60 transition-colors group">
+                      {/* Name + Description */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <FolderOpen className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 truncate max-w-[240px]">
+                              {cat.name}
                             </p>
-                          )}
+                            {cat.description && (
+                              <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[240px]">
+                                {cat.description}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Slug */}
-                    <td className="px-6 py-4 hidden md:table-cell">
-                      <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">
-                        {cat.slug}
-                      </span>
-                    </td>
+                      {/* Slug + copy */}
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                            {cat.slug}
+                          </span>
+                          <button
+                            onClick={() => copySlug(cat.slug)}
+                            className="text-slate-400 hover:text-primary transition-colors"
+                            title="Sao chép slug"
+                          >
+                            {copiedSlug === cat.slug ? (
+                              <Check className="w-3.5 h-3.5 text-success" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
 
-                    {/* Sort order */}
-                    <td className="px-6 py-4 text-center hidden lg:table-cell">
-                      <span className="text-xs text-slate-500">
-                        {cat.sort_order ?? 0}
-                      </span>
-                    </td>
+                      {/* Post count */}
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <span className="text-sm font-semibold text-primary-600">
+                          {postCount ?? "—"}
+                        </span>
+                      </td>
 
-                    {/* Active toggle */}
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => toggleActive(cat)}
-                        disabled={patchMutation.isPending}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                          cat.is_active
-                            ? "text-emerald-600 bg-emerald-50 border border-emerald-200"
-                            : "text-slate-500 bg-slate-50 border border-slate-200"
-                        )}
-                      >
-                        <span
+                      {/* Sort order */}
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <span className="text-sm text-slate-600">{cat.sort_order ?? 0}</span>
+                      </td>
+
+                      {/* Active toggle */}
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => toggleActive(cat)}
+                          disabled={patchMutation.isPending}
                           className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            cat.is_active ? "bg-emerald-500" : "bg-slate-400"
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                            cat.is_active
+                              ? "text-emerald-600 bg-emerald-50 border border-emerald-200"
+                              : "text-slate-500 bg-slate-50 border border-slate-200"
                           )}
-                        />
-                        {cat.is_active ? "Hoạt động" : "Tắt"}
-                      </button>
-                    </td>
-
-                    {/* Created at */}
-                    <td className="px-6 py-4 text-right hidden sm:table-cell">
-                      <span className="text-xs text-slate-400">
-                        {cat.created_at ? formatDate(cat.created_at) : "—"}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className=" py-4">
-                      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity justify-end">
-                        <button
-                          onClick={() => openEdit(cat)}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-                          title="Sửa"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <span
+                            className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              cat.is_active ? "bg-emerald-500" : "bg-slate-400"
+                            )}
+                          />
+                          {cat.is_active ? "Hoạt động" : "Tắt"}
                         </button>
-                        <button
-                          onClick={() => openConfirmDelete(cat.id)}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          title="Xóa"
+                      </td>
+
+                      {/* Created at */}
+                      <td className="px-6 py-4 hidden sm:table-cell">
+                        <span className="text-xs text-slate-500">
+                          {cat.created_at ? formatDate(cat.created_at) : "—"}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4">
+                        <RowMenu
+                          onEdit={() => openEdit(cat)}
+                          onDelete={() => openConfirmDelete(cat.id)}
                           disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -393,50 +555,14 @@ export default function CategoriesPage() {
 
         {/* Pagination */}
         {filteredRows.length > 0 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-xs text-slate-400">
-              Hiển thị {((page - 1) * PAGE_SIZE) + 1}–
-              {Math.min(page * PAGE_SIZE, total)} trong {total} danh mục
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm"
-              >
-                ‹
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(
-                  (p) =>
-                    p === 1 || p === totalPages || Math.abs(p - page) <= 1
-                )
-                .map((p, idx, arr) => (
-                  <span key={p} className="contents">
-                    {idx > 0 && arr[idx - 1] !== p - 1 && (
-                      <span className="px-1 text-slate-400 text-sm">…</span>
-                    )}
-                    <button
-                      onClick={() => setPage(p)}
-                      className={cn(
-                        "inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm transition-colors",
-                        p === page
-                          ? "bg-primary text-white shadow-sm"
-                          : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      {p}
-                    </button>
-                  </span>
-                ))}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm"
-              >
-                ›
-              </button>
-            </div>
+          <div className="px-6 py-4 border-t border-slate-100">
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              totalItems={total}
+              pageSize={PAGE_SIZE}
+            />
           </div>
         )}
       </div>
@@ -577,9 +703,7 @@ export default function CategoriesPage() {
                   disabled={isMutating}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-60"
                 >
-                  {isMutating && (
-                    <Spinner size="sm" />
-                  )}
+                  {isMutating && <Spinner size="sm" />}
                   {editingId ? "Lưu thay đổi" : "Tạo danh mục"}
                 </button>
                 <button
