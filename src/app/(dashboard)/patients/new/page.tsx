@@ -7,29 +7,22 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { useCreatePatient } from "@/api/patientApi";
+import { useCreateAdminPatient } from "@/api/adminPatientsApi";
 import { useProvinces, useWards } from "@/api/addressesApi";
+import { roomsHooks } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
-import type { CreatePatientPayload } from "@/types/patient";
 import {
   ArrowLeft,
+  Building2,
   CalendarDays,
   ClipboardList,
-  CloudUpload,
-  FileSearch,
   IdCard,
   Phone,
-  Search,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
-function maskPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return "09xxxxxxxx";
-  if (digits.length < 6) return phone;
-  return `${digits.slice(0, 2)}x${"x".repeat(Math.min(6, Math.max(0, digits.length - 5)))}${digits.slice(-3)}`;
-}
+const FALLBACK_FACILITY_ID = "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
 
 function formatDateLabel(value: string): string {
   if (!value) return "Chưa nhập";
@@ -51,7 +44,15 @@ function SectionTitle({ step, title }: { step: number; title: string }) {
   );
 }
 
-function SummaryRow({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
+function SummaryRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="grid grid-cols-[24px_120px_10px_1fr] items-center gap-3 text-sm">
       <Icon className="h-4 w-4 text-slate-500" />
@@ -68,30 +69,36 @@ const selectClass = "h-11 rounded-xl border-slate-200 bg-white shadow-none focus
 export default function NewPatientPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    patientfirstname: "",
-    patientlastname: "",
-    patientbirthday: "",
-    patientsex: "",
-    patientphonenumber: "",
-    patientethnic: "",
-    identifynumber: "",
-    insurancenumber: "",
-    email: "",
-    addressdetail: "",
-    addressstreet: "",
-    addressprovince: "",
-    addresscity: "",
-    addressward: "",
-    addresscountry: "VN",
-    professionid: "",
+    his_patient_id: "",
+    patient_last_name: "",
+    patient_first_name: "",
+    birthday: "",
+    sex: "",
+    ethnic_name: "",
+    profession_name: "",
+    identity_number: "",
+    insurance_number: "",
+    insurance_expired_date_text: "",
+    phone_number: "",
+    address_detail: "",
+    address_street: "",
+    province_code: "",
+    province_name: "",
+    ward_code: "",
+    ward_name: "",
+    country_code: "VN",
+    country_name: "Việt Nam",
   });
 
+  const { data: rooms } = roomsHooks.useList();
   const { data: provinces } = useProvinces();
-  const { data: wards } = useWards(form.addressprovince || null);
+  const { data: wards } = useWards(form.province_code || null);
 
-  const createMutation = useCreatePatient({
-    onSuccess: (data) => {
-      toast.success(`Đã thêm bệnh nhân thành công! Mã BN: ${data.his_patient_id ?? data.id}`);
+  const facilityId = rooms?.find((r) => r.facility_id)?.facility_id || FALLBACK_FACILITY_ID;
+
+  const createMutation = useCreateAdminPatient({
+    onSuccess: () => {
+      toast.success("Đã thêm bệnh nhân thành công!");
       router.push("/patients");
     },
     onError: (err) => toast.error(err.message || "Tạo bệnh nhân thất bại"),
@@ -99,52 +106,69 @@ export default function NewPatientPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => {
-      const newForm = { ...prev, [name]: value };
-      if (name === "addressprovince") {
-        newForm.addresscity = "";
-        newForm.addressward = "";
-      }
-      if (name === "addresscity") newForm.addressward = "";
-      return newForm;
-    });
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const fullName = useMemo(
+    () => [form.patient_last_name, form.patient_first_name].filter(Boolean).join(" ").trim(),
+    [form.patient_last_name, form.patient_first_name]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.patientfirstname || !form.patientlastname || !form.patientbirthday || !form.patientsex || !form.patientphonenumber) {
-      toast.error("Vui lòng nhập đầy đủ họ tên, ngày sinh, giới tính và số điện thoại.");
+
+    if (!form.his_patient_id.trim()) {
+      toast.error("Vui lòng nhập mã bệnh nhân (mã HIS).");
       return;
     }
-    if (!/^\d{10}$/.test(form.patientphonenumber)) {
-      toast.error("Số điện thoại phải gồm đúng 10 chữ số và không được nhập chữ.");
+    if (!fullName) {
+      toast.error("Vui lòng nhập họ và tên bệnh nhân.");
       return;
     }
-    const payload: CreatePatientPayload = {
-      patientid: "",
-      patientfirstname: form.patientfirstname,
-      patientlastname: form.patientlastname,
-      patientbirthday: form.patientbirthday || undefined,
-      patientsex: form.patientsex || undefined,
-      patientphonenumber: form.patientphonenumber || undefined,
-      patientethnic: form.patientethnic || undefined,
-      identifynumber: form.identifynumber || undefined,
-      insurancenumber: form.insurancenumber || undefined,
-      addressdetail: form.addressdetail || undefined,
-      addressstreet: form.addressstreet || undefined,
-      addressprovince: form.addressprovince || undefined,
-      addresscity: form.addresscity || undefined,
-      addressward: form.addressward || undefined,
-      addresscountry: form.addresscountry || undefined,
-      professionid: form.professionid || undefined,
-    };
-    createMutation.mutate({ payload });
+    if (form.phone_number && !/^\d{10}$/.test(form.phone_number)) {
+      toast.error("Số điện thoại phải gồm đúng 10 chữ số.");
+      return;
+    }
+
+    const addressFull = [
+      form.address_detail,
+      form.address_street,
+      form.ward_name,
+      form.province_name,
+      form.country_name,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    createMutation.mutate({
+      facility_id: facilityId,
+      his_patient_id: form.his_patient_id.trim(),
+      patient_full_name: fullName,
+      patient_first_name: form.patient_first_name.trim() || undefined,
+      patient_last_name: form.patient_last_name.trim() || undefined,
+      birthday: form.birthday || undefined,
+      birth_year: form.birthday ? form.birthday.slice(0, 4) : undefined,
+      sex: form.sex || undefined,
+      ethnic_name: form.ethnic_name.trim() || undefined,
+      profession_name: form.profession_name.trim() || undefined,
+      identity_number: form.identity_number.trim() || undefined,
+      insurance_number: form.insurance_number.trim() || undefined,
+      insurance_expired_date_text: form.insurance_expired_date_text || undefined,
+      phone_number: form.phone_number.trim() || undefined,
+      address_detail: form.address_detail.trim() || undefined,
+      address_street: form.address_street.trim() || undefined,
+      ward_code: form.ward_code || undefined,
+      ward_name: form.ward_name || undefined,
+      province_code: form.province_code || undefined,
+      province_name: form.province_name || undefined,
+      country_code: form.country_code || undefined,
+      country_name: form.country_name || undefined,
+      address_full: addressFull || undefined,
+    });
   };
 
   const loading = createMutation.isPending;
   const isLoadingAddress = !provinces;
-
-  const fullName = useMemo(() => [form.patientfirstname, form.patientlastname].filter(Boolean).join(" ") || "Chưa nhập", [form.patientfirstname, form.patientlastname]);
 
   const provinceOptions = provinces?.map((p) => ({ value: p.city, label: p.cityname })) || [];
   const wardOptions = wards?.map((w) => ({ value: w.wardcode, label: w.wardname || w.wardcode })) || [];
@@ -158,12 +182,9 @@ export default function NewPatientPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Thêm bệnh nhân mới</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Tạo hồ sơ bệnh nhân mới và đồng bộ thông tin lên HIS</p>
+            <p className="mt-1 text-sm text-muted-foreground">Tạo hồ sơ bệnh nhân mới trong hệ thống</p>
           </div>
         </div>
-        <Button type="button" variant="outline" className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-4 text-primary-700">
-          <FileSearch className="h-4 w-4" /> Kiểm tra trùng hồ sơ
-        </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
@@ -172,34 +193,30 @@ export default function NewPatientPage() {
             <SectionTitle step={1} title="Thông tin định danh" />
             <CardContent className="space-y-4 pt-2">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input className={inputClass} label="Họ, chữ lót *" name="patientfirstname" value={form.patientfirstname} onChange={handleChange} placeholder="Nhập họ, chữ lót" required />
-                <Input className={inputClass} label="Tên *" name="patientlastname" value={form.patientlastname} onChange={handleChange} placeholder="Nhập tên" required />
-                <Input className={inputClass} label="Ngày sinh *" name="patientbirthday" type="date" value={form.patientbirthday} onChange={handleChange} required />
-                <Select
-                  label="Giới tính *"
-                  value={form.patientsex}
-                  onValueChange={(val) => setForm((prev) => ({ ...prev, patientsex: val }))}
-                  options={[{ value: "nam", label: "Nam" }, { value: "nu", label: "Nữ" }]}
-                  placeholder="Chọn giới tính"
-                  className={selectClass}
+                <Input
+                  className={inputClass}
+                  label="Mã bệnh nhân (HIS) *"
+                  name="his_patient_id"
+                  value={form.his_patient_id}
+                  onChange={handleChange}
+                  placeholder="VD: BN-2025-001"
+                  hint="Mã duy nhất trong cơ sở y tế"
                   required
                 />
-                <Input
-                  className={inputClass}
-                  label="Dân tộc"
-                  name="patientethnic"
-                  value={form.patientethnic}
-                  onChange={handleChange}
-                  placeholder="Nhập dân tộc"
+                <div />
+                <Input className={inputClass} label="Họ, chữ lót *" name="patient_last_name" value={form.patient_last_name} onChange={handleChange} placeholder="Nhập họ, chữ lót" required />
+                <Input className={inputClass} label="Tên *" name="patient_first_name" value={form.patient_first_name} onChange={handleChange} placeholder="Nhập tên" required />
+                <Input className={inputClass} label="Ngày sinh" name="birthday" type="date" value={form.birthday} onChange={handleChange} />
+                <Select
+                  label="Giới tính"
+                  value={form.sex}
+                  onValueChange={(val) => setForm((prev) => ({ ...prev, sex: val }))}
+                  options={[{ value: "MALE", label: "Nam" }, { value: "FEMALE", label: "Nữ" }]}
+                  placeholder="Chọn giới tính"
+                  className={selectClass}
                 />
-                <Input
-                  className={inputClass}
-                  label="Nghề nghiệp"
-                  name="professionid"
-                  value={form.professionid}
-                  onChange={handleChange}
-                  placeholder="Nhập nghề nghiệp"
-                />
+                <Input className={inputClass} label="Dân tộc" name="ethnic_name" value={form.ethnic_name} onChange={handleChange} placeholder="Nhập dân tộc" />
+                <Input className={inputClass} label="Nghề nghiệp" name="profession_name" value={form.profession_name} onChange={handleChange} placeholder="Nhập nghề nghiệp" />
               </div>
             </CardContent>
           </Card>
@@ -208,8 +225,9 @@ export default function NewPatientPage() {
             <SectionTitle step={2} title="Thông tin giấy tờ" />
             <CardContent className="space-y-4 pt-2">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input className={inputClass} label="Số CCCD" name="identifynumber" value={form.identifynumber} onChange={handleChange} placeholder="Nhập số CCCD" hint="CCCD gồm 12 chữ số" />
-                <Input className={inputClass} label="Mã BHYT" name="insurancenumber" value={form.insurancenumber} onChange={handleChange} placeholder="Nhập mã BHYT" />
+                <Input className={inputClass} label="Số CCCD" name="identity_number" value={form.identity_number} onChange={handleChange} placeholder="Nhập số CCCD" hint="CCCD gồm 12 chữ số" />
+                <Input className={inputClass} label="Mã BHYT" name="insurance_number" value={form.insurance_number} onChange={handleChange} placeholder="Nhập mã BHYT" />
+                <Input className={inputClass} label="Hạn BHYT" name="insurance_expired_date_text" type="date" value={form.insurance_expired_date_text} onChange={handleChange} />
               </div>
             </CardContent>
           </Card>
@@ -220,37 +238,43 @@ export default function NewPatientPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   className={inputClass}
-                  label="Số điện thoại *"
-                  name="patientphonenumber"
+                  label="Số điện thoại"
+                  name="phone_number"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={10}
-                  value={form.patientphonenumber}
+                  value={form.phone_number}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
-                      patientphonenumber: e.target.value.replace(/\D/g, "").slice(0, 10),
+                      phone_number: e.target.value.replace(/\D/g, "").slice(0, 10),
                     }))
                   }
                   placeholder="09xxxxxxxx"
-                  hint="Số điện thoại gồm đúng 10 chữ số"
-                  required
+                  hint="Số điện thoại gồm 10 chữ số"
                 />
-                <Input className={inputClass} label="Email" name="email" value={form.email} onChange={handleChange} placeholder="email@example.com" />
               </div>
 
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-slate-700">Địa chỉ</h3>
                 <div className="grid gap-4 md:grid-cols-[240px_1fr]">
-                  <Input className={inputClass} label="Số nhà" name="addressdetail" value={form.addressdetail} onChange={handleChange} placeholder="Nhập số nhà" />
-                  <Input className={inputClass} label="Đường/Thôn" name="addressstreet" value={form.addressstreet} onChange={handleChange} placeholder="Nhập đường hoặc thôn/xóm" />
+                  <Input className={inputClass} label="Số nhà" name="address_detail" value={form.address_detail} onChange={handleChange} placeholder="Nhập số nhà" />
+                  <Input className={inputClass} label="Đường/Thôn" name="address_street" value={form.address_street} onChange={handleChange} placeholder="Nhập đường hoặc thôn/xóm" />
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <Select
                     label="Tỉnh/Thành"
-                    name="addressprovince"
-                    value={form.addressprovince}
-                    onValueChange={(val) => setForm((prev) => ({ ...prev, addressprovince: val, addresscity: "", addressward: "" }))}
+                    value={form.province_code}
+                    onValueChange={(val) => {
+                      const p = provinces?.find((x) => x.city === val);
+                      setForm((prev) => ({
+                        ...prev,
+                        province_code: val,
+                        province_name: p?.cityname ?? "",
+                        ward_code: "",
+                        ward_name: "",
+                      }));
+                    }}
                     options={provinceOptions}
                     placeholder={isLoadingAddress ? "Đang tải..." : "Chọn tỉnh/thành"}
                     disabled={isLoadingAddress}
@@ -258,21 +282,28 @@ export default function NewPatientPage() {
                   />
                   <Select
                     label="Phường/Xã"
-                    name="addressward"
-                    value={form.addressward}
-                    onValueChange={(val) => setForm((prev) => ({ ...prev, addressward: val }))}
+                    value={form.ward_code}
+                    onValueChange={(val) => {
+                      const w = wards?.find((x) => x.wardcode === val);
+                      setForm((prev) => ({ ...prev, ward_code: val, ward_name: w?.wardname ?? "" }));
+                    }}
                     options={wardOptions}
-                    placeholder={!form.addressprovince ? "Vui lòng chọn tỉnh/thành trước" : wardOptions.length ? "Chọn phường/xã" : "Không có dữ liệu"}
-                    disabled={!form.addressprovince}
+                    placeholder={!form.province_code ? "Vui lòng chọn tỉnh/thành trước" : wardOptions.length ? "Chọn phường/xã" : "Không có dữ liệu"}
+                    disabled={!form.province_code}
                     className={selectClass}
                   />
                 </div>
                 <div className="mt-4">
                   <Select
                     label="Quốc gia"
-                    name="addresscountry"
-                    value={form.addresscountry}
-                    onValueChange={(val) => setForm((prev) => ({ ...prev, addresscountry: val }))}
+                    value={form.country_code}
+                    onValueChange={(val) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        country_code: val,
+                        country_name: val === "VN" ? "Việt Nam" : "",
+                      }))
+                    }
                     options={[{ value: "VN", label: "Việt Nam" }, { value: "OTHER", label: "Quốc gia khác" }]}
                     placeholder="Chọn quốc gia"
                     className={selectClass}
@@ -292,33 +323,23 @@ export default function NewPatientPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-4 border-b border-slate-100 pb-5">
-                <SummaryRow icon={UserRound} label="Họ tên" value={fullName} />
-                <SummaryRow icon={CalendarDays} label="Ngày sinh" value={formatDateLabel(form.patientbirthday)} />
-                <SummaryRow icon={Phone} label="SĐT" value={maskPhone(form.patientphonenumber)} />
-                <SummaryRow icon={IdCard} label="CCCD" value={form.identifynumber || "Chưa nhập"} />
-                <SummaryRow icon={ShieldCheck} label="BHYT" value={form.insurancenumber || "Chưa nhập"} />
-              </div>
-
-              <div className="space-y-3 border-b border-slate-100 pb-5">
-                <div className="flex items-center justify-between rounded-xl bg-surface-secondary px-3 py-3 text-sm">
-                  <span className="flex items-center gap-2 text-slate-600"><Search className="h-4 w-4 text-primary-600" /> Kiểm tra trùng hồ sơ</span>
-                  <span className="rounded-full bg-warning-light px-3 py-1 text-xs font-semibold text-warning">Chưa thực hiện</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-surface-secondary px-3 py-3 text-sm">
-                  <span className="flex items-center gap-2 text-slate-600"><CloudUpload className="h-4 w-4 text-primary-600" /> Đồng bộ HIS</span>
-                  <span className="rounded-full bg-success-light px-3 py-1 text-xs font-semibold text-success">Sẵn sàng tạo mới</span>
-                </div>
+                <SummaryRow icon={IdCard} label="Mã BN" value={form.his_patient_id || "Chưa nhập"} />
+                <SummaryRow icon={UserRound} label="Họ tên" value={fullName || "Chưa nhập"} />
+                <SummaryRow icon={CalendarDays} label="Ngày sinh" value={formatDateLabel(form.birthday)} />
+                <SummaryRow icon={Phone} label="SĐT" value={form.phone_number || "Chưa nhập"} />
+                <SummaryRow icon={ShieldCheck} label="BHYT" value={form.insurance_number || "Chưa nhập"} />
+                <SummaryRow icon={Building2} label="Cơ sở" value={rooms?.find((r) => r.facility_id)?.facility_id ? "Đã xác định" : "Mặc định"} />
               </div>
 
               <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">
                 <p className="font-medium">Vui lòng kiểm tra kỹ thông tin trước khi tạo hồ sơ.</p>
-                <p className="mt-1 text-primary-700">Sau khi lưu, thông tin sẽ được đồng bộ lên hệ thống HIS.</p>
+                <p className="mt-1 text-primary-700">Mã bệnh nhân phải là duy nhất trong cơ sở y tế.</p>
               </div>
 
               <div className="grid grid-cols-[1fr_2fr] gap-3 pt-1">
                 <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => router.back()}>Hủy</Button>
                 <Button type="submit" variant="primary" className="h-11 rounded-xl" disabled={loading}>
-                  {loading ? <><Spinner size="sm" className="mr-2" />Đang lưu...</> : "Tạo hồ sơ trên HIS"}
+                  {loading ? <><Spinner size="sm" className="mr-2" />Đang lưu...</> : "Tạo bệnh nhân"}
                 </Button>
               </div>
             </CardContent>

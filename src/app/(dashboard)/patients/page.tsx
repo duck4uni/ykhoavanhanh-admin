@@ -8,7 +8,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { useSearchPatients } from "@/api/patientApi";
 import { formatDateTime } from "@/lib/utils";
-import type { Patient } from "@/types/patient";
+import type { Patient, SearchPatientParams } from "@/types/patient";
 import {
   FiUsers,
   FiShield,
@@ -52,27 +52,56 @@ function getSource(p: Patient): { label: string; className: string } {
 
 // Trạng thái đồng bộ HIS — suy ra từ synced_at / his_updated_at
 function getSyncStatus(p: Patient): { label: string; className: string } {
-  if (p.synced_at) return { label: "Đã đồng bộ", className: "bg-success-light text-success" };
+  if (p.synced_at) return { label: "Chưa đồng bộ", className: "bg-success-light text-success" };
   if (p.his_patient_id) return { label: "Chờ đồng bộ", className: "bg-warning-light text-warning" };
   return { label: "Chưa đồng bộ", className: "bg-error-light text-error" };
 }
 
+/**
+ * Suy ra param tìm kiếm phù hợp từ ô nhập:
+ * - Số điện thoại: bắt đầu bằng "0", gồm 10–11 chữ số  → patientphonenumber
+ * - Chuỗi toàn chữ số khác (mã BN dạng số như "26107837", "123123") → patientcode
+ * - Có chữ cái / dấu gạch (mã BN dạng "BN-2025-001") → patientcode
+ * - Còn lại (có khoảng trắng / chữ tiếng Việt) → patientname
+ */
+function buildSearchParams(raw: string): SearchPatientParams {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  const digitsOnly = /^\d+$/.test(trimmed);
+  if (digitsOnly) {
+    const isPhone = trimmed.startsWith("0") && trimmed.length >= 10 && trimmed.length <= 11;
+    return isPhone ? { patientphonenumber: trimmed } : { patientcode: trimmed };
+  }
+
+  // Không có khoảng trắng và chứa số → coi là mã BN (VD: "BN-2025-001")
+  if (!/\s/.test(trimmed) && /\d/.test(trimmed)) {
+    return { patientcode: trimmed };
+  }
+
+  return { patientname: trimmed };
+}
+
 export default function PatientsPage() {
-  const [, setPage] = useState(1);
+  const [page, setPage] = useState(1);
   const [searchValue, setSearchValue] = useState("");
   const [gender, setGender] = useState("all");
   const [source, setSource] = useState("all");
   const [syncStatus, setSyncStatus] = useState("all");
-  const [searchParams, setSearchParams] = useState<{ patientcode?: string; patientphonenumber?: string }>({});
+  const [searchParams, setSearchParams] = useState<SearchPatientParams>({});
 
-  const { data: patientsData, isLoading } = useSearchPatients(searchParams);
+  const { data: patientsData, isLoading } = useSearchPatients({
+    ...searchParams,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
   const patients = useMemo(() => patientsData?.rows ?? [], [patientsData]);
   const total = patientsData?.count ?? 0;
   const totalPages = patientsData?.totalPages ?? 1;
-  const currentPage = patientsData?.currentPage ?? 1;
+  const currentPage = patientsData?.currentPage ?? page;
 
-  // Áp bộ lọc phía client (giới tính / nguồn / trạng thái)
+  // Áp bộ lọc phía client (giới tính / nguồn / trạng thái) — API chưa hỗ trợ các lọc này
   const filtered = useMemo(() => {
     return patients.filter((p) => {
       const matchGender = gender === "all" || getGender(p) === gender;
@@ -95,11 +124,7 @@ export default function PatientsPage() {
   ];
 
   function handleSearch() {
-    const trimmed = searchValue.trim();
-    const isPhone = /^\d+$/.test(trimmed);
-    setSearchParams(
-      trimmed ? (isPhone ? { patientphonenumber: trimmed } : { patientcode: trimmed }) : {}
-    );
+    setSearchParams(buildSearchParams(searchValue));
     setPage(1);
   }
 

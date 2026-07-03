@@ -143,9 +143,11 @@ export default function MedicalRecordsPage() {
           <Button variant="outline" className="gap-2">
             <FiDownload className="h-4 w-4" /> Xuất Excel
           </Button>
-          <Button variant="primary" className="gap-2">
-            <FiPlus className="h-4 w-4" /> Tạo hồ sơ
-          </Button>
+          <Link href="/medical-records/new">
+            <Button variant="primary" className="gap-2">
+              <FiPlus className="h-4 w-4" /> Tạo hồ sơ
+            </Button>
+          </Link>
         </div>
       </div>
 

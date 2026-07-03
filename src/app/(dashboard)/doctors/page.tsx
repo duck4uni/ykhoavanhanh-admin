@@ -111,10 +111,13 @@ function DoctorAvatar({ doctor }: { doctor: HisDoctor }) {
 }
 
 export default function DoctorsPage() {
-  const { data: doctors, isLoading } = doctorsHooks.useList();
-  const allDoctors = useMemo(() => doctors ?? [], [doctors]);
-
   const [page, setPage] = useState(1);
+  const { data: doctorsData, isLoading } = doctorsHooks.usePaginatedList({
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const allDoctors = useMemo(() => doctorsData?.rows ?? [], [doctorsData]);
+
   const [search, setSearch] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
   const [clinicFilter, setClinicFilter] = useState("all");
@@ -176,16 +179,18 @@ export default function DoctorsPage() {
     });
   }, [allDoctors, search, specialtyFilter, clinicFilter, statusFilter, scheduleFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered;
 
   const activeCount = allDoctors.filter((doctor) => getDoctorStatus(doctor).label === "Hoạt động").length;
   const withSchedule = allDoctors.filter((doctor) => getScheduleCount(doctor) > 0).length;
   const unassignedSpecialty = allDoctors.filter((doctor) => getSpecialtyName(doctor) === "—").length;
   const activePct = allDoctors.length > 0 ? Math.round((activeCount / allDoctors.length) * 100) : 0;
 
+  const totalDoctors = doctorsData?.count ?? allDoctors.length;
+
   const stats = [
-    { label: "Tổng bác sĩ", value: allDoctors.length, sub: "Tất cả bác sĩ trong hệ thống", icon: Users, tone: "bg-primary-100 text-primary-600" },
+    { label: "Tổng bác sĩ", value: totalDoctors, sub: "Tất cả bác sĩ trong hệ thống", icon: Users, tone: "bg-primary-100 text-primary-600" },
     { label: "Đang hoạt động", value: activeCount, sub: `${activePct}% tổng số bác sĩ`, icon: CheckCircle2, tone: "bg-success-light text-success" },
     { label: "Có lịch khám", value: withSchedule, sub: "Đã được tạo lịch khám", icon: CalendarCheck, tone: "bg-purple-100 text-purple-600" },
     { label: "Chưa gán chuyên khoa", value: unassignedSpecialty, sub: "Cần cập nhật thông tin", icon: UserRound, tone: "bg-warning-light text-warning" },
@@ -377,7 +382,7 @@ export default function DoctorsPage() {
               </table>
             </div>
             <div className="border-t border-slate-100 px-5 py-4">
-              <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
+              <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={doctorsData?.count ?? filtered.length} pageSize={PAGE_SIZE} />
             </div>
           </>
         )}

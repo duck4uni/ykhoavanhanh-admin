@@ -5,7 +5,7 @@
 
 import { apiGet, apiPost, apiPut } from "@/lib/axios";
 import type { Patient, SearchPatientParams, CreatePatientPayload } from "@/types/patient";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,32 @@ export function useSearchPatients(
     retry: 1,
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Tìm/tải bệnh nhân theo trang, hỗ trợ cuộn để tải thêm (infinite scroll).
+ * Trả về danh sách phẳng qua `patients` + `fetchNextPage`/`hasNextPage`.
+ */
+export function useInfinitePatients(
+  params: SearchPatientParams,
+  options?: { enabled?: boolean; pageSize?: number }
+) {
+  const pageSize = options?.pageSize ?? 10;
+  const query = useInfiniteQuery({
+    queryKey: [...patientKeys.list(params), "infinite", pageSize],
+    queryFn: ({ pageParam }) => searchPatients({ ...params, page: pageParam, pageSize }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.currentPage < lastPage.totalPages ? lastPage.currentPage + 1 : undefined,
+    staleTime: 1000 * 60 * 2,
+    retry: 1,
+    enabled: options?.enabled ?? true,
+  });
+
+  const patients = query.data?.pages.flatMap((p) => p.rows) ?? [];
+  const total = query.data?.pages[0]?.count ?? 0;
+
+  return { ...query, patients, total };
 }
 
 export function useGetAllPatients() {

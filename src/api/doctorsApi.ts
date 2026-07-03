@@ -2,6 +2,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  useInfiniteQuery,
   type UseMutationOptions,
   type UseQueryResult,
 } from "@tanstack/react-query";
@@ -93,6 +94,7 @@ export interface DoctorListParams {
   idbv?: string;
   page?: number;
   pageSize?: number;
+  doctorname?: string;
 }
 
 // ─── CRUD factory ─────────────────────────────────────────────────────────
@@ -225,6 +227,22 @@ export const doctorsHooks = {
       staleTime: 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
       ...options,
+    });
+  },
+
+  useInfiniteList: (
+    params?: DoctorListParams,
+    options?: { enabled?: boolean; pageSize?: number }
+  ) => {
+    const pageSize = options?.pageSize ?? 10;
+    return useInfiniteQuery({
+      queryKey: [...doctorsKeys.list(params as unknown as Record<string, unknown>), "infinite", pageSize],
+      queryFn: ({ pageParam }) => doctorsService.getPaginatedList({ ...params, page: pageParam, pageSize }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) =>
+        lastPage.currentPage < lastPage.totalPages ? lastPage.currentPage + 1 : undefined,
+      staleTime: 1000 * 60 * 2,
+      enabled: options?.enabled ?? true,
     });
   },
 
