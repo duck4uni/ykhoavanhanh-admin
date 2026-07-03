@@ -13,9 +13,7 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import {
   ArrowLeft,
   CalendarDays,
-  ChevronDown,
   CreditCard,
-  Edit3,
   FileText,
   Grid2X2,
   History,
@@ -225,11 +223,11 @@ export default function PatientDetailPage() {
             </div>
           </div>
         </div>
-        {/* <Link href={`/patients/${patientId}/edit`}>
+        <Link href={`/medical-records/new?patientId=${patientId}`}>
           <Button variant="primary" className="h-11 gap-2 rounded-xl px-5">
-            <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ <ChevronDown className="h-4 w-4" />
+            <FileText className="h-4 w-4" /> Tạo hồ sơ bệnh án
           </Button>
-        </Link> */}
+        </Link>
       </div>
 
       {/* Tabs */}

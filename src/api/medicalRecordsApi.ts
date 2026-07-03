@@ -6,8 +6,13 @@
  */
 
 import { createApi, type PaginatedResult } from "@/api/createApi";
-import { apiGet } from "@/lib/axios";
-import { useQuery } from "@tanstack/react-query";
+import { apiGet, apiPost } from "@/lib/axios";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
 import type { PaginationParams } from "@/types/api-response";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -115,10 +120,32 @@ export const medicalRecordsKeys = {
   stats: (facilityId?: string) => ["medical-records", "stats", facilityId ?? null] as const,
 };
 
+// POST /medical-records có thể trả envelope { status, responseData } (chuẩn app)
+// hoặc { success, data } — hỗ trợ cả hai để không báo lỗi nhầm khi tạo thành công.
+type MedicalRecordResponse = {
+  status?: "success" | "fail";
+  success?: boolean;
+  responseData?: MedicalRecord | null;
+  data?: MedicalRecord | null;
+  message?: string;
+  message_en?: string;
+};
+
 export const medicalRecordsService = {
   ...service,
   getList: async (params?: MedicalRecordListParams): Promise<PaginatedResult<MedicalRecord>> => {
     return service.getList(params as PaginationParams);
+  },
+  create: async (payload: CreateMedicalRecordPayload): Promise<MedicalRecord> => {
+    const res = await apiPost<MedicalRecord>("/medical-records", payload as Record<string, unknown>);
+    const data = res.data as MedicalRecordResponse;
+    const responseData = data.responseData ?? data.data;
+
+    if ((data.status === "success" || data.success === true) && responseData) {
+      return responseData;
+    }
+
+    throw new Error(data.message || "Tạo hồ sơ bệnh án thất bại");
   },
 };
 
@@ -136,6 +163,23 @@ export const medicalRecordsHooks = {
       staleTime: 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
       ...options,
+    });
+  },
+  useCreate: (
+    options?: UseMutationOptions<MedicalRecord, Error, CreateMedicalRecordPayload>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<MedicalRecord, Error, CreateMedicalRecordPayload>({
+      mutationFn: (payload) => medicalRecordsService.create(payload),
+      onSuccess: (data, variables, context, mutation) => {
+        qc.invalidateQueries({ queryKey: keys.all });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => {
+        onError?.(error, variables, context, mutation);
+      },
+      ...rest,
     });
   },
 };

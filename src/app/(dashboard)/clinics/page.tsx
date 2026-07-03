@@ -12,9 +12,11 @@ import {
   RotateCcw,
   Pencil,
   Trash2,
+  X,
 } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
-import { LoadingSection } from "@/components/ui/Spinner";
+import { Input } from "@/components/ui/Input";
+import { LoadingSection, Spinner } from "@/components/ui/Spinner";
 import { roomsHooks, type HisRoom } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
 
@@ -51,15 +53,51 @@ function StatusBadge() {
   );
 }
 
-export default function ClinicsPage() {
-  const { data: rooms, isLoading } = roomsHooks.useList();
-  const allRooms = useMemo(() => rooms ?? [], [rooms]);
+type RoomForm = {
+  room_id: string;
+  room_name: string;
+  description: string;
+};
 
+function mapRoomToForm(room: HisRoom): RoomForm {
+  return {
+    room_id: room.roomid,
+    room_name: room.roomname,
+    description: room.description ?? "",
+  };
+}
+
+export default function ClinicsPage() {
   const [page, setPage] = useState(1);
+  const { data: roomsData, isLoading } = roomsHooks.usePaginatedList({
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const allRooms = useMemo(() => roomsData?.rows ?? [], [roomsData]);
+
   const [search, setSearch] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [hisFilter, setHisFilter] = useState("all");
+  const [editingRoom, setEditingRoom] = useState<HisRoom | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [form, setForm] = useState<RoomForm>({ room_id: "", room_name: "", description: "" });
+
+  const updateMutation = roomsHooks.useUpdate({
+    onSuccess: () => {
+      toast.success("Cập nhật phòng khám thành công");
+      closeEditModal();
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật phòng khám thất bại"),
+  });
+
+  const createMutation = roomsHooks.useCreate({
+    onSuccess: () => {
+      toast.success("Tạo phòng khám thành công");
+      closeCreateModal();
+    },
+    onError: (err) => toast.error(err.message || "Tạo phòng khám thất bại"),
+  });
 
   const examAreaOptions = useMemo(() => {
     return Array.from(new Set(allRooms.map(getExamAreaName))).filter(Boolean).sort();
@@ -82,10 +120,10 @@ export default function ClinicsPage() {
     });
   }, [allRooms, search, areaFilter, statusFilter, hisFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered;
 
-  const totalRooms = allRooms.length;
+  const totalRooms = roomsData?.count ?? allRooms.length;
   const activeRooms = allRooms.length;
   const withHis = allRooms.filter(hasHisCode).length;
   const withoutDescription = allRooms.filter((room) => !room.description?.trim()).length;
@@ -112,6 +150,61 @@ export default function ClinicsPage() {
     toast.info(`Chưa hỗ trợ ${action} phòng khám từ HIS API`);
   }
 
+  function openEditModal(room: HisRoom) {
+    setEditingRoom(room);
+    setForm(mapRoomToForm(room));
+  }
+
+  function closeEditModal() {
+    setEditingRoom(null);
+    setForm({ room_id: "", room_name: "", description: "" });
+  }
+
+  function openCreateModal() {
+    setForm({ room_id: "", room_name: "", description: "" });
+    setCreateModalOpen(true);
+  }
+
+  function closeCreateModal() {
+    setCreateModalOpen(false);
+    setForm({ room_id: "", room_name: "", description: "" });
+  }
+
+  async function handleCreateRoom(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.room_id.trim() || !form.room_name.trim()) {
+      toast.error("Vui lòng nhập mã phòng và tên phòng khám");
+      return;
+    }
+
+    const facilityId = allRooms[0]?.facility_id || "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
+
+    await createMutation.mutateAsync({
+      facility_id: facilityId,
+      room_id: form.room_id.trim(),
+      room_name: form.room_name.trim(),
+      description: form.description.trim() || null,
+    });
+  }
+
+  async function handleUpdateRoom(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingRoom) return;
+    if (!form.room_id.trim() || !form.room_name.trim()) {
+      toast.error("Vui lòng nhập mã phòng và tên phòng khám");
+      return;
+    }
+
+    await updateMutation.mutateAsync({
+      id: editingRoom.id,
+      data: {
+        room_id: form.room_id.trim(),
+        room_name: form.room_name.trim(),
+        description: form.description.trim() || null,
+      },
+    });
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -123,7 +216,7 @@ export default function ClinicsPage() {
           </p>
         </div>
         <button
-          onClick={() => showHisOnlyNotice("tạo")}
+          onClick={openCreateModal}
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" /> Thêm phòng khám
@@ -277,7 +370,7 @@ export default function ClinicsPage() {
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => showHisOnlyNotice("cập nhật")}
+                              onClick={() => openEditModal(room)}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-primary transition-colors hover:bg-primary-50"
                               title="Sửa"
                             >
@@ -304,13 +397,130 @@ export default function ClinicsPage() {
                 currentPage={page}
                 totalPages={totalPages}
                 onPageChange={setPage}
-                totalItems={filtered.length}
+                totalItems={roomsData?.count ?? filtered.length}
                 pageSize={PAGE_SIZE}
               />
             </div>
           </>
         )}
       </div>
+
+      {editingRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
+          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-xl font-bold text-slate-900">Chỉnh sửa phòng khám</h2>
+              <button onClick={closeEditModal} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRoom} className="space-y-5 p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Mã phòng *"
+                  value={form.room_id}
+                  onChange={(event) => setForm((current) => ({ ...current, room_id: event.target.value }))}
+                  required
+                />
+                <Input
+                  label="Tên phòng khám *"
+                  value={form.room_name}
+                  onChange={(event) => setForm((current) => ({ ...current, room_name: event.target.value }))}
+                  required
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Mô tả"
+                    value={form.description}
+                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Nhập mô tả phòng khám"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={updateMutation.isPending}
+                  className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {updateMutation.isPending && <Spinner size="sm" />}
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeCreateModal} />
+          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-xl font-bold text-slate-900">Thêm phòng khám mới</h2>
+              <button onClick={closeCreateModal} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRoom} className="space-y-5 p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Mã phòng *"
+                  value={form.room_id}
+                  onChange={(event) => setForm((current) => ({ ...current, room_id: event.target.value }))}
+                  required
+                />
+                <Input
+                  label="Tên phòng khám *"
+                  value={form.room_name}
+                  onChange={(event) => setForm((current) => ({ ...current, room_name: event.target.value }))}
+                  required
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Mô tả"
+                    value={form.description}
+                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Nhập mô tả phòng khám"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={createMutation.isPending}
+                  className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-60"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+                >
+                  {createMutation.isPending && <Spinner size="sm" />}
+                  Tạo phòng khám
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

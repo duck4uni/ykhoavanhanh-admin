@@ -38,9 +38,18 @@ export interface Patient {
 
 export interface SearchPatientParams {
   ip?: string;
+  /** Trang hiện tại */
+  page?: number;
+  /** Số bản ghi mỗi trang (tối đa 100) */
+  pageSize?: number;
+  /** Mã đơn vị (lọc theo cơ sở) */
   idbv?: string;
+  /** Mã bệnh nhân HIS (tìm chính xác) */
   patientcode?: string;
+  /** Số điện thoại hoặc số CCCD (tìm gần đúng) */
   patientphonenumber?: string;
+  /** Tên bệnh nhân (tìm gần đúng) */
+  patientname?: string;
 }
 
 export interface CreatePatientPayload {
