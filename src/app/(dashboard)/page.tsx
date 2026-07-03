@@ -3,7 +3,14 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/Spinner";
-import { useDashboardStats, useTicketRatios } from "@/api/dashboardApi";
+import {
+  useDashboardStats,
+  useTicketRatios,
+  useRevenueByDay,
+  useRecentTickets,
+  useUpcomingSchedules,
+  type DashboardFilter,
+} from "@/api/dashboardApi";
 import {
   FiDollarSign,
   FiCalendar,
@@ -14,23 +21,19 @@ import {
   FiStar,
   FiCheckCircle,
   FiInfo,
-  FiArrowUpRight,
-  FiArrowDownRight,
-  FiAlertTriangle,
-  FiCreditCard,
   FiUser,
 } from "react-icons/fi";
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
   Cell,
   PieChart,
   Pie,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
 } from "recharts";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -47,64 +50,82 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("vi-VN").format(value);
 }
 
+function formatRevenueTick(value: number): string {
+  if (value >= 1_000_000) return `${value / 1_000_000}M`;
+  if (value >= 1_000) return `${value / 1_000}K`;
+  return String(value);
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Cắt YYYY-MM-DD theo local time. */
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Chuyển key range → { fromDate, toDate } (YYYY-MM-DD). */
+function rangeToFilter(range: string): DashboardFilter {
+  const now = new Date();
+  const toDate = toISODate(now);
+  if (range === "7d") {
+    const from = new Date(now);
+    from.setDate(from.getDate() - 6);
+    return { fromDate: toISODate(from), toDate };
+  }
+  if (range === "30d") {
+    const from = new Date(now);
+    from.setDate(from.getDate() - 29);
+    return { fromDate: toISODate(from), toDate };
+  }
+  // today
+  return { fromDate: toDate, toDate };
+}
+
+function formatChartDate(value: string): string {
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}`;
+}
+
+function fillRevenueByDay(
+  rows: Array<{ date: string; revenue: number }> | undefined,
+  filter: DashboardFilter
+) {
+  if (!filter.fromDate || !filter.toDate) return [];
+  const byDate = new Map((rows ?? []).map((r) => [r.date, r.revenue]));
+  const result: Array<{ date: string; label: string; revenue: number }> = [];
+  const cursor = new Date(`${filter.fromDate}T00:00:00`);
+  const end = new Date(`${filter.toDate}T00:00:00`);
+  while (cursor <= end) {
+    const date = toISODate(cursor);
+    result.push({ date, label: formatChartDate(date), revenue: byDate.get(date) ?? 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+}
+
 const RANGE_OPTIONS = [
   { key: "today", label: "Hôm nay" },
   { key: "7d", label: "7 ngày" },
   { key: "30d", label: "30 ngày" },
 ] as const;
 
-// ─── Mock series (không có endpoint tương ứng ở backend) ─────────────────────
-const revenueByDay = [
-  { date: "12/05", value: 62_000_000 },
-  { date: "13/05", value: 78_000_000 },
-  { date: "14/05", value: 118_000_000 },
-  { date: "15/05", value: 92_000_000 },
-  { date: "16/05", value: 110_000_000 },
-  { date: "17/05", value: 104_000_000 },
-  { date: "18/05", value: 126_450_000 },
-];
-
-const recentAppointments = [
-  { time: "18/05/2025 14:30", patient: "Nguyễn Văn An", doctor: "BS. Trần Minh Đức", specialty: "Tim mạch", status: "confirmed" },
-  { time: "18/05/2025 15:00", patient: "Trần Thị Bích Ngọc", doctor: "BS. Lê Hoàng Nam", specialty: "Nội tổng quát", status: "pending" },
-  { time: "18/05/2025 15:30", patient: "Phạm Quốc Huy", doctor: "BS. Nguyễn Thu Hà", specialty: "Nhi khoa", status: "confirmed" },
-  { time: "18/05/2025 16:00", patient: "Lê Thị Kim Oanh", doctor: "BS. Phạm Văn Tú", specialty: "Sản phụ khoa", status: "waiting_payment" },
-  { time: "18/05/2025 16:30", patient: "Đỗ Minh Khang", doctor: "BS. Võ Thị Mai", specialty: "Tai mũi họng", status: "confirmed" },
-];
-
-const systemActivities = [
-  {
-    icon: FiAlertTriangle,
-    tone: "text-error bg-error-light",
-    title: "Cảnh báo: Hết hạn giấy phép hành nghề",
-    desc: "BS. Nguyễn Văn A - Số giấy phép 12345 sẽ hết hạn sau 7 ngày",
-    time: "14:45",
-  },
-  {
-    icon: FiInfo,
-    tone: "text-primary-600 bg-primary-100",
-    title: "Sao lưu dữ liệu thành công",
-    desc: "Dữ liệu hệ thống đã được sao lưu an toàn",
-    time: "14:30",
-  },
-  {
-    icon: FiCreditCard,
-    tone: "text-warning bg-warning-light",
-    title: "Kết nối thanh toán chậm",
-    desc: "Cổng thanh toán VNPay đang phản hồi chậm",
-    time: "14:15",
-  },
-  {
-    icon: FiCheckCircle,
-    tone: "text-success bg-success-light",
-    title: "Cập nhật hệ thống thành công",
-    desc: "Phiên bản 2.3.1 đã được cập nhật",
-    time: "13:50",
-  },
-];
-
 // Màu cho donut theo trạng thái phiếu
-const DONUT_COLORS = ["#1A6BBF", "#F5B942", "#E5484D", "#B39DDB"];
+const DONUT_COLORS = ["#1A6BBF", "#F5B942", "#E5484D", "#B39DDB", "#2BB673", "#8895A7"];
 
 // ─── Small components ────────────────────────────────────────────────────────
 
@@ -113,11 +134,10 @@ interface KpiCardProps {
   value: string;
   icon: React.ComponentType<{ className?: string }>;
   iconBg: string;
-  delta?: { value: string; up: boolean };
   footer?: React.ReactNode;
 }
 
-function KpiCard({ title, value, icon: Icon, iconBg, delta, footer }: KpiCardProps) {
+function KpiCard({ title, value, icon: Icon, iconBg, footer }: KpiCardProps) {
   return (
     <Card className="gap-0 p-5">
       <div className="flex items-start gap-4">
@@ -130,12 +150,6 @@ function KpiCard({ title, value, icon: Icon, iconBg, delta, footer }: KpiCardPro
             <FiInfo className="h-3.5 w-3.5 flex-shrink-0 text-text-disabled" />
           </div>
           <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
-          {delta && (
-            <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${delta.up ? "text-success" : "text-error"}`}>
-              {delta.up ? <FiArrowUpRight className="h-3.5 w-3.5" /> : <FiArrowDownRight className="h-3.5 w-3.5" />}
-              {delta.value} so với hôm qua
-            </p>
-          )}
         </div>
       </div>
       {footer && (
@@ -148,14 +162,16 @@ function KpiCard({ title, value, icon: Icon, iconBg, delta, footer }: KpiCardPro
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  confirmed: { label: "Đã xác nhận", className: "bg-success-light text-success" },
-  pending: { label: "Chờ xác nhận", className: "bg-warning-light text-warning" },
-  waiting_payment: { label: "Chờ thanh toán", className: "bg-primary-100 text-primary-600" },
-  cancelled: { label: "Đã hủy", className: "bg-error-light text-error" },
+  CONFIRMED: { label: "Đã xác nhận", className: "bg-success-light text-success" },
+  PAID: { label: "Đã thanh toán", className: "bg-success-light text-success" },
+  PENDING: { label: "Chờ xác nhận", className: "bg-warning-light text-warning" },
+  WAITING_PAYMENT: { label: "Chờ thanh toán", className: "bg-primary-100 text-primary-600" },
+  CANCELLED: { label: "Đã hủy", className: "bg-error-light text-error" },
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_BADGE[status] ?? STATUS_BADGE.pending;
+function StatusBadge({ status }: { status: string | null }) {
+  const key = (status ?? "").toUpperCase();
+  const s = STATUS_BADGE[key] ?? { label: status || "—", className: "bg-surface-secondary text-muted-foreground" };
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${s.className}`}>
       {s.label}
@@ -180,13 +196,6 @@ function RangeToggle({ value, onChange }: { value: string; onChange: (v: string)
           {opt.label}
         </button>
       ))}
-      <button
-        type="button"
-        className="rounded-md px-2 py-1.5 text-muted-foreground hover:text-foreground"
-        aria-label="Chọn ngày"
-      >
-        <FiCalendar className="h-4 w-4" />
-      </button>
     </div>
   );
 }
@@ -195,26 +204,28 @@ function RangeToggle({ value, onChange }: { value: string; onChange: (v: string)
 
 export default function DashboardPage() {
   const [range, setRange] = useState<string>("today");
-  const [revenueRange, setRevenueRange] = useState<string>("7d");
-  const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: ratios, isLoading: ratiosLoading } = useTicketRatios();
 
-  const confirmationRatio =
-    stats && stats.totalTickets > 0
-      ? ((stats.paidTickets / stats.totalTickets) * 100).toFixed(1)
-      : "0";
+  const filter = useMemo(() => rangeToFilter(range), [range]);
+
+  const { data: stats, isLoading: statsLoading } = useDashboardStats(filter);
+  const { data: ratios, isLoading: ratiosLoading } = useTicketRatios(filter);
+  const { data: revenueByDay, isLoading: revenueLoading } = useRevenueByDay(filter);
+  const { data: recentTickets, isLoading: recentLoading } = useRecentTickets({ limit: 10 });
+  const { data: upcoming, isLoading: upcomingLoading } = useUpcomingSchedules();
 
   const paidRatio =
     stats && stats.totalTickets > 0
       ? ((stats.paidTickets / stats.totalTickets) * 100).toFixed(1)
       : "0";
 
-  // Số phiếu chờ xác nhận lấy từ ticket-ratios nếu có
+  const confirmationRatio =
+    stats && stats.totalTickets > 0
+      ? ((stats.paidTickets / stats.totalTickets) * 100).toFixed(1)
+      : "0";
+
   const pendingRatio = useMemo(() => {
     if (!ratios) return null;
-    return ratios.find((r) =>
-      /chờ|pending|wait/i.test(r.ticketStatus)
-    );
+    return ratios.find((r) => /chờ|pending|wait/i.test(r.ticketStatus));
   }, [ratios]);
 
   const donutData = useMemo(() => {
@@ -225,6 +236,11 @@ export default function DashboardPage() {
   }, [ratios]);
 
   const totalTicketsForDonut = donutData.reduce((sum, d) => sum + d.value, 0);
+
+  const revenueChartData = useMemo(
+    () => fillRevenueByDay(revenueByDay, filter),
+    [revenueByDay, filter]
+  );
 
   if (statsLoading || ratiosLoading) {
     return (
@@ -248,13 +264,6 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <RangeToggle value={range} onChange={setRange} />
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm text-foreground shadow-sm"
-          >
-            <span className="text-muted-foreground">Chi nhánh:</span>
-            <span className="font-medium">Tất cả</span>
-          </button>
         </div>
       </div>
 
@@ -265,23 +274,19 @@ export default function DashboardPage() {
           value={stats ? formatCurrency(stats.totalRevenue) : "—"}
           icon={FiDollarSign}
           iconBg="bg-success"
-          delta={{ value: "12,5%", up: true }}
-          footer={`Hôm qua: ${stats ? formatCurrency(stats.totalRevenue * 0.89) : "—"}`}
+          footer={stats ? `Doanh thu thuần: ${formatCurrency(stats.netRevenue)}` : undefined}
         />
         <KpiCard
           title="Tổng phiếu khám"
           value={stats ? formatNumber(stats.totalTickets) : "—"}
           icon={FiCalendar}
           iconBg="bg-primary-600"
-          delta={{ value: "8,3%", up: true }}
-          footer={`Hôm qua: ${stats ? formatNumber(Math.round(stats.totalTickets * 0.92)) : "—"}`}
         />
         <KpiCard
           title="Phiếu đã thanh toán"
           value={stats ? formatNumber(stats.paidTickets) : "—"}
           icon={FiActivity}
           iconBg="bg-secondary-500"
-          delta={{ value: "9,7%", up: true }}
           footer={`Tỷ lệ: ${paidRatio}%`}
         />
         <KpiCard
@@ -289,7 +294,6 @@ export default function DashboardPage() {
           value={pendingRatio ? formatNumber(pendingRatio.totalCount) : "—"}
           icon={FiClock}
           iconBg="bg-accent-500"
-          delta={{ value: "4,5%", up: false }}
           footer={pendingRatio ? `Tỷ lệ: ${pendingRatio.ratioPercent}%` : "Tỷ lệ: —"}
         />
         <KpiCard
@@ -297,14 +301,12 @@ export default function DashboardPage() {
           value={stats ? formatNumber(stats.cancelledTickets) : "—"}
           icon={FiXCircle}
           iconBg="bg-error"
-          delta={{ value: "14,3%", up: false }}
         />
         <KpiCard
           title="Tổng bác sĩ"
           value={stats ? formatNumber(stats.totalDoctors) : "—"}
           icon={FiUsers}
           iconBg="bg-purple-500"
-          delta={{ value: "5 bác sĩ mới", up: true }}
         />
         <KpiCard
           title="Đánh giá trung bình"
@@ -322,177 +324,208 @@ export default function DashboardPage() {
           value={`${confirmationRatio}%`}
           icon={FiCheckCircle}
           iconBg="bg-success"
-          delta={{ value: "3,6%", up: true }}
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Revenue bar chart */}
-        <Card className="p-5">
-          <div className="mb-4 flex items-center justify-between">
+      {/* Revenue by day */}
+      <Card className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
             <h2 className="text-lg font-semibold text-foreground">Doanh thu theo ngày</h2>
-            <select
-              value={revenueRange}
-              onChange={(e) => setRevenueRange(e.target.value)}
-              className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm text-foreground"
-            >
-              <option value="7d">7 ngày</option>
-              <option value="30d">30 ngày</option>
-            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Dữ liệu từ {formatChartDate(filter.fromDate ?? "")} đến {formatChartDate(filter.toDate ?? "")}
+            </p>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={revenueByDay} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+        </div>
+        {revenueLoading ? (
+          <div className="flex h-[280px] items-center justify-center">
+            <LoadingSpinner text="Đang tải doanh thu..." />
+          </div>
+        ) : revenueChartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={revenueChartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#627D98" }} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 12, fill: "#627D98" }}
+              />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tick={{ fontSize: 12, fill: "#627D98" }}
-                tickFormatter={(v) => `${(v / 1_000_000).toFixed(0)}M`}
+                tickFormatter={(v) => formatRevenueTick(Number(v))}
+                domain={[0, (dataMax: number) => Math.max(dataMax, 1_000_000)]}
               />
               <Tooltip
                 formatter={(v) => [formatCurrency(Number(v)), "Doanh thu"]}
+                labelFormatter={(_, payload) => {
+                  const row = payload?.[0]?.payload as { date?: string } | undefined;
+                  return row?.date ? `Ngày ${formatChartDate(row.date)}` : "Doanh thu";
+                }}
                 cursor={{ fill: "rgba(11,92,173,0.06)" }}
               />
-              <Bar dataKey="value" name="Doanh thu (đồng)" radius={[6, 6, 0, 0]}>
-                {revenueByDay.map((entry, index) => (
+              <Bar dataKey="revenue" name="Doanh thu (đồng)" maxBarSize={72} radius={[6, 6, 0, 0]}>
+                {revenueChartData.map((entry, index) => (
                   <Cell
                     key={entry.date}
-                    fill={index === revenueByDay.length - 1 ? "#0B5CAD" : "#B3D1EF"}
+                    fill={index === revenueChartData.length - 1 ? "#0B5CAD" : "#B3D1EF"}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary-300" /> Doanh thu (đồng)
-          </p>
-        </Card>
+        ) : (
+          <p className="py-10 text-center text-sm text-muted-foreground">Không có dữ liệu doanh thu.</p>
+        )}
+        <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary-300" /> Doanh thu đã thanh toán (VNĐ)
+        </p>
+      </Card>
 
-        {/* Ticket status donut */}
-        <Card className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Tỷ lệ trạng thái phiếu khám</h2>
-            <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm text-muted-foreground">
-              7 ngày
-            </span>
-          </div>
-          {donutData.length > 0 ? (
-            <div className="flex flex-col items-center gap-6 sm:flex-row">
-              <div className="relative h-[220px] w-[220px] flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={70}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      stroke="none"
-                    >
-                      {donutData.map((entry, index) => (
-                        <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v, n) => [`${formatNumber(Number(v))} phiếu`, n as string]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-foreground">{formatNumber(totalTicketsForDonut)}</span>
-                  <span className="text-xs text-muted-foreground">Tổng phiếu</span>
-                </div>
-              </div>
-              <div className="flex-1 space-y-3">
-                {donutData.map((d, index) => (
-                  <div key={d.name} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: DONUT_COLORS[index % DONUT_COLORS.length] }}
-                      />
-                      <span className="text-sm text-muted-foreground">{d.name}</span>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground">
-                      {d.percent}% <span className="text-muted-foreground">({formatNumber(d.value)})</span>
-                    </span>
-                  </div>
-                ))}
+      {/* Ticket status donut */}
+      <Card className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Tỷ lệ trạng thái phiếu khám</h2>
+        </div>
+        {donutData.length > 0 ? (
+          <div className="flex flex-col items-center justify-center gap-8 lg:flex-row lg:justify-start">
+            <div className="relative h-[220px] w-[220px] flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {donutData.map((entry, index) => (
+                      <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [`${formatNumber(Number(v))} phiếu`, n as string]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold text-foreground">{formatNumber(totalTicketsForDonut)}</span>
+                <span className="text-xs text-muted-foreground">Tổng phiếu</span>
               </div>
             </div>
+            <div className="w-full max-w-sm space-y-3 lg:flex-none">
+              {donutData.map((d, index) => (
+                <div key={d.name} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: DONUT_COLORS[index % DONUT_COLORS.length] }}
+                    />
+                    <span className="text-sm text-muted-foreground">{d.name}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {d.percent}% <span className="text-muted-foreground">({formatNumber(d.value)})</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
           ) : (
             <p className="py-10 text-center text-sm text-muted-foreground">Không có dữ liệu</p>
-          )}
-        </Card>
-      </div>
+        )}
+      </Card>
 
       {/* Bottom panels */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Recent appointments */}
+        {/* Recent tickets */}
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Lịch hẹn mới nhất</h2>
-            <button className="text-sm font-medium text-primary-600 hover:underline">Xem tất cả</button>
+            <h2 className="text-lg font-semibold text-foreground">Phiếu khám gần đây</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                  <th className="pb-2 pr-3 font-medium">Thời gian</th>
-                  <th className="pb-2 pr-3 font-medium">Bệnh nhân</th>
-                  <th className="pb-2 pr-3 font-medium">Bác sĩ</th>
-                  <th className="pb-2 pr-3 font-medium">Chuyên khoa</th>
-                  <th className="pb-2 font-medium">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentAppointments.map((a, i) => (
-                  <tr key={i} className="border-b border-border last:border-0">
-                    <td className="py-3 pr-3 text-muted-foreground">{a.time}</td>
-                    <td className="py-3 pr-3">
-                      <span className="flex items-center gap-1.5 text-foreground">
-                        <FiUser className="h-3.5 w-3.5 text-text-disabled" />
-                        {a.patient}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-3 text-foreground">{a.doctor}</td>
-                    <td className="py-3 pr-3 text-muted-foreground">{a.specialty}</td>
-                    <td className="py-3">
-                      <StatusBadge status={a.status} />
-                    </td>
+          {recentLoading ? (
+            <div className="py-10">
+              <LoadingSpinner text="Đang tải..." />
+            </div>
+          ) : recentTickets && recentTickets.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
+                    <th className="pb-2 pr-3 font-medium">Thời gian</th>
+                    <th className="pb-2 pr-3 font-medium">Bệnh nhân</th>
+                    <th className="pb-2 pr-3 font-medium">Bác sĩ</th>
+                    <th className="pb-2 pr-3 font-medium">Dịch vụ</th>
+                    <th className="pb-2 font-medium">Trạng thái</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentTickets.map((t) => (
+                    <tr key={t.bookingId} className="border-b border-border last:border-0">
+                      <td className="py-3 pr-3 text-muted-foreground">
+                        {formatDateTime(t.appointmentTime ?? t.createdAt)}
+                      </td>
+                      <td className="py-3 pr-3">
+                        <span className="flex items-center gap-1.5 text-foreground">
+                          <FiUser className="h-3.5 w-3.5 text-text-disabled" />
+                          {t.patientName ?? "—"}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3 text-foreground">{t.doctorName ?? "—"}</td>
+                      <td className="py-3 pr-3 text-muted-foreground">{t.serviceName ?? "—"}</td>
+                      <td className="py-3">
+                        <StatusBadge status={t.localStatus} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="py-10 text-center text-sm text-muted-foreground">Chưa có phiếu khám nào.</p>
+          )}
         </Card>
 
-        {/* System activity */}
+        {/* Upcoming schedules */}
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Hoạt động hệ thống</h2>
-            <button className="text-sm font-medium text-primary-600 hover:underline">Xem tất cả</button>
+            <h2 className="text-lg font-semibold text-foreground">Lịch khám sắp tới</h2>
           </div>
-          <div className="space-y-1">
-            {systemActivities.map((act, i) => {
-              const Icon = act.icon;
-              return (
-                <div key={i} className="flex items-start gap-3 rounded-lg px-2 py-3 hover:bg-surface-secondary">
-                  <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${act.tone}`}>
-                    <Icon className="h-4.5 w-4.5" />
+          {upcomingLoading ? (
+            <div className="py-10">
+              <LoadingSpinner text="Đang tải..." />
+            </div>
+          ) : upcoming && upcoming.length > 0 ? (
+            <div className="space-y-1">
+              {upcoming.map((s) => (
+                <div key={s.scheduleId} className="flex items-start gap-3 rounded-lg px-2 py-3 hover:bg-surface-secondary">
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-600">
+                    <FiCalendar className="h-4.5 w-4.5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">{act.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{act.desc}</p>
+                    <p className="text-sm font-medium text-foreground">{s.doctorName ?? "—"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {s.examAreaName ?? s.specialtyName ?? "—"}
+                      {s.roomName ? ` · ${s.roomName}` : ""}
+                    </p>
                   </div>
-                  <span className="flex-shrink-0 text-xs text-muted-foreground">{act.time}</span>
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-xs font-medium text-foreground">
+                      {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {s.bookedCount}/{s.maxAppointments ?? "—"} slot
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-10 text-center text-sm text-muted-foreground">Không có lịch khám sắp tới.</p>
+          )}
         </Card>
       </div>
     </div>

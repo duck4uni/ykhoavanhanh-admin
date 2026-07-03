@@ -5,6 +5,17 @@ import { Select as SelectPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
+function RequiredLabel({ label }: { label: string }) {
+  const required = label.trimEnd().endsWith("*")
+  const text = required ? label.trimEnd().slice(0, -1).trimEnd() : label
+  return (
+    <>
+      {text}
+      {required && <span className="ml-1 text-red-500">*</span>}
+    </>
+  )
+}
+
 // ── shadcn/ui Select primitives ──────────────────────────────────────────────
 
 function SelectRoot({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
@@ -163,7 +174,7 @@ export function Select({
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1"><RequiredLabel label={label} /></label>
         )}
         <select
           name={name}
@@ -192,7 +203,7 @@ export function Select({
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1"><RequiredLabel label={label} /></label>
       )}
       <SelectRoot value={value} onValueChange={handleValueChange} disabled={disabled}>
         <SelectTrigger

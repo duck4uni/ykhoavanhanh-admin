@@ -41,6 +41,23 @@ export interface Ward {
   type: string | null;
 }
 
+interface OpenApiProvince {
+  code: number;
+  name: string;
+}
+
+interface OpenApiWard {
+  code: number;
+  name: string;
+  province_code: number;
+}
+
+type ListResponse<T> = T[] | { rows: T[] };
+
+function unwrapList<T>(data: ListResponse<T>): T[] {
+  return Array.isArray(data) ? data : data.rows ?? [];
+}
+
 // ─── Query Keys ────────────────────────────────────────────────────────────────
 
 export const addressKeys = {
@@ -55,51 +72,54 @@ export const addressKeys = {
 // ─── Service Functions ─────────────────────────────────────────────────────
 
 async function fetchNations(): Promise<Nation[]> {
-  const res = await apiGet<Nation[]>("/nation");
+  const res = await apiGet<ListResponse<Nation>>("/nation");
   if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
+    return unwrapList(res.data.responseData);
   }
   throw new Error(res.data.message || "Khong the lay danh sach dan toc");
 }
 
 async function fetchProfessions(): Promise<Profession[]> {
-  const res = await apiGet<Profession[]>("/profession");
+  const res = await apiGet<ListResponse<Profession>>("/profession");
   if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
+    return unwrapList(res.data.responseData);
   }
   throw new Error(res.data.message || "Khong the lay danh sach nghe nghiep");
 }
 
 async function fetchCountries(): Promise<Country[]> {
-  const res = await apiGet<Country[]>("/countries");
+  const res = await apiGet<ListResponse<Country>>("/countries");
   if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
+    return unwrapList(res.data.responseData);
   }
   throw new Error(res.data.message || "Khong the lay danh sach quoc gia");
 }
 
 async function fetchProvinces(): Promise<Province[]> {
-  const res = await apiGet<Province[]>("/provinces");
-  if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
-  }
-  throw new Error(res.data.message || "Khong the lay danh sach tinh thanh");
+  const res = await fetch("https://provinces.open-api.vn/api/v2/p/");
+  if (!res.ok) throw new Error("Không thể lấy danh sách tỉnh/thành");
+  const data = (await res.json()) as OpenApiProvince[];
+  return data.map((p) => ({ city: String(p.code), cityname: p.name }));
 }
 
 async function fetchDistricts(city: string): Promise<District[]> {
-  const res = await apiGet<District[]>("/district", { params: { city } });
-  if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
-  }
-  throw new Error(res.data.message || "Khong the lay danh sach quan huyen");
+  // Province Open API v2 không còn cấp quận/huyện sau sáp nhập 07/2025.
+  // Giữ hook này để tương thích code cũ, form mới sẽ không dùng nữa.
+  return [{ city, districtcode: city, districtname: null, type: null }];
 }
 
-async function fetchWards(districtcode: string): Promise<Ward[]> {
-  const res = await apiGet<Ward[]>("/ward", { params: { districtcode } });
-  if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
-  }
-  throw new Error(res.data.message || "Khong the lay danh sach phuong xa");
+async function fetchWards(provinceCode: string): Promise<Ward[]> {
+  const url = new URL("https://provinces.open-api.vn/api/v2/w/");
+  url.searchParams.set("province", provinceCode);
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Không thể lấy danh sách phường/xã");
+  const data = (await res.json()) as OpenApiWard[];
+  return data.map((w) => ({
+    districtcode: String(w.province_code),
+    wardcode: String(w.code),
+    wardname: w.name,
+    type: null,
+  }));
 }
 
 // ─── Hooks ─────────────────────────────────────────────────────────────────

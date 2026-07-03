@@ -4,6 +4,17 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+function RequiredLabel({ label }: { label: string }) {
+  const required = label.trimEnd().endsWith("*");
+  const text = required ? label.trimEnd().slice(0, -1).trimEnd() : label;
+  return (
+    <>
+      {text}
+      {required && <span className="ml-1 text-red-500">*</span>}
+    </>
+  );
+}
+
 // Inline shadcn/ui Input để tránh case conflict trên Windows
 function ShadcnInput({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
@@ -33,7 +44,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div className="w-full">
         {label && (
           <label className="block text-sm font-medium text-foreground mb-1">
-            {label}
+            <RequiredLabel label={label} />
           </label>
         )}
         <ShadcnInput

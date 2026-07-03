@@ -49,8 +49,14 @@ export interface AppointmentReview {
   /** Included in list/detail responses */
   facility?: {
     id: string;
-    name: string;
+    facility_name: string;
     idbv: string;
+  };
+  /** Included in list/detail responses */
+  patient?: {
+    id: string;
+    patient_full_name: string;
+    phone_number: string | null;
   };
 }
 
