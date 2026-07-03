@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import {
@@ -26,6 +27,8 @@ import {
   Users,
   Filter,
   RotateCcw,
+  Info,
+  RefreshCw,
 } from "lucide-react";
 
 const PAGE_SIZE = 10;
@@ -39,8 +42,16 @@ const SHIFT_LABEL: Record<string, string> = {
 
 /* ─── Form types ─────────────────────────────────────────────────────────── */
 
+type WorkTimeSlot = {
+  id: string;
+  start: string;
+  end: string;
+  max_appointments: number;
+};
+
 type ScheduleForm = {
   doctor_id: string;
+  doctor_name: string;
   exam_area_id: string;
   specialty_id: string;
   room_id: string;
@@ -57,6 +68,7 @@ type ScheduleForm = {
 
 const createInitialForm = (): ScheduleForm => ({
   doctor_id: "",
+  doctor_name: "",
   exam_area_id: "",
   specialty_id: "",
   room_id: "",
@@ -71,39 +83,102 @@ const createInitialForm = (): ScheduleForm => ({
   note: "",
 });
 
+const createSlotId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createDefaultSlots = (): WorkTimeSlot[] => [
+  { id: createSlotId(), start: "08:00", end: "09:00", max_appointments: 20 },
+  { id: createSlotId(), start: "09:00", end: "10:00", max_appointments: 20 },
+  { id: createSlotId(), start: "10:00", end: "11:00", max_appointments: 20 },
+  { id: createSlotId(), start: "11:00", end: "12:00", max_appointments: 20 },
+];
+
+const createSlotFromForm = (form: ScheduleForm): WorkTimeSlot => ({
+  id: createSlotId(),
+  start: form.start_time,
+  end: form.end_time,
+  max_appointments: form.max_appointments,
+});
+
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const date = new Date(2000, 0, 1, h || 0, m || 0);
+  date.setMinutes(date.getMinutes() + minutes);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function normalizeTime(time?: string): string {
+  return time?.slice(0, 5) || "";
+}
+
+function toApiTime(time: string): string {
+  return time.length === 5 ? `${time}:00` : time;
+}
+
+function getScheduleSlots(item: DoctorWorkSchedule): WorkTimeSlot[] {
+  if (item.time_slots?.length) {
+    return item.time_slots.map((slot) => ({
+      id: createSlotId(),
+      start: normalizeTime(slot.start),
+      end: normalizeTime(slot.end),
+      max_appointments: slot.max_appointments ?? item.max_appointments ?? 20,
+    }));
+  }
+
+  return [
+    {
+      id: createSlotId(),
+      start: normalizeTime(item.start_time),
+      end: normalizeTime(item.end_time),
+      max_appointments: item.max_appointments ?? 20,
+    },
+  ].filter((slot) => slot.start || slot.end);
+}
+
+function getScheduleTimeText(item: DoctorWorkSchedule): string {
+  const slots = getScheduleSlots(item);
+  if (!slots.length) return "—";
+  if (slots.length === 1) return `${slots[0].start || "—"} - ${slots[0].end || "—"}`;
+  return `${slots[0].start || "—"} - ${slots[slots.length - 1].end || "—"} (${slots.length} khung)`;
+}
+
 function mapItemToForm(item: DoctorWorkSchedule): ScheduleForm {
+  const firstSlot = getScheduleSlots(item)[0];
   return {
     doctor_id: item.doctor_id,
+    doctor_name: item.doctor?.doctor_name ?? "",
     exam_area_id: item.exam_area_id,
     specialty_id: item.specialty_id ?? "",
     room_id: item.room_id ?? "",
     schedule_date: item.schedule_date,
-    start_time: item.start_time.slice(0, 5),
-    end_time: item.end_time.slice(0, 5),
+    start_time: firstSlot?.start || normalizeTime(item.start_time),
+    end_time: firstSlot?.end || normalizeTime(item.end_time),
     shift_code: item.shift_code ?? "MORNING",
     max_appointments: item.max_appointments ?? 20,
-    exam_fee: item.exam_fee ? Number(item.exam_fee) : 0,
+    exam_fee: item.exam_fee ?? 0,
     allow_booking: item.allow_booking,
     status: item.status,
     note: item.note ?? "",
   };
 }
 
-function formToPayload(form: ScheduleForm): CreateDoctorWorkSchedulePayload {
+function formToPayload(form: ScheduleForm, slots: WorkTimeSlot[]): CreateDoctorWorkSchedulePayload {
   return {
     doctor_id: form.doctor_id,
     exam_area_id: form.exam_area_id,
     specialty_id: form.specialty_id || undefined,
     room_id: form.room_id || undefined,
     schedule_date: form.schedule_date,
-    start_time: `${form.start_time}:00`,
-    end_time: `${form.end_time}:00`,
     shift_code: form.shift_code,
     max_appointments: form.max_appointments,
-    exam_fee: String(form.exam_fee),
+    exam_fee: form.exam_fee,
     allow_booking: form.allow_booking,
     status: form.status,
     note: form.note || undefined,
+    time_slots: slots.map((slot) => ({
+      start: toApiTime(slot.start),
+      end: toApiTime(slot.end),
+      max_appointments: slot.max_appointments,
+    })),
   };
 }
 
@@ -163,6 +238,7 @@ export default function AppointmentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ScheduleForm>(createInitialForm);
+  const [workSlots, setWorkSlots] = useState<WorkTimeSlot[]>(createDefaultSlots);
 
   const { data, isLoading } = doctorWorkSchedulesHooks.useList();
   const schedules = useMemo(() => data?.rows ?? [], [data]);
@@ -171,18 +247,8 @@ export default function AppointmentsPage() {
   const { data: areasData } = examAreasHooks.useList();
   const examAreas = areasData?.rows ?? [];
 
-  const { data: doctors } = doctorsHooks.useList();
+  const { data: doctors, isLoading: isLoadingDoctors } = doctorsHooks.useList();
   const doctorList = doctors ?? [];
-
-  /* ── Mutations ────────────────────────────────────────────────────────── */
-
-  const createMutation = doctorWorkSchedulesHooks.useCreate({
-    onSuccess: () => {
-      toast.success("Tạo lịch khám thành công");
-      closeModal();
-    },
-    onError: (err) => toast.error(err.message || "Tạo lịch khám thất bại"),
-  });
 
   const updateMutation = doctorWorkSchedulesHooks.useUpdate({
     onSuccess: () => {
@@ -197,7 +263,7 @@ export default function AppointmentsPage() {
     onError: (err) => toast.error(err.message || "Xóa lịch khám thất bại"),
   });
 
-  const isMutating = createMutation.isPending || updateMutation.isPending;
+  const isMutating = updateMutation.isPending;
 
   /* ── Filtering ────────────────────────────────────────────────────────── */
 
@@ -232,15 +298,11 @@ export default function AppointmentsPage() {
 
   /* ── Actions ──────────────────────────────────────────────────────────── */
 
-  function openCreate() {
-    setEditingId(null);
-    setForm(createInitialForm());
-    setModalOpen(true);
-  }
-
   function openEdit(item: DoctorWorkSchedule) {
     setEditingId(item.id);
-    setForm(mapItemToForm(item));
+    const nextForm = mapItemToForm(item);
+    setForm(nextForm);
+    setWorkSlots(getScheduleSlots(item));
     setModalOpen(true);
   }
 
@@ -248,19 +310,52 @@ export default function AppointmentsPage() {
     setModalOpen(false);
     setEditingId(null);
     setForm(createInitialForm());
+    setWorkSlots(createDefaultSlots());
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.doctor_id || !form.exam_area_id || !form.schedule_date) {
       toast.error("Vui lòng chọn bác sĩ, khu khám và ngày khám");
       return;
     }
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: formToPayload(form) });
-    } else {
-      createMutation.mutate(formToPayload(form));
+    if (workSlots.length === 0) {
+      toast.error("Vui lòng thêm ít nhất một khung giờ làm việc");
+      return;
     }
+
+    try {
+      if (!editingId) return;
+      await updateMutation.mutateAsync({ id: editingId, data: formToPayload(form, workSlots) });
+    } catch {
+      // onError của mutation đã hiển thị toast.
+    }
+  }
+
+  function updateSlot(id: string, patch: Partial<WorkTimeSlot>) {
+    setWorkSlots((slots) => slots.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
+  }
+
+  function addSlot() {
+    setWorkSlots((slots) => {
+      const start = slots[slots.length - 1]?.end ?? form.start_time;
+      return [...slots, { id: createSlotId(), start, end: addMinutes(start, 30), max_appointments: form.max_appointments }];
+    });
+  }
+
+  function autoGenerateSlots() {
+    const slots: WorkTimeSlot[] = [];
+    let cursor = form.start_time;
+    while (cursor < form.end_time) {
+      const end = addMinutes(cursor, 30);
+      slots.push({ id: createSlotId(), start: cursor, end: end > form.end_time ? form.end_time : end, max_appointments: form.max_appointments });
+      cursor = end;
+    }
+    setWorkSlots(slots.length > 0 ? slots : [createSlotFromForm(form)]);
+  }
+
+  function removeSlot(id: string) {
+    setWorkSlots((slots) => slots.filter((slot) => slot.id !== id));
   }
 
   function resetFilters() {
@@ -299,13 +394,13 @@ export default function AppointmentsPage() {
             Quản lý lịch làm việc, khung giờ và số lượng slot khám của bác sĩ.
           </p>
         </div>
-        <button
-          onClick={openCreate}
+        <Link
+          href="/appointments/new"
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />
           Thêm lịch khám
-        </button>
+        </Link>
       </div>
 
       {/* Stat cards */}
@@ -424,7 +519,6 @@ export default function AppointmentsPage() {
                     <th className="px-6 py-3.5">Giờ khám</th>
                     <th className="px-6 py-3.5">Ca</th>
                     <th className="px-6 py-3.5">Slot</th>
-                    <th className="px-6 py-3.5">Phí khám</th>
                     <th className="px-6 py-3.5">Trạng thái</th>
                     <th className="px-6 py-3.5 text-right">Thao tác</th>
                   </tr>
@@ -432,7 +526,7 @@ export default function AppointmentsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {paged.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                      <td colSpan={9} className="px-6 py-12 text-center text-sm text-muted-foreground">
                         Không tìm thấy lịch khám phù hợp.
                       </td>
                     </tr>
@@ -445,17 +539,12 @@ export default function AppointmentsPage() {
                         </td>
                         <td className="px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
                         <td className="px-6 py-4 text-slate-600">{item.schedule_date}</td>
-                        <td className="px-6 py-4 text-slate-600">
-                          {item.start_time.slice(0, 5)} - {item.end_time.slice(0, 5)}
-                        </td>
+                        <td className="px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
                         <td className="px-6 py-4 text-slate-600">
                           {SHIFT_LABEL[item.shift_code ?? ""] ?? (item.shift_code || "—")}
                         </td>
                         <td className="px-6 py-4">
                           <SlotBar booked={item.booked_count ?? 0} max={item.max_appointments ?? 0} />
-                        </td>
-                        <td className="px-6 py-4 text-slate-700">
-                          {item.exam_fee ? `${Number(item.exam_fee).toLocaleString("vi-VN")} đ` : "—"}
                         </td>
                         <td className="px-6 py-4">
                           <StatusBadge item={item} />
@@ -503,114 +592,186 @@ export default function AppointmentsPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+          <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-800">
+              <h2 className="text-xl font-bold text-slate-900">
                 {editingId ? "Chỉnh sửa lịch khám" : "Thêm lịch khám mới"}
               </h2>
-              <button onClick={closeModal} className="text-slate-400 transition-colors hover:text-slate-600">
+              <button onClick={closeModal} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Select
-                  label="Bác sĩ *"
-                  value={form.doctor_id}
-                  onChange={(e) => setForm((p) => ({ ...p, doctor_id: e.target.value }))}
-                  options={[
-                    { value: "", label: "-- Chọn bác sĩ --" },
-                    ...doctorList.map((d) => ({ value: d.id, label: d.doctorname })),
-                  ]}
-                />
-                <Select
-                  label="Khu khám *"
-                  value={form.exam_area_id}
-                  onChange={(e) => setForm((p) => ({ ...p, exam_area_id: e.target.value }))}
-                  options={[
-                    { value: "", label: "-- Chọn khu khám --" },
-                    ...examAreas.map((a) => ({ value: a.id, label: a.name })),
-                  ]}
-                />
-                <Input
-                  label="Ngày khám *"
-                  type="date"
-                  value={form.schedule_date}
-                  onChange={(e) => setForm((p) => ({ ...p, schedule_date: e.target.value }))}
-                />
-                <Select
-                  label="Ca khám"
-                  value={form.shift_code}
-                  onChange={(e) => setForm((p) => ({ ...p, shift_code: e.target.value }))}
-                  options={[
-                    { value: "MORNING", label: "Sáng" },
-                    { value: "AFTERNOON", label: "Chiều" },
-                    { value: "EVENING", label: "Tối" },
-                    { value: "NIGHT", label: "Đêm" },
-                  ]}
-                />
-                <Input
-                  label="Giờ bắt đầu *"
-                  type="time"
-                  value={form.start_time}
-                  onChange={(e) => setForm((p) => ({ ...p, start_time: e.target.value }))}
-                />
-                <Input
-                  label="Giờ kết thúc *"
-                  type="time"
-                  value={form.end_time}
-                  onChange={(e) => setForm((p) => ({ ...p, end_time: e.target.value }))}
-                />
-                <Input
-                  label="Số slot tối đa"
-                  type="number"
-                  value={String(form.max_appointments)}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, max_appointments: Number(e.target.value) || 0 }))
-                  }
-                />
-                <Input
-                  label="Phí khám (VND)"
-                  type="number"
-                  value={String(form.exam_fee)}
-                  onChange={(e) => setForm((p) => ({ ...p, exam_fee: Number(e.target.value) || 0 }))}
-                />
-                <Select
-                  label="Cho phép đặt lịch"
-                  value={String(form.allow_booking)}
-                  onChange={(e) => setForm((p) => ({ ...p, allow_booking: e.target.value === "true" }))}
-                  options={[
-                    { value: "true", label: "Có" },
-                    { value: "false", label: "Không" },
-                  ]}
-                />
-                <Select
-                  label="Trạng thái"
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, status: e.target.value as ScheduleForm["status"] }))
-                  }
-                  options={[
-                    { value: "ACTIVE", label: "Hoạt động" },
-                    { value: "INACTIVE", label: "Tạm ngưng" },
-                  ]}
-                />
-                <div className="md:col-span-2">
-                  <Input
-                    label="Ghi chú"
-                    value={form.note}
-                    onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
-                    placeholder="VD: Ca sáng thứ Tư"
+            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {editingId ? (
+                    <Input label="Bác sĩ *" value={form.doctor_name || "—"} readOnly disabled />
+                  ) : (
+                    <Select
+                      label="Bác sĩ *"
+                      value={form.doctor_id}
+                      onChange={(e) => setForm((p) => ({ ...p, doctor_id: e.target.value }))}
+                      placeholder={isLoadingDoctors ? "Đang tải danh sách bác sĩ..." : "-- Chọn bác sĩ --"}
+                      disabled={isLoadingDoctors}
+                      options={doctorList.map((d) => ({
+                        value: d.id,
+                        label: d.doctorid ? `${d.doctorname} (${d.doctorid})` : d.doctorname,
+                      }))}
+                    />
+                  )}
+                  <Select
+                    label="Khu khám *"
+                    value={form.exam_area_id}
+                    onChange={(e) => setForm((p) => ({ ...p, exam_area_id: e.target.value }))}
+                    options={[
+                      { value: "", label: "-- Chọn khu khám --" },
+                      ...examAreas.map((a) => ({ value: a.id, label: a.name })),
+                    ]}
                   />
+                  <Input
+                    label="Ngày khám *"
+                    type="date"
+                    value={form.schedule_date}
+                    onChange={(e) => setForm((p) => ({ ...p, schedule_date: e.target.value }))}
+                  />
+                  <Select
+                    label="Ca khám"
+                    value={form.shift_code}
+                    onChange={(e) => setForm((p) => ({ ...p, shift_code: e.target.value }))}
+                    options={[
+                      { value: "MORNING", label: "Sáng" },
+                      { value: "AFTERNOON", label: "Chiều" },
+                      { value: "EVENING", label: "Tối" },
+                      { value: "NIGHT", label: "Đêm" },
+                    ]}
+                  />
+                  <Select
+                    label="Trạng thái"
+                    value={form.status}
+                    onChange={(e) => {
+                      const status = e.target.value as ScheduleForm["status"];
+                      setForm((p) => ({ ...p, status }));
+                    }}
+                    options={[
+                      { value: "ACTIVE", label: "Hoạt động" },
+                      { value: "INACTIVE", label: "Tạm ngưng" },
+                    ]}
+                  />
+                  <Input
+                    label="Số lượt khám tối đa"
+                    type="number"
+                    min={0}
+                    value={form.max_appointments}
+                    onChange={(e) => setForm((p) => ({ ...p, max_appointments: Number(e.target.value) || 0 }))}
+                  />
+                  {/* <Input
+                    label="Phí khám"
+                    type="number"
+                    min={0}
+                    value={form.exam_fee}
+                    onChange={(e) => setForm((p) => ({ ...p, exam_fee: Number(e.target.value) || 0 }))}
+                  /> */}
+                  <div className="md:col-span-2">
+                    <Input
+                      label="Ghi chú"
+                      value={form.note}
+                      onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
+                      placeholder="VD: Ca sáng thứ Tư"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="flex items-center gap-1.5 text-base font-semibold text-slate-900">
+                        Khung giờ làm việc <Info className="h-4 w-4 text-slate-400" />
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">Các khe thời gian gửi trong trường time_slots theo API mới.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={autoGenerateSlots}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" /> Tự sinh khung giờ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addSlot}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary-200 bg-white px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-100"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Thêm khung giờ
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <div className="grid grid-cols-[1fr_1fr_120px_72px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                      <span>Bắt đầu</span>
+                      <span>Kết thúc</span>
+                      <span>Slot khám</span>
+                      <span className="text-center">Thao tác</span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {workSlots.map((slot) => (
+                        <div key={slot.id} className="grid grid-cols-[1fr_1fr_120px_72px] items-center gap-3 px-3 py-2">
+                          <div className="relative">
+                            <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="time"
+                              value={slot.start}
+                              onChange={(e) => updateSlot(slot.id, { start: e.target.value })}
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="time"
+                              value={slot.end}
+                              onChange={(e) => updateSlot(slot.id, { end: e.target.value })}
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                            />
+                          </div>
+                          <div className="flex h-10 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                            <input
+                              type="number"
+                              min={0}
+                              value={slot.max_appointments}
+                              onChange={(e) => updateSlot(slot.id, { max_appointments: Number(e.target.value) || 0 })}
+                              className="min-w-0 flex-1 px-3 text-sm outline-none"
+                            />
+                            <span className="flex items-center border-l border-slate-200 px-2 text-xs text-slate-500">slot</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSlot(slot.id)}
+                            className="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            aria-label="Xóa khung giờ"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {workSlots.length === 0 && (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">Chưa có khung giờ làm việc.</div>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Tổng cộng: <b>{workSlots.length}</b> khung giờ · <b>{workSlots.reduce((sum, slot) => sum + slot.max_appointments, 0)}</b> slot khám
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-4 border-t border-slate-100 p-6">
                 <button
                   type="submit"
                   disabled={isMutating}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
                 >
                   {isMutating && <Spinner size="sm" />}
                   {editingId ? "Lưu thay đổi" : "Tạo lịch khám"}
@@ -618,7 +779,7 @@ export default function AppointmentsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200"
+                  className="rounded-xl bg-slate-100 px-6 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200"
                 >
                   Hủy
                 </button>

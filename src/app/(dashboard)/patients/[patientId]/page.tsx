@@ -1,96 +1,477 @@
 "use client";
+
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { useGetPatientById } from "@/api/patientApi";
+import { medicalRecordsHooks } from "@/api/medicalRecordsApi";
+import { appointmentReviewsHooks } from "@/api/appointmentReviewsApi";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ChevronDown,
+  CreditCard,
+  Edit3,
+  FileText,
+  Grid2X2,
+  History,
+  IdCard,
+  Phone,
+  ShieldCheck,
+  Star,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 
-function getFullName(p: { patient_first_name: string | null; patient_last_name: string | null }): string {
-  return [p.patient_first_name, p.patient_last_name].filter(Boolean).join(" ") || "—";
+function getFullName(p: {
+  patient_first_name: string | null;
+  patient_last_name: string | null;
+  patient_full_name?: string | null;
+}): string {
+  return (
+    p.patient_full_name ||
+    [p.patient_first_name, p.patient_last_name].filter(Boolean).join(" ") ||
+    "—"
+  );
 }
 
 function getGender(sex: string | null): string {
   if (!sex) return "—";
-  return sex.toLowerCase() === "nam" ? "Nam" : sex.toLowerCase() === "nữ" || sex.toLowerCase() === "nu" ? "Nữ" : sex;
+  return sex.toLowerCase() === "nam"
+    ? "Nam"
+    : sex.toLowerCase() === "nữ" || sex.toLowerCase() === "nu"
+      ? "Nữ"
+      : sex;
 }
+
+function getAge(birthday: string | null, birthYear: string | null): string {
+  const year = birthday
+    ? new Date(birthday).getFullYear()
+    : birthYear
+      ? Number(birthYear)
+      : null;
+  if (!year || Number.isNaN(year)) return "—";
+  return `${new Date().getFullYear() - year} tuổi`;
+}
+
+function toNumber(v: string | number | null | undefined): number {
+  if (v == null) return 0;
+  return typeof v === "number" ? v : Number(v) || 0;
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[120px_1fr] gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-slate-800">{value || "—"}</span>
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-primary-700">
+        <Icon className="h-4 w-4" /> {title}
+      </h3>
+      <div className="space-y-3">{children}</div>
+    </div>
+  );
+}
+
+const tabs = [
+  { key: "overview", label: "Tổng quan", icon: Grid2X2 },
+  { key: "appointments", label: "Lịch sử đặt khám", icon: CalendarDays },
+  { key: "records", label: "Hồ sơ bệnh án", icon: FileText },
+  { key: "payments", label: "Thanh toán", icon: CreditCard },
+  { key: "reviews", label: "Đánh giá", icon: Star },
+  { key: "family", label: "Người thân", icon: UsersRound },
+  { key: "logs", label: "Nhật ký cập nhật", icon: History },
+] as const;
 
 export default function PatientDetailPage() {
   const { patientId } = useParams<{ patientId: string }>();
   const router = useRouter();
-  const { data: patient, isLoading } = useGetPatientById(patientId);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  if (isLoading) {
+  const { data: patient, isLoading } = useGetPatientById(patientId);
+  const { data: recordsData, isLoading: recordsLoading } =
+    medicalRecordsHooks.useList(
+      {
+        patient_id: patientId,
+        page: 1,
+        pageSize: 5,
+        sortField: "examined_at",
+        sortOrder: "DESC",
+      },
+      { enabled: Boolean(patientId) },
+    );
+  const { data: reviewsData } = appointmentReviewsHooks.useList(
+    {
+      patient_id: patientId,
+      page: 1,
+      pageSize: 1,
+      sortField: "created_at",
+      sortOrder: "DESC",
+    },
+    { enabled: Boolean(patientId) },
+  );
+
+  const records = useMemo(() => recordsData?.rows ?? [], [recordsData]);
+  const totalPaid = records.reduce(
+    (sum, r) => sum + toNumber(r.paid_amount || r.total_amount),
+    0,
+  );
+  const latestRecord = records[0];
+  const latestReview = reviewsData?.rows?.[0];
+
+  if (isLoading)
     return <LoadingSection text="Đang tải thông tin bệnh nhân..." />;
-  }
 
   if (!patient) {
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">Không tìm thấy bệnh nhân.</p>
-        <Button variant="outline" className="mt-4" onClick={() => router.back()}>Quay lại</Button>
+        <Button
+          variant="outline"
+          className="mt-4"
+          onClick={() => router.back()}
+        >
+          Quay lại
+        </Button>
       </div>
     );
   }
 
   const fullName = getFullName(patient);
+  const patientCode = patient.his_patient_id ?? patient.id;
+  const address =
+    patient.address_full ??
+    [
+      patient.address_detail,
+      patient.address_street,
+      patient.ward_name,
+      patient.district_name,
+      patient.province_name,
+    ]
+      .filter(Boolean)
+      .join(", ");
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => router.back()}>← Quay lại</Button>
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-4">
+          <Button
+            variant="outline"
+            className="h-10 gap-2 rounded-xl"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" /> Quay lại
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
-            <p className="text-sm text-gray-500 font-mono">{patient.his_patient_id ?? patient.id}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-slate-900">{fullName}</h1>
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-light px-3 py-1 text-xs font-semibold text-success">
+                <ShieldCheck className="h-3.5 w-3.5" /> Hồ sơ chính
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+              <span>
+                Mã bệnh nhân: <b>{patientCode}</b>
+              </span>
+              <span>•</span>
+              <span>{getGender(patient.sex)}</span>
+              <span>•</span>
+              <span>
+                {patient.birthday
+                  ? `${formatDate(patient.birthday)} (${getAge(patient.birthday, patient.birth_year)})`
+                  : getAge(patient.birthday, patient.birth_year)}
+              </span>
+              <span>•</span>
+              <span>{patient.phone_number ?? "—"}</span>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium">
+              <span className="rounded-lg bg-success-light px-2.5 py-1 text-success">
+                Đã đồng bộ HIS
+              </span>
+              <span className="rounded-lg bg-primary-100 px-2.5 py-1 text-primary-600">
+                {patient.insurance_number ? "Có BHYT" : "Chưa có BHYT"}
+              </span>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
+                Nguồn: Mobile App
+              </span>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
+                {recordsData?.count ?? 0} lượt đặt khám
+              </span>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
+                Lần cập nhật:{" "}
+                {patient.his_updated_at
+                  ? formatDateTime(patient.his_updated_at)
+                  : "—"}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/patients/${patientId}/edit`}>
-            <Button variant="outline" size="sm">Chỉnh sửa</Button>
-          </Link>
+        {/* <Link href={`/patients/${patientId}/edit`}>
+          <Button variant="primary" className="h-11 gap-2 rounded-xl px-5">
+            <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ <ChevronDown className="h-4 w-4" />
+          </Button>
+        </Link> */}
+      </div>
+
+      {/* Tabs */}
+      <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white px-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+        <div className="flex min-w-max items-center gap-6">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`inline-flex h-14 items-center gap-2 border-b-2 text-sm font-medium transition-colors ${active ? "border-primary-600 text-primary-600" : "border-transparent text-slate-600 hover:text-primary-600"}`}
+              >
+                <Icon className="h-4 w-4" /> {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        {/* Thông tin cơ bản */}
-        <div className="col-span-2 space-y-6">
-          <Card>
-            <CardHeader><CardTitle>Thông tin cá nhân</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="text-gray-500">Mã bệnh nhân:</span> <span className="font-medium ml-2 font-mono">{patient.his_patient_id ?? patient.id}</span></div>
-              <div><span className="text-gray-500">Họ tên:</span> <span className="font-medium ml-2">{fullName}</span></div>
-              <div><span className="text-gray-500">Ngày sinh:</span> <span className="font-medium ml-2">{patient.birthday || patient.birth_year || "—"}</span></div>
-              <div><span className="text-gray-500">Giới tính:</span> <span className="font-medium ml-2">{getGender(patient.sex)}</span></div>
-              <div><span className="text-gray-500">Điện thoại:</span> <span className="font-medium ml-2">{patient.phone_number ?? "—"}</span></div>
-              <div><span className="text-gray-500">Số CCCD:</span> <span className="font-medium ml-2">{patient.identity_number ?? "—"}</span></div>
-              <div><span className="text-gray-500">Mã BHYT:</span> <span className="font-medium ml-2">{patient.insurance_number ?? "—"}</span></div>
-              <div><span className="text-gray-500">Dân tộc:</span> <span className="font-medium ml-2">{patient.ethnic_name ?? patient.ethnic_code ?? "—"}</span></div>
-              <div><span className="text-gray-500">Nghề nghiệp:</span> <span className="font-medium ml-2">{patient.profession_name ?? patient.profession_id ?? "—"}</span></div>
-              <div className="col-span-2"><span className="text-gray-500">Địa chỉ:</span> <span className="font-medium ml-2">{patient.address_full ?? ([patient.address_detail, patient.address_street, patient.ward_name, patient.district_name, patient.province_name].filter(Boolean).join(", ") || "—")}</span></div>
-            </CardContent>
-          </Card>
+      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        {/* Main */}
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+            <h2 className="mb-5 text-lg font-semibold text-slate-900">
+              Thông tin cá nhân
+            </h2>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <SectionCard title="Thông tin định danh" icon={IdCard}>
+                <InfoRow label="Mã bệnh nhân" value={patientCode} />
+                <InfoRow label="Họ tên" value={fullName} />
+                <InfoRow
+                  label="Ngày sinh"
+                  value={
+                    patient.birthday
+                      ? `${formatDate(patient.birthday)} (${getAge(patient.birthday, patient.birth_year)})`
+                      : "—"
+                  }
+                />
+                <InfoRow label="Giới tính" value={getGender(patient.sex)} />
+                <InfoRow label="Số CCCD" value={patient.identity_number} />
+                <InfoRow label="Mã BHYT" value={patient.insurance_number} />
+                <InfoRow
+                  label="Dân tộc"
+                  value={patient.ethnic_name ?? patient.ethnic_code}
+                />
+                <InfoRow
+                  label="Nghề nghiệp"
+                  value={patient.profession_name ?? patient.profession_id}
+                />
+              </SectionCard>
+
+              <div className="space-y-4">
+                <SectionCard title="Thông tin liên hệ" icon={Phone}>
+                  <InfoRow label="Điện thoại" value={patient.phone_number} />
+                  <InfoRow label="Email" value="—" />
+                  <InfoRow label="Địa chỉ" value={address || "—"} />
+                </SectionCard>
+                <SectionCard title="Thông tin BHYT" icon={ShieldCheck}>
+                  <InfoRow
+                    label="Có BHYT"
+                    value={patient.insurance_number ? "Có" : "Không"}
+                  />
+                  <InfoRow
+                    label="Số thẻ BHYT"
+                    value={patient.insurance_number}
+                  />
+                  <InfoRow
+                    label="Nơi đăng ký KCB BĐ"
+                    value="Bệnh viện Vạn Hạnh"
+                  />
+                  <InfoRow
+                    label="Giá trị sử dụng"
+                    value={
+                      patient.insurance_expired_date_text
+                        ? `Đến ${patient.insurance_expired_date_text}`
+                        : "—"
+                    }
+                  />
+                </SectionCard>
+              </div>
+
+              <SectionCard title="Thông tin hành chính" icon={UserRound}>
+                <InfoRow
+                  label="Quốc tịch"
+                  value={
+                    patient.country_name ??
+                    patient.national_code ??
+                    patient.country_code
+                  }
+                />
+                <InfoRow label="Tình trạng hôn nhân" value="—" />
+                <InfoRow label="Nhóm máu" value="—" />
+                <InfoRow label="Chiều cao" value="—" />
+                <InfoRow label="Cân nặng" value="—" />
+                <InfoRow label="Ghi chú" value="—" />
+              </SectionCard>
+            </div>
+          </div>
+
+          {/* Recent records */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Lịch sử đặt khám gần nhất
+              </h2>
+              <Link
+                href="/medical-records"
+                className="text-sm font-medium text-primary-600 hover:underline"
+              >
+                Xem tất cả →
+              </Link>
+            </div>
+            {recordsLoading ? (
+              <LoadingSection text="Đang tải lịch sử..." />
+            ) : records.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-medium text-slate-500">
+                      <th className="px-4 py-3">Ngày khám</th>
+                      <th className="px-4 py-3">Bác sĩ</th>
+                      <th className="px-4 py-3">Chuyên khoa</th>
+                      <th className="px-4 py-3">Phòng khám</th>
+                      <th className="px-4 py-3">Dịch vụ</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                      <th className="px-4 py-3">Thanh toán</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {records.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {formatDate(r.examined_at)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {r.doctor?.doctor_name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.specialty?.name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.room?.room_name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {r.service?.service_name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
+                            Đã khám
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-800">
+                          {formatCurrency(
+                            toNumber(r.paid_amount || r.total_amount),
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Chưa có lịch sử khám.
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Sidebar info */}
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <Avatar name={fullName} size="lg" className="mx-auto mb-3" />
-              <p className="font-semibold text-gray-900">{fullName}</p>
-              <p className="text-sm text-gray-500 font-mono">{patient.his_patient_id ?? patient.id}</p>
-            </CardContent>
-          </Card>
+        {/* Sidebar */}
+        <div className="space-y-5">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+            <div className="flex items-center gap-4 border-b border-slate-100 p-5">
+              <Avatar name={fullName} size="lg" className="h-14 w-14" />
+              <div>
+                <p className="text-lg font-bold text-slate-900">{fullName}</p>
+                <p className="text-sm text-muted-foreground">
+                  Mã bệnh nhân: {patientCode}
+                </p>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-5 py-3 text-sm">
+                <span className="text-muted-foreground">
+                  Tổng lượt đặt khám
+                </span>
+                <b>{recordsData?.count ?? 0}</b>
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 text-sm">
+                <span className="text-muted-foreground">Lần khám gần nhất</span>
+                <b>
+                  {latestRecord ? formatDate(latestRecord.examined_at) : "—"}
+                </b>
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 text-sm">
+                <span className="text-muted-foreground">Tổng thanh toán</span>
+                <b>{formatCurrency(totalPaid)}</b>
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 text-sm">
+                <span className="text-muted-foreground">Đánh giá gần nhất</span>
+                <b>{latestReview ? `${latestReview.overall_rating} ★` : "—"}</b>
+              </div>
+            </div>
+          </div>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Thông tin khác</CardTitle></CardHeader>
-            <CardContent className="text-sm space-y-3">
-              <div className="flex justify-between"><span className="text-gray-500">Quốc tịch</span><span className="font-medium">{patient.national_code ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">BHYT hết hạn</span><span className="font-medium">{patient.insurance_expired_date_text ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Cập nhật lúc</span><span className="font-medium">{patient.his_updated_at ?? patient.updated_at ?? "—"}</span></div>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+            <h2 className="mb-4 text-base font-semibold text-slate-900">
+              Thông tin khác
+            </h2>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Quốc tịch</span>
+                <span className="font-medium">
+                  {patient.country_name ?? patient.national_code ?? "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">BHYT hết hạn</span>
+                <span className="font-medium">
+                  {patient.insurance_expired_date_text ?? "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cập nhật lúc</span>
+                <span className="font-medium text-right">
+                  {patient.his_updated_at
+                    ? formatDateTime(patient.his_updated_at)
+                    : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Nguồn hồ sơ</span>
+                <span className="font-medium">Mobile App</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Trạng thái</span>
+                <span className="font-medium text-success">● Hoạt động</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

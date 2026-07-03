@@ -1,15 +1,18 @@
 "use client";
 
-import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { mockReviews } from "@/mock-data/reviews";
+import { LoadingSection } from "@/components/ui/Spinner";
+import { appointmentReviewsHooks } from "@/api/appointmentReviewsApi";
 import { formatDateTime } from "@/lib/utils";
-import { Star, ArrowLeft, Eye, EyeOff, Check, X, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
+import { Star, ArrowLeft, Check, X, MessageSquare } from "lucide-react";
 
-function StarRow({ label, value }: { label: string; value: number }) {
+function StarRow({ label, value }: { label: string; value: number | null }) {
+  const v = value ?? 0;
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm text-gray-600">{label}</span>
@@ -17,24 +20,36 @@ function StarRow({ label, value }: { label: string; value: number }) {
         {[1, 2, 3, 4, 5].map((s) => (
           <Star
             key={s}
-            className={`h-4 w-4 ${s <= value ? "text-yellow-400 fill-yellow-400" : "text-gray-200 fill-gray-200"}`}
+            className={`h-4 w-4 ${s <= v ? "text-yellow-400 fill-yellow-400" : "text-gray-200 fill-gray-200"}`}
           />
         ))}
-        <span className="ml-1 text-sm font-medium text-gray-700">{value}/5</span>
+        <span className="ml-1 text-sm font-medium text-gray-700">{v}/5</span>
       </div>
     </div>
   );
 }
 
-export default function ReviewDetailPage({ params }: { params: Promise<{ reviewId: string }> }) {
-  const { reviewId } = use(params);
+export default function ReviewDetailPage() {
+  const params = useParams<{ reviewId: string }>();
+  const reviewId = params.reviewId;
   const router = useRouter();
 
-  const review = mockReviews.find((r) => r.id === reviewId);
-  const [approved, setApproved] = useState(review?.isApproved ?? false);
-  const [visible, setVisible] = useState(review?.isVisible ?? false);
-  const [adminNote, setAdminNote] = useState(review?.adminNote ?? "");
-  const [saved, setSaved] = useState(false);
+  const { data: review, isLoading } = appointmentReviewsHooks.useDetail(reviewId);
+
+  const [adminReply, setAdminReply] = useState("");
+
+  useEffect(() => {
+    if (review) setAdminReply(review.admin_reply ?? "");
+  }, [review]);
+
+  const updateMutation = appointmentReviewsHooks.useUpdate({
+    onSuccess: () => toast.success("Cập nhật đánh giá thành công"),
+    onError: (err) => toast.error(err.message || "Cập nhật đánh giá thất bại"),
+  });
+
+  if (isLoading) {
+    return <LoadingSection text="Đang tải đánh giá..." />;
+  }
 
   if (!review) {
     return (
@@ -45,11 +60,35 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
     );
   }
 
-  const avgRating = ((review.attitude + review.expertise + review.waitTime + review.facilities) / 4).toFixed(1);
+  const detailRatings = [
+    review.doctor_rating,
+    review.service_rating,
+    review.waiting_time_rating,
+    review.facility_rating,
+  ].filter((v): v is number => typeof v === "number");
+  const avgRating =
+    detailRatings.length > 0
+      ? (detailRatings.reduce((a, b) => a + b, 0) / detailRatings.length).toFixed(1)
+      : review.overall_rating.toFixed(1);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const patientName = review.is_anonymous
+    ? "Ẩn danh"
+    : review.patient?.patient_full_name ?? "—";
+  const patientPhone = review.is_anonymous ? null : review.patient?.phone_number ?? null;
+  const doctorName = review.doctor?.doctor_name ?? "—";
+
+  function handleSaveReply() {
+    updateMutation.mutate({
+      id: reviewId,
+      data: {
+        admin_reply: adminReply,
+        admin_replied_at: new Date().toISOString(),
+      },
+    });
+  }
+
+  function handleSetStatus(status: "APPROVED" | "REJECTED" | "PENDING") {
+    updateMutation.mutate({ id: reviewId, data: { status } });
   }
 
   return (
@@ -60,13 +99,13 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Chi tiết đánh giá</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{review.patientName} → {review.doctorName}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{patientName} → {doctorName}</p>
         </div>
         <div className="flex items-center gap-2">
-          {!visible ? (
-            <Badge variant="default">Ẩn</Badge>
-          ) : approved ? (
+          {review.status === "APPROVED" ? (
             <Badge variant="success">Đã duyệt</Badge>
+          ) : review.status === "REJECTED" ? (
+            <Badge variant="danger">Đã từ chối</Badge>
           ) : (
             <Badge variant="warning">Chờ duyệt</Badge>
           )}
@@ -85,21 +124,21 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4 pb-4 border-b">
-                <div className="text-5xl font-bold text-gray-900">{review.rating}</div>
+                <div className="text-5xl font-bold text-gray-900">{review.overall_rating}</div>
                 <div>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className={`h-5 w-5 ${s <= review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-200 fill-gray-200"}`} />
+                      <Star key={s} className={`h-5 w-5 ${s <= review.overall_rating ? "text-yellow-400 fill-yellow-400" : "text-gray-200 fill-gray-200"}`} />
                     ))}
                   </div>
                   <p className="text-sm text-gray-500 mt-1">Điểm tổng thể / Trung bình chi tiết: {avgRating}</p>
                 </div>
               </div>
               <div className="space-y-3">
-                <StarRow label="Thái độ bác sĩ" value={review.attitude} />
-                <StarRow label="Chuyên môn" value={review.expertise} />
-                <StarRow label="Thời gian chờ" value={review.waitTime} />
-                <StarRow label="Cơ sở vật chất" value={review.facilities} />
+                <StarRow label="Chuyên môn bác sĩ" value={review.doctor_rating} />
+                <StarRow label="Dịch vụ" value={review.service_rating} />
+                <StarRow label="Thời gian chờ" value={review.waiting_time_rating} />
+                <StarRow label="Cơ sở vật chất" value={review.facility_rating} />
               </div>
             </CardContent>
           </Card>
@@ -116,30 +155,25 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
             </Card>
           )}
 
-          {/* Doctor reply */}
-          {review.doctorReply && (
-            <Card>
-              <CardHeader><CardTitle>Phản hồi từ bác sĩ</CardTitle></CardHeader>
-              <CardContent>
-                <blockquote className="border-l-4 border-green-200 pl-4 text-gray-700 italic">
-                  &ldquo;{review.doctorReply}&rdquo;
-                </blockquote>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Admin note */}
+          {/* Admin reply */}
           <Card>
-            <CardHeader><CardTitle>Ghi chú nội bộ</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Phản hồi của quản trị viên</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <textarea
                 rows={3}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Ghi chú của quản trị viên (không hiển thị với bệnh nhân)..."
-                value={adminNote}
-                onChange={(e) => setAdminNote(e.target.value)}
+                placeholder="Nhập phản hồi hiển thị cho bệnh nhân..."
+                value={adminReply}
+                onChange={(e) => setAdminReply(e.target.value)}
               />
-              <Button variant="outline" onClick={handleSave}>{saved ? "Đã lưu!" : "Lưu ghi chú"}</Button>
+              {review.admin_replied_at && (
+                <p className="text-xs text-gray-400">
+                  Phản hồi lúc: {formatDateTime(review.admin_replied_at)}
+                </p>
+              )}
+              <Button variant="outline" onClick={handleSaveReply} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Đang lưu..." : "Lưu phản hồi"}
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -150,22 +184,25 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
           <Card>
             <CardHeader><CardTitle>Kiểm duyệt</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {!approved ? (
-                <Button variant="primary" className="w-full" onClick={() => { setApproved(true); setVisible(true); }}>
+              {review.status !== "APPROVED" ? (
+                <Button variant="primary" className="w-full" disabled={updateMutation.isPending} onClick={() => handleSetStatus("APPROVED")}>
                   <Check className="h-4 w-4 mr-2" /> Duyệt đánh giá
                 </Button>
               ) : (
-                <Button variant="outline" className="w-full text-red-600 border-red-300 hover:bg-red-50" onClick={() => setApproved(false)}>
-                  <X className="h-4 w-4 mr-2" /> Huỷ duyệt
+                <Button variant="outline" className="w-full" disabled={updateMutation.isPending} onClick={() => handleSetStatus("PENDING")}>
+                  Chuyển về chờ duyệt
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={() => setVisible(!visible)}
-              >
-                {visible ? <><EyeOff className="h-4 w-4 mr-2" />Ẩn khỏi trang web</> : <><Eye className="h-4 w-4 mr-2" />Hiển thị trên trang web</>}
-              </Button>
+              {review.status !== "REJECTED" && (
+                <Button
+                  variant="outline"
+                  className="w-full text-red-600 border-red-300 hover:bg-red-50"
+                  disabled={updateMutation.isPending}
+                  onClick={() => handleSetStatus("REJECTED")}
+                >
+                  <X className="h-4 w-4 mr-2" /> Từ chối
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -175,19 +212,28 @@ export default function ReviewDetailPage({ params }: { params: Promise<{ reviewI
             <CardContent className="space-y-3 text-sm">
               <div>
                 <p className="text-gray-500">Bệnh nhân</p>
-                <p className="font-medium">{review.patientName}</p>
+                <p className="font-medium">{patientName}</p>
+                {patientPhone && <p className="text-xs text-gray-500">{patientPhone}</p>}
               </div>
               <div>
                 <p className="text-gray-500">Bác sĩ được đánh giá</p>
-                <p className="font-medium">{review.doctorName}</p>
+                <p className="font-medium">{doctorName}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Khu khám</p>
+                <p className="font-medium">{review.exam_area?.name ?? "—"}</p>
               </div>
               <div>
                 <p className="text-gray-500">Mã lịch hẹn</p>
-                <p className="font-mono text-primary-600">{review.appointmentId}</p>
+                <p className="font-mono text-primary-600 break-all">{review.appointment_id ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Nguồn</p>
+                <p>{review.source ?? "—"}</p>
               </div>
               <div>
                 <p className="text-gray-500">Ngày gửi</p>
-                <p>{formatDateTime(review.createdAt)}</p>
+                <p>{formatDateTime(review.created_at)}</p>
               </div>
             </CardContent>
           </Card>

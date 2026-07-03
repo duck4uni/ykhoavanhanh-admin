@@ -35,6 +35,13 @@ type DoctorApiItem = Partial<HisDoctor> & {
   raw_data?: Record<string, unknown> | null;
 };
 
+export interface PaginatedDoctors {
+  count: number;
+  rows: HisDoctor[];
+  totalPages: number;
+  currentPage: number;
+}
+
 type DoctorsListResponse =
   | DoctorApiItem[]
   | {
@@ -84,6 +91,8 @@ export interface DoctorImportReport {
 export interface DoctorListParams {
   ip?: string;
   idbv?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 // ─── CRUD factory ─────────────────────────────────────────────────────────
@@ -96,9 +105,28 @@ export const doctorsService = {
   ...baseService,
 
   getList: async (params?: DoctorListParams): Promise<HisDoctor[]> => {
+    const data = await doctorsService.getPaginatedList(params);
+    return data.rows;
+  },
+
+  getPaginatedList: async (params?: DoctorListParams): Promise<PaginatedDoctors> => {
     const res = await apiGet<DoctorsListResponse>("/doctors", { params });
     if (res.data.status === "success" && res.data.responseData) {
-      return normalizeDoctorList(res.data.responseData);
+      if (Array.isArray(res.data.responseData)) {
+        const rows = normalizeDoctorList(res.data.responseData);
+        return {
+          count: rows.length,
+          rows,
+          totalPages: 1,
+          currentPage: 1,
+        };
+      }
+      return {
+        count: res.data.responseData.count,
+        rows: normalizeDoctorList(res.data.responseData),
+        totalPages: res.data.responseData.totalPages,
+        currentPage: res.data.responseData.currentPage,
+      };
     }
     throw new Error(res.data.message || "Không thể lấy danh sách bác sĩ");
   },
@@ -181,6 +209,19 @@ export const doctorsHooks = {
     return useQuery<HisDoctor[], Error>({
       queryKey: doctorsKeys.list(params as unknown as Record<string, unknown>),
       queryFn: () => doctorsService.getList(params),
+      staleTime: 1000 * 60 * 2,
+      enabled: options?.enabled ?? true,
+      ...options,
+    });
+  },
+
+  usePaginatedList: (
+    params?: DoctorListParams,
+    options?: { enabled?: boolean; staleTime?: number }
+  ): UseQueryResult<PaginatedDoctors, Error> => {
+    return useQuery<PaginatedDoctors, Error>({
+      queryKey: doctorsKeys.list(params as unknown as Record<string, unknown>),
+      queryFn: () => doctorsService.getPaginatedList(params),
       staleTime: 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
       ...options,

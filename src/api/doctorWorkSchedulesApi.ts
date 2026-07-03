@@ -10,6 +10,12 @@ import type { PaginationParams } from "@/types/api-response";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+export type DoctorWorkScheduleTimeSlot = {
+  start: string;
+  end: string;
+  max_appointments?: number;
+};
+
 export interface DoctorWorkSchedule {
   id: string;
   doctor_id: string;
@@ -17,15 +23,18 @@ export interface DoctorWorkSchedule {
   specialty_id: string | null;
   room_id: string | null;
   schedule_date: string;
-  start_time: string;
-  end_time: string;
+  /** Deprecated response shape kept for old backend compatibility. */
+  start_time?: string;
+  /** Deprecated response shape kept for old backend compatibility. */
+  end_time?: string;
   shift_code: string | null;
   max_appointments: number | null;
   booked_count: number;
-  exam_fee: string | null;
+  exam_fee: number | null;
   allow_booking: boolean;
   status: "ACTIVE" | "INACTIVE";
   note: string | null;
+  time_slots: DoctorWorkScheduleTimeSlot[];
   his_schedule_id: string | null;
   his_updated_at: string | null;
   raw_data: unknown | null;
@@ -59,16 +68,16 @@ export type CreateDoctorWorkSchedulePayload = {
   doctor_id: string;
   exam_area_id: string;
   schedule_date: string;
-  start_time: string;
-  end_time: string;
   specialty_id?: string;
   room_id?: string;
   shift_code?: string;
   max_appointments?: number;
-  exam_fee?: string;
+  booked_count?: number;
+  exam_fee?: number;
   allow_booking?: boolean;
   status?: "ACTIVE" | "INACTIVE";
   note?: string;
+  time_slots?: DoctorWorkScheduleTimeSlot[];
   his_schedule_id?: string;
   his_updated_at?: string;
   raw_data?: unknown;
