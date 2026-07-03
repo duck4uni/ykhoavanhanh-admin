@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { notificationsHooks, type NotificationCategory } from "@/api/notificationsApi";
+import type { Notification } from "@/api/notificationsApi";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
@@ -12,7 +13,6 @@ import {
   CheckCheck,
   Search,
   X,
-  ChevronRight,
   MailOpen,
   Mail,
   Plus,
@@ -222,56 +222,12 @@ export default function NotificationsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRows.map((notif) => (
-                  <tr
+                  <NotificationRow
                     key={notif.id}
-                    className={cn(
-                      "hover:bg-slate-50/60 transition-colors group",
-                      !notif.has_user_read && "bg-sky-50/30"
-                    )}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "mt-0.5 w-2 h-2 rounded-full flex-shrink-0",
-                          notif.has_user_read ? "bg-slate-200" : "bg-primary"
-                        )} />
-                        <div className="min-w-0">
-                          <p className={cn("text-sm truncate max-w-xs", notif.has_user_read ? "text-slate-600" : "font-medium text-slate-800")}>
-                            {notif.title}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">{notif.content}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn("inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium", CATEGORY_COLORS[notif.category])}>
-                        {CATEGORY_LABELS[notif.category]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">
-                      {notif.sent_time ? formatDateTime(notif.sent_time) : "—"}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {notif.has_user_read ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                          <MailOpen className="w-3.5 h-3.5" />
-                          Đã đọc
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                          <Mail className="w-3.5 h-3.5" />
-                          Chưa đọc
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <RowActions
-                        notif={notif}
-                        markOneMutation={markOneMutation}
-                        onDelete={(id) => deleteMutation.mutate(id)}
-                      />
-                    </td>
-                  </tr>
+                    notif={notif}
+                    markOneMutation={markOneMutation}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -327,14 +283,14 @@ export default function NotificationsPage() {
   );
 }
 
-// ── RowActions sub-component ──────────────────────────────────────────────────
+// ── NotificationRow sub-component ─────────────────────────────────────────────
 
-function RowActions({
+function NotificationRow({
   notif,
   markOneMutation,
   onDelete,
 }: {
-  notif: { id: string; has_user_read: boolean };
+  notif: Notification;
   markOneMutation: ReturnType<typeof notificationsHooks.useMarkAsReadById>;
   onDelete: (id: string) => void;
 }) {
@@ -344,42 +300,87 @@ function RowActions({
     onConfirm: () => onDelete(notif.id),
   });
 
+  const handleRowClick = () => {
+    if (!notif.has_user_read) {
+      markOneMutation.mutate(notif.id);
+    }
+  };
+
   return (
     <>
-      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity justify-end">
-        {!notif.has_user_read && (
-          <button
-            onClick={() => markOneMutation.mutate(notif.id)}
-            disabled={markOneMutation.isPending && markOneMutation.variables === notif.id}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-            title="Đánh dấu đã đọc"
-          >
-            <CheckCheck className="w-3.5 h-3.5" />
-          </button>
+      <tr
+        className={cn(
+          "hover:bg-slate-50/60 transition-colors group cursor-pointer",
+          !notif.has_user_read && "bg-sky-50/30"
         )}
-        <Link
-          href={`/notifications/${notif.id}/edit`}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-          title="Chỉnh sửa"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </Link>
-        <button
-          onClick={open}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-          title="Xóa"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-        <Link
-          href={`/notifications/${notif.id}`}
-          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-          title="Xem chi tiết"
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-      {ConfirmDialog}
+        onClick={handleRowClick}
+      >
+        <td className="px-6 py-4">
+          <div className="flex items-start gap-3">
+            <div className={cn(
+              "mt-0.5 w-2 h-2 rounded-full flex-shrink-0",
+              notif.has_user_read ? "bg-slate-200" : "bg-primary"
+            )} />
+            <div className="min-w-0">
+              <p className={cn("text-sm truncate max-w-xs", notif.has_user_read ? "text-slate-600" : "font-medium text-slate-800")}>
+                {notif.title}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate max-w-sm">{notif.content}</p>
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <span className={cn("inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium", CATEGORY_COLORS[notif.category])}>
+            {CATEGORY_LABELS[notif.category]}
+          </span>
+        </td>
+        <td className="px-6 py-4 text-sm text-slate-500">
+          {notif.sent_time ? formatDateTime(notif.sent_time) : "—"}
+        </td>
+        <td className="px-6 py-4 text-center">
+          {notif.has_user_read ? (
+            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+              <MailOpen className="w-3.5 h-3.5" />
+              Đã đọc
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+              <Mail className="w-3.5 h-3.5" />
+              Chưa đọc
+            </span>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity justify-end">
+            {!notif.has_user_read && (
+              <button
+                onClick={(e) => { e.stopPropagation(); markOneMutation.mutate(notif.id); }}
+                disabled={markOneMutation.isPending && markOneMutation.variables === notif.id}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
+                title="Đánh dấu đã đọc"
+              >
+                <CheckCheck className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <Link
+              href={`/notifications/${notif.id}/edit`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
+              title="Chỉnh sửa"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </Link>
+            <button
+              onClick={(e) => { e.stopPropagation(); open(); }}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              title="Xóa"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {ConfirmDialog}
+        </td>
+      </tr>
     </>
   );
 }

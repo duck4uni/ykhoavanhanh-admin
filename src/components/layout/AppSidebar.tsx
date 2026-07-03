@@ -18,7 +18,6 @@ import {
   MessageSquare,
   Settings,
   Stethoscope,
-  Tag,
   Users,
   Wrench,
 } from "lucide-react";

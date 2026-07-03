@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { notificationsHooks, type NotificationCategory, type NotificationSubCategory } from "@/api/notificationsApi";
@@ -31,8 +31,8 @@ function toDatetimeLocal(iso: string | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function EditNotificationPage({ params }: { params: Promise<{ notificationId: string }> }) {
-  const { notificationId } = use(params);
+export default function EditNotificationPage({ params }: { params: { notificationId: string } }) {
+  const { notificationId } = params;
   const router = useRouter();
 
   const { data: notif, isFetching } = notificationsHooks.useDetail(notificationId);

@@ -5,7 +5,7 @@ import {
   type UseMutationOptions,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { apiGet, apiPut } from "@/lib/axios";
+import { apiGet, apiPost, apiPut } from "@/lib/axios";
 import { createApi } from "./createApi";
 
 // ─── Types (theo api.md) ────────────────────────────────────────────────
@@ -53,6 +53,14 @@ const { service: baseService, hooks: baseHooks, keys } = createApi<Notification>
 export const notificationsService = {
   ...baseService,
 
+  create: async (data: Partial<Notification>): Promise<Notification> => {
+    const res = await apiPost<Notification[]>("/notifications", [data as Record<string, unknown>]);
+    if (res.data.status === "success" && res.data.responseData && res.data.responseData.length > 0) {
+      return res.data.responseData[0];
+    }
+    throw new Error(res.data.message || "Tạo thông báo thất bại");
+  },
+
   getList: async (params?: NotificationQuery): Promise<PaginatedNotifications> => {
     const res = await apiGet<PaginatedNotifications>("/notifications", { params });
     if (res.data.status === "success" && res.data.responseData) {
@@ -89,6 +97,24 @@ export const notificationsKeys = keys;
 
 export const notificationsHooks = {
   ...baseHooks,
+
+  useCreate: (
+    options?: UseMutationOptions<Notification, Error, Partial<Notification>>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<Notification, Error, Partial<Notification>>({
+      mutationFn: (data) => notificationsService.create(data),
+      onSuccess: (data, variables, context) => {
+        qc.invalidateQueries({ queryKey: notificationsKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
 
   useList: (
     params?: NotificationQuery,

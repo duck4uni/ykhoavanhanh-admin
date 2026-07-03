@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { notificationsHooks, type NotificationCategory } from "@/api/notificationsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -22,8 +22,8 @@ const CATEGORY_COLORS: Record<NotificationCategory, string> = {
   SYSTEM: "bg-slate-100 text-slate-600",
 };
 
-export default function NotificationDetailPage({ params }: { params: Promise<{ notificationId: string }> }) {
-  const { notificationId } = use(params);
+export default function NotificationDetailPage({ params }: { params: { notificationId: string } }) {
+  const { notificationId } = params;
   const router = useRouter();
 
   const { data: notif, isFetching } = notificationsHooks.useDetail(notificationId);
