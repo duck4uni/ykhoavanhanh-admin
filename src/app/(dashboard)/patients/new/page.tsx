@@ -18,8 +18,6 @@ import {
   CloudUpload,
   FileSearch,
   IdCard,
-  Mail,
-  MapPin,
   Phone,
   Search,
   ShieldCheck,
