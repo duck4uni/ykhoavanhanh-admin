@@ -143,9 +143,11 @@ export const doctorsService = {
 
   create: async (data: Partial<HisDoctor>): Promise<HisDoctor> => {
     const res = await apiPost<DoctorApiItem>("/doctors", {
+      facility_id: data.facility_id,
       doctor_id: data.doctorid,
       doctor_name: data.doctorname,
       description: data.description,
+      specialty_id: data.specialty_id,
     });
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeDoctor(res.data.responseData);
@@ -158,6 +160,7 @@ export const doctorsService = {
       doctor_id: data.doctorid ?? id,
       doctor_name: data.doctorname,
       description: data.description,
+      specialty_id: data.specialty_id,
     });
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeDoctor(res.data.responseData);

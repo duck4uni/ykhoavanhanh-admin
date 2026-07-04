@@ -20,19 +20,23 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection, Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shares/dialog-confirm";
 import { doctorsHooks, type HisDoctor } from "@/api/doctorsApi";
+import { specialtiesHooks } from "@/api/specialtiesApi";
 import { toast } from "@/components/ui/Toast";
 
 const PAGE_SIZE = 10;
+const FALLBACK_FACILITY_ID = "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
 
 type DoctorForm = {
   doctorid: string;
   doctorname: string;
+  specialty_id: string;
   description: string;
 };
 
 const createInitialForm = (): DoctorForm => ({
   doctorid: "",
   doctorname: "",
+  specialty_id: "",
   description: "",
 });
 
@@ -40,6 +44,7 @@ function mapItemToForm(item: HisDoctor): DoctorForm {
   return {
     doctorid: item.doctorid,
     doctorname: item.doctorname,
+    specialty_id: item.specialty_id ?? "",
     description: item.description ?? "",
   };
 }
@@ -62,7 +67,7 @@ function formatUpdatedAt(value: string): string {
   });
 }
 
-function getSpecialtyName(doctor: HisDoctor): string {
+function inferSpecialtyName(doctor: HisDoctor): string {
   const desc = (doctor.description ?? "").toLowerCase();
   if (/sản|phụ|sa/i.test(desc)) return "Sản phụ khoa";
   if (/nội/i.test(desc)) return "Nội tổng quát";
@@ -73,13 +78,13 @@ function getSpecialtyName(doctor: HisDoctor): string {
 }
 
 function getClinicName(doctor: HisDoctor): string {
-  const specialty = getSpecialtyName(doctor);
+  const specialty = inferSpecialtyName(doctor);
   return specialty === "—" ? "—" : `PK ${specialty}`;
 }
 
 function getScheduleCount(doctor: HisDoctor): number {
   const codeNumber = Number(doctor.doctorid.replace(/\D/g, "")) || 0;
-  if (getSpecialtyName(doctor) === "—") return 0;
+  if (inferSpecialtyName(doctor) === "—") return 0;
   return codeNumber % 25;
 }
 
@@ -116,7 +121,12 @@ export default function DoctorsPage() {
     page,
     pageSize: PAGE_SIZE,
   });
+  const { data: specialtiesData } = specialtiesHooks.useList();
   const allDoctors = useMemo(() => doctorsData?.rows ?? [], [doctorsData]);
+  const specialties = specialtiesData?.rows ?? [];
+  const facilityId = allDoctors.find((doctor) => doctor.facility_id)?.facility_id || FALLBACK_FACILITY_ID;
+  const getDoctorSpecialtyName = (doctor: HisDoctor) =>
+    specialties.find((specialty) => specialty.id === doctor.specialty_id)?.name ?? inferSpecialtyName(doctor);
 
   const [search, setSearch] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
@@ -152,8 +162,8 @@ export default function DoctorsPage() {
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const specialtyOptions = useMemo(() => {
-    return Array.from(new Set(allDoctors.map(getSpecialtyName).filter((v) => v !== "—"))).sort();
-  }, [allDoctors]);
+    return specialties.map((specialty) => specialty.name).filter(Boolean).sort();
+  }, [specialties]);
 
   const clinicOptions = useMemo(() => {
     return Array.from(new Set(allDoctors.map(getClinicName).filter((v) => v !== "—"))).sort();
@@ -162,7 +172,7 @@ export default function DoctorsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allDoctors.filter((doctor) => {
-      const specialty = getSpecialtyName(doctor);
+      const specialty = getDoctorSpecialtyName(doctor);
       const clinic = getClinicName(doctor);
       const status = getDoctorStatus(doctor).label;
       const scheduleCount = getScheduleCount(doctor);
@@ -184,7 +194,7 @@ export default function DoctorsPage() {
 
   const activeCount = allDoctors.filter((doctor) => getDoctorStatus(doctor).label === "Hoạt động").length;
   const withSchedule = allDoctors.filter((doctor) => getScheduleCount(doctor) > 0).length;
-  const unassignedSpecialty = allDoctors.filter((doctor) => getSpecialtyName(doctor) === "—").length;
+  const unassignedSpecialty = allDoctors.filter((doctor) => getDoctorSpecialtyName(doctor) === "—").length;
   const activePct = allDoctors.length > 0 ? Math.round((activeCount / allDoctors.length) * 100) : 0;
 
   const totalDoctors = doctorsData?.count ?? allDoctors.length;
@@ -203,8 +213,16 @@ export default function DoctorsPage() {
   }
 
   function openEdit(item: HisDoctor) {
-    setEditingId(item.id);
-    setForm(mapItemToForm(item));
+    // PUT /doctors/{id} dùng mã bác sĩ HIS (doctor_id), không phải UUID DB.
+    setEditingId(item.doctorid);
+
+    const inferredSpecialtyName = inferSpecialtyName(item);
+    const fallbackSpecialtyId = specialties.find((specialty) => specialty.name === inferredSpecialtyName)?.id ?? "";
+
+    setForm({
+      ...mapItemToForm(item),
+      specialty_id: item.specialty_id ?? fallbackSpecialtyId,
+    });
     setModalOpen(true);
   }
 
@@ -220,10 +238,23 @@ export default function DoctorsPage() {
       toast.error("Vui lòng nhập mã và tên bác sĩ");
       return;
     }
+    if (!facilityId) {
+      toast.error("Không xác định được cơ sở y tế để tạo bác sĩ");
+      return;
+    }
+
+    const payload: Partial<HisDoctor> = {
+      facility_id: facilityId,
+      doctorid: form.doctorid.trim(),
+      doctorname: form.doctorname.trim(),
+      specialty_id: form.specialty_id || undefined,
+      description: form.description.trim() || null,
+    };
+
     if (editingId) {
-      updateMutation.mutate({ id: editingId, data: form as Partial<HisDoctor> });
+      updateMutation.mutate({ id: editingId, data: payload });
     } else {
-      createMutation.mutate(form as Partial<HisDoctor>);
+      createMutation.mutate(payload);
     }
   }
 
@@ -368,7 +399,7 @@ export default function DoctorsPage() {
                           <td className="px-5 py-4"><DoctorAvatar doctor={doctor} /></td>
                           <td className="px-5 py-4 font-mono font-semibold text-slate-700">{doctor.doctorid}</td>
                           <td className="px-5 py-4 font-semibold text-slate-800">{doctor.doctorname}</td>
-                          <td className="px-5 py-4 text-slate-700">{getSpecialtyName(doctor)}</td>
+                          <td className="px-5 py-4 text-slate-700">{getDoctorSpecialtyName(doctor)}</td>
                           <td className="px-5 py-4 text-slate-700">{getClinicName(doctor)}</td>
                           <td className="px-5 py-4 font-semibold text-primary-600">{getScheduleCount(doctor)}</td>
                           <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{status.label}</span></td>
@@ -401,6 +432,19 @@ export default function DoctorsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Mã bác sĩ *" value={form.doctorid} onChange={(e) => setForm((p) => ({ ...p, doctorid: e.target.value }))} placeholder="VD: 0330" />
                 <Input label="Tên bác sĩ *" value={form.doctorname} onChange={(e) => setForm((p) => ({ ...p, doctorname: e.target.value }))} placeholder="VD: Nguyễn Văn A" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">Chuyên khoa</label>
+                <select
+                  value={form.specialty_id}
+                  onChange={(e) => setForm((p) => ({ ...p, specialty_id: e.target.value }))}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+                >
+                  <option value="">Chọn chuyên khoa</option>
+                  {specialties.map((specialty) => (
+                    <option key={specialty.id} value={specialty.id}>{specialty.name}</option>
+                  ))}
+                </select>
               </div>
               <Input label="Mô tả" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="VD: Bác sĩ khoa Tim mạch" />
               <div className="flex items-center gap-3 pt-2">
