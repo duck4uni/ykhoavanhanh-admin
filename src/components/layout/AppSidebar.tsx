@@ -58,6 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: "patients", label: "Bệnh nhân", icon: Users,
     children: [
       { name: "Danh sách bệnh nhân", href: "/patients" },
+      { name: "Danh sách lịch khám", href: "/patients/appointment-bookings" },
       { name: "Hồ sơ bệnh án", href: "/medical-records" },
     ],
   },

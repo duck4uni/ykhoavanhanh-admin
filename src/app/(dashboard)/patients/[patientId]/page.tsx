@@ -9,6 +9,7 @@ import { LoadingSection } from "@/components/ui/Spinner";
 import { useGetPatientById } from "@/api/patientApi";
 import { medicalRecordsHooks } from "@/api/medicalRecordsApi";
 import { appointmentReviewsHooks } from "@/api/appointmentReviewsApi";
+import { appointmentBookingsHooks } from "@/api/appointmentBookingsApi";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -61,6 +62,32 @@ function toNumber(v: string | number | null | undefined): number {
   return typeof v === "number" ? v : Number(v) || 0;
 }
 
+function formatStatus(status: string | null | undefined): string {
+  if (!status) return "—";
+  const labels: Record<string, string> = {
+    HIS_SYNCED: "Đã đồng bộ HIS",
+    CONFIRMED: "Đã xác nhận",
+    PAID: "Đã thanh toán",
+    CANCELED: "Đã hủy",
+    CANCELLED: "Đã hủy",
+    PENDING: "Đang chờ",
+    APPROVED: "Đã duyệt",
+    REJECTED: "Từ chối",
+    COMPLETED: "Hoàn tất",
+    UNPAID: "Chưa thanh toán",
+    PARTIAL: "Thanh toán một phần",
+  };
+  return labels[status] ?? status;
+}
+
+function EmptyTab({ text }: { text: string }) {
+  return (
+    <p className="py-10 text-center text-sm text-muted-foreground">
+      {text}
+    </p>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-3 text-sm">
@@ -105,6 +132,21 @@ export default function PatientDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   const { data: patient, isLoading } = useGetPatientById(patientId);
+  const appointmentBookingParams = useMemo(
+    () => ({
+      patient_id: patient?.id ?? patientId,
+      page: 1,
+      pageSize: 10,
+      sortField: "appointment_time",
+      sortOrder: "DESC" as const,
+    }),
+    [patient?.id, patientId],
+  );
+  const { data: bookingsData, isLoading: bookingsLoading } =
+    appointmentBookingsHooks.useList(
+      appointmentBookingParams,
+      { enabled: Boolean(patient?.id ?? patientId) },
+    );
   const { data: recordsData, isLoading: recordsLoading } =
     medicalRecordsHooks.useList(
       {
@@ -127,11 +169,13 @@ export default function PatientDetailPage() {
     { enabled: Boolean(patientId) },
   );
 
+  const bookings = useMemo(() => bookingsData?.rows ?? [], [bookingsData]);
   const records = useMemo(() => recordsData?.rows ?? [], [recordsData]);
   const totalPaid = records.reduce(
     (sum, r) => sum + toNumber(r.paid_amount || r.total_amount),
     0,
   );
+  const latestBooking = bookings[0];
   const latestRecord = records[0];
   const latestReview = reviewsData?.rows?.[0];
 
@@ -212,7 +256,7 @@ export default function PatientDetailPage() {
                 Nguồn: Mobile App
               </span>
               <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
-                {recordsData?.count ?? 0} lượt đặt khám
+                {bookingsData?.count ?? 0} lượt đặt khám
               </span>
               <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-600">
                 Lần cập nhật:{" "}
@@ -249,8 +293,9 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        {/* Main */}
+      {activeTab === "overview" ? (
+        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          {/* Main */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
             <h2 className="mb-5 text-lg font-semibold text-slate-900">
@@ -416,12 +461,12 @@ export default function PatientDetailPage() {
                 <span className="text-muted-foreground">
                   Tổng lượt đặt khám
                 </span>
-                <b>{recordsData?.count ?? 0}</b>
+                <b>{bookingsData?.count ?? 0}</b>
               </div>
               <div className="flex items-center justify-between px-5 py-3 text-sm">
                 <span className="text-muted-foreground">Lần khám gần nhất</span>
                 <b>
-                  {latestRecord ? formatDate(latestRecord.examined_at) : "—"}
+                  {latestBooking?.appointment_time ? formatDate(latestBooking.appointment_time) : "—"}
                 </b>
               </div>
               <div className="flex items-center justify-between px-5 py-3 text-sm">
@@ -472,6 +517,262 @@ export default function PatientDetailPage() {
           </div>
         </div>
       </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
+          {activeTab === "appointments" && (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    Lịch sử đặt khám
+                  </h2>
+                  {/* <p className="text-sm text-muted-foreground">
+                    Dữ liệu từ /appointment-bookings theo patient_id {appointmentBookingParams.patient_id}.
+                  </p> */}
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                  {bookingsData?.count ?? 0} lượt
+                </span>
+              </div>
+              {bookingsLoading ? (
+                <LoadingSection text="Đang tải lịch sử đặt khám..." />
+              ) : bookings.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-medium text-slate-500">
+                        <th className="px-4 py-3">Thời gian hẹn</th>
+                        <th className="px-4 py-3">Mã đặt khám</th>
+                        <th className="px-4 py-3">Mã BN HIS</th>
+                        <th className="px-4 py-3">Phòng</th>
+                        <th className="px-4 py-3">Bác sĩ</th>
+                        <th className="px-4 py-3">Dịch vụ</th>
+                        <th className="px-4 py-3">Nguồn</th>
+                        <th className="px-4 py-3">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {bookings.map((booking) => (
+                        <tr key={booking.id} className="hover:bg-slate-50/60">
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {booking.appointment_time
+                              ? formatDateTime(booking.appointment_time)
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {booking.his_booking_id ?? booking.request_booking_id ?? booking.id}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {booking.his_patient_id ?? booking.patient?.his_patient_id ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {booking.room_id ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {booking.doctor_id ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {booking.service_id ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {booking.source ?? "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
+                              {formatStatus(booking.local_status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyTab text="Chưa có lịch sử đặt khám." />
+              )}
+            </>
+          )}
+
+          {activeTab === "records" && (
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Hồ sơ bệnh án
+                </h2>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                  {recordsData?.count ?? 0} hồ sơ
+                </span>
+              </div>
+              {recordsLoading ? (
+                <LoadingSection text="Đang tải hồ sơ bệnh án..." />
+              ) : records.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-medium text-slate-500">
+                        <th className="px-4 py-3">Mã hồ sơ</th>
+                        <th className="px-4 py-3">Ngày khám</th>
+                        <th className="px-4 py-3">Bác sĩ</th>
+                        <th className="px-4 py-3">Chẩn đoán</th>
+                        <th className="px-4 py-3">Thanh toán</th>
+                        <th className="px-4 py-3">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {records.map((record) => (
+                        <tr key={record.id} className="hover:bg-slate-50/60">
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {record.record_code}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {formatDate(record.examined_at)}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {record.doctor?.doctor_name ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {record.diagnosis ?? record.conclusion ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">
+                            {formatCurrency(toNumber(record.paid_amount || record.total_amount))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
+                              {formatStatus(record.record_status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyTab text="Chưa có hồ sơ bệnh án." />
+              )}
+            </>
+          )}
+
+          {activeTab === "payments" && (
+            <>
+              <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                Thanh toán
+              </h2>
+              {recordsLoading ? (
+                <LoadingSection text="Đang tải dữ liệu thanh toán..." />
+              ) : records.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-medium text-slate-500">
+                        <th className="px-4 py-3">Mã hồ sơ</th>
+                        <th className="px-4 py-3">Ngày khám</th>
+                        <th className="px-4 py-3">Tổng tiền</th>
+                        <th className="px-4 py-3">Đã thanh toán</th>
+                        <th className="px-4 py-3">Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {records.map((record) => (
+                        <tr key={record.id} className="hover:bg-slate-50/60">
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {record.record_code}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {formatDate(record.examined_at)}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">
+                            {formatCurrency(toNumber(record.total_amount))}
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-800">
+                            {formatCurrency(toNumber(record.paid_amount))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              {formatStatus(record.payment_status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyTab text="Chưa có dữ liệu thanh toán." />
+              )}
+            </>
+          )}
+
+          {activeTab === "reviews" && (
+            <>
+              <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                Đánh giá
+              </h2>
+              {latestReview ? (
+                <div className="space-y-4 rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-2xl font-bold text-warning">
+                      {latestReview.overall_rating} ★
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      {formatStatus(latestReview.status)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {formatDateTime(latestReview.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-700">
+                    {latestReview.comment || "Chưa có nội dung đánh giá."}
+                  </p>
+                  {latestReview.admin_reply && (
+                    <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                      <b>Phản hồi:</b> {latestReview.admin_reply}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <EmptyTab text="Chưa có đánh giá." />
+              )}
+            </>
+          )}
+
+          {activeTab === "family" && (
+            <>
+              <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                Người thân
+              </h2>
+              <EmptyTab text="Chưa có dữ liệu người thân." />
+            </>
+          )}
+
+          {activeTab === "logs" && (
+            <>
+              <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                Nhật ký cập nhật
+              </h2>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="font-medium text-slate-800">Cập nhật HIS gần nhất</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {patient.his_updated_at ? formatDateTime(patient.his_updated_at) : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="font-medium text-slate-800">Đồng bộ vào hệ thống</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {patient.synced_at ? formatDateTime(patient.synced_at) : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="font-medium text-slate-800">Cập nhật hồ sơ</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {patient.updated_at ? formatDateTime(patient.updated_at) : "—"}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
