@@ -63,14 +63,14 @@ export function LoginFormView() {
               priority
             />
             <div>
-              <p className="text-sm font-bold tracking-wide text-primary-700">BỆNH VIỆN VẠN HẠNH</p>
+              <p className="text-sm font-bold tracking-wide text-primary-700">BỆNH VIỆN ĐA KHOA VẠN HẠNH</p>
 
               <p className="text-sm text-text-slate">Cổng quản trị nội bộ</p>
             </div>
           </div>
 
           {/* Heading */}
-          <h1 className="text-4xl font-bold leading-tight text-text-navy xl:text-5xl">
+          <h1 className="text-4xl font-bold leading-tight text-text-navy xl:text-4xl">
             Quản lý vận hành bệnh viện
             <br />
             <span className="text-primary-600">nhanh chóng</span> và an toàn
