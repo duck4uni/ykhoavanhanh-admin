@@ -12,7 +12,7 @@ import {
 import { formatDateTime } from "@/lib/utils";
 import { FiRotateCcw, FiSliders } from "react-icons/fi";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+// const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 type BookingFilters = {
   facility_id: string;
@@ -62,7 +62,7 @@ function pruneEmptyFilters(filters: BookingFilters) {
 
 export default function PatientAppointmentBookingsPage() {
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
   const [draftFilters, setDraftFilters] =
     useState<BookingFilters>(initialFilters);
   const [filters, setFilters] = useState<BookingFilters>(initialFilters);

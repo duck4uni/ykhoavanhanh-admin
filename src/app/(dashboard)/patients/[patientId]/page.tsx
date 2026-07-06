@@ -176,7 +176,6 @@ export default function PatientDetailPage() {
     0,
   );
   const latestBooking = bookings[0];
-  const latestRecord = records[0];
   const latestReview = reviewsData?.rows?.[0];
 
   if (isLoading)
