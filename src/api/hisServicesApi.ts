@@ -95,11 +95,18 @@ function normalizeHisServiceList(data: HisServicesListResponse): HisService[] {
 }
 
 export type CreateHisServicePayload = {
+  /** UUID khu vực khám — chọn từ GET /exam-areas. */
+  exam_area_id?: string;
+  /** UUID cơ sở — ưu tiên dùng nếu có (doc mục 2.1). */
+  facility_id?: string;
+  /** Mã cơ sở HIS — dùng khi không truyền facility_id. */
+  idbv?: string;
   service_id: string;
   service_name: string;
-  service_type?: string;
   price?: number;
-  description?: string;
+  specialty_id?: string;
+  /** Field mở rộng (servicetype/insurancetype/description...) ghi vào cột jsonb. */
+  raw_data?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
