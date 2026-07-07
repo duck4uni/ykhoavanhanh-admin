@@ -313,7 +313,9 @@ export function AppSidebar() {
                 {!collapsed && isExpanded && (
                   <div className="ml-7 mt-0.5 space-y-0.5">
                     {visibleChildren.map((child) => {
-                      const childActive = pathname === child.href;
+                      const childActive =
+                        pathname === child.href ||
+                        pathname.startsWith(child.href + "/");
                       return (
                         <Link
                           key={child.href}

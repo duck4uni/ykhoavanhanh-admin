@@ -28,6 +28,7 @@ export interface HisService {
   description: string | null;
   updatetime: string;
   facility_id?: string | null;
+  exam_area_id?: string | null;
   specialty_id?: string | null;
   synced_at?: string | null;
   created_at?: string;

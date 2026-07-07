@@ -15,26 +15,19 @@ import {
   ShieldPlus,
   Trash2,
   CalendarDays,
-  X,
 } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
-import { LoadingSection, Spinner } from "@/components/ui/Spinner";
-import { Input } from "@/components/ui/Input";
+import { LoadingSection } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/shares/dialog-confirm";
-import { specialtiesHooks } from "@/api/specialtiesApi";
 import {
   hisServicesHooks,
   hisServicesService,
   type HisService,
-  type CreateHisServicePayload,
 } from "@/api/hisServicesApi";
 import { toast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
-
-// Cơ sở mặc định để tạo dịch vụ khi list chưa có facility_id (giống trang Bác sĩ).
-const FALLBACK_FACILITY_ID = "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
 
 function formatDateTime(value: string): string {
   const date = new Date(value);
@@ -66,41 +59,6 @@ function supportsInsurance(service: HisService): boolean {
   return service.insurancetype.toLowerCase().includes("bh");
 }
 
-type ServiceForm = {
-  service_id: string;
-  service_name: string;
-  service_type: string;
-  price: string;
-  insurance_type: string;
-  specialty_id: string;
-  description: string;
-};
-
-function createInitialForm(): ServiceForm {
-  return {
-    service_id: "",
-    service_name: "",
-    service_type: "",
-    price: "",
-    insurance_type: "",
-    specialty_id: "",
-    description: "",
-  };
-}
-
-function mapServiceToForm(service: HisService): ServiceForm {
-  return {
-    service_id: service.serviceid ?? "",
-    service_name: service.servicename === "—" ? "" : service.servicename ?? "",
-    service_type: service.servicetype === "—" ? "" : service.servicetype ?? "",
-    price: service.price ? String(service.price) : "",
-    insurance_type:
-      service.insurancetype === "—" ? "" : service.insurancetype ?? "",
-    specialty_id: service.specialty_id ?? "",
-    description: service.description ?? "",
-  };
-}
-
 function StatusBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
@@ -120,44 +78,16 @@ export default function ExamServicesPage() {
   const [fromDate, setFromDate] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingRawData, setEditingRawData] = useState<Record<string, unknown> | null>(null);
-  const [form, setForm] = useState<ServiceForm>(createInitialForm);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const createMutation = hisServicesHooks.useCreate({
-    onSuccess: () => {
-      toast.success("Tạo dịch vụ thành công");
-      closeModal();
-    },
-    onError: (err) => toast.error(err.message || "Tạo dịch vụ thất bại"),
-  });
-  const updateMutation = hisServicesHooks.useUpdate({
-    onSuccess: () => {
-      toast.success("Cập nhật dịch vụ thành công");
-      closeModal();
-    },
-    onError: (err) => toast.error(err.message || "Cập nhật dịch vụ thất bại"),
-  });
   const deleteMutation = hisServicesHooks.useDelete({
     onSuccess: () => toast.success("Xóa dịch vụ thành công"),
     onError: (err) => toast.error(err.message || "Xóa dịch vụ thất bại"),
   });
 
-  const isMutating =
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    deleteMutation.isPending;
-
   const { data, isLoading } = hisServicesHooks.usePaginatedList({ page: currentPage, pageSize });
-  const { data: specialtiesData } = specialtiesHooks.useList();
-  const specialties = specialtiesData?.rows ?? [];
   const services = useMemo(() => data?.rows ?? [], [data]);
-  const facilityId =
-    services.find((service) => service.facility_id)?.facility_id ||
-    FALLBACK_FACILITY_ID;
   const total = data?.count ?? 0;
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
 
@@ -227,51 +157,8 @@ export default function ExamServicesPage() {
   }
 
   function openEdit(service: HisService) {
-    // PUT /his-services/{id} dùng id = UUID (PK) trong DB, không phải mã dịch vụ HIS.
-    setEditingId(service.id);
-    setEditingRawData(service.raw_data ?? null);
-    setForm(mapServiceToForm(service));
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setEditingId(null);
-    setEditingRawData(null);
-    setForm(createInitialForm());
-  }
-
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!form.service_id.trim() || !form.service_name.trim()) {
-      toast.error("Vui lòng nhập mã và tên dịch vụ");
-      return;
-    }
-
-    // Cột thật của bảng his_services: service_id, service_name, price, specialty_id.
-    // servicetype/insurancetype/description KHÔNG phải cột thật → lưu trong raw_data
-    // (đúng key mà normalizeHisService đọc lại để hiển thị). Merge lên raw_data cũ
-    // để không mất các key khác (vd fromdate) khi cập nhật.
-    const rawData: Record<string, unknown> = { ...(editingRawData ?? {}) };
-    rawData.servicetype = form.service_type.trim() || undefined;
-    rawData.insurancetype = form.insurance_type.trim() || undefined;
-    rawData.description = form.description.trim() || undefined;
-
-    const payload: CreateHisServicePayload = {
-      service_id: form.service_id.trim(),
-      service_name: form.service_name.trim(),
-      price: form.price.trim() ? Number(form.price) : undefined,
-      specialty_id: form.specialty_id || undefined,
-      description: form.description.trim() || undefined,
-      raw_data: rawData,
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: payload });
-    } else {
-      // POST cần facility_id (hoặc idbv) để resolve cơ sở — theo doc mục 2.1.
-      createMutation.mutate({ ...payload, facility_id: facilityId });
-    }
+    // Trang sửa dùng id = UUID (PK) trong DB, không phải mã dịch vụ HIS.
+    router.push(`/exam-services/${service.id}/edit`);
   }
 
   function openConfirmDelete(id: string) {
@@ -407,81 +294,6 @@ export default function ExamServicesPage() {
           </>
         )}
       </div>
-
-      {/* Modal tạo/sửa dịch vụ */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-800">{editingId ? "Chỉnh sửa dịch vụ khám" : "Thêm dịch vụ khám"}</h2>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Mã dịch vụ *"
-                  value={form.service_id}
-                  onChange={(e) => setForm((p) => ({ ...p, service_id: e.target.value }))}
-                  placeholder="VD: 51582"
-                  disabled={Boolean(editingId)}
-                />
-                <Input
-                  label="Loại dịch vụ"
-                  value={form.service_type}
-                  onChange={(e) => setForm((p) => ({ ...p, service_type: e.target.value }))}
-                  placeholder="VD: KHÁM"
-                />
-              </div>
-              <Input
-                label="Tên dịch vụ *"
-                value={form.service_name}
-                onChange={(e) => setForm((p) => ({ ...p, service_name: e.target.value }))}
-                placeholder="VD: Khám bệnh chăm sóc tích cực"
-              />
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Giá (đ)"
-                  type="number"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-                  placeholder="VD: 500000"
-                />
-                <Input
-                  label="Loại bảo hiểm"
-                  value={form.insurance_type}
-                  onChange={(e) => setForm((p) => ({ ...p, insurance_type: e.target.value }))}
-                  placeholder="VD: BHYT"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Chuyên khoa</label>
-                <select
-                  value={form.specialty_id}
-                  onChange={(e) => setForm((p) => ({ ...p, specialty_id: e.target.value }))}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
-                >
-                  <option value="">Chọn chuyên khoa</option>
-                  {specialties.map((specialty) => (
-                    <option key={specialty.id} value={specialty.id}>{specialty.name}</option>
-                  ))}
-                </select>
-              </div>
-              <Input
-                label="Mô tả"
-                value={form.description}
-                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                placeholder="Mô tả dịch vụ (không bắt buộc)"
-              />
-              <div className="flex items-center gap-3 pt-2">
-                <button type="submit" disabled={isMutating} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60">{isMutating && <Spinner size="sm" />}{editingId ? "Lưu thay đổi" : "Tạo dịch vụ"}</button>
-                <button type="button" onClick={closeModal} className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200">Hủy</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       <ConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} variant="delete" title="Xóa dịch vụ khám" description="Bạn có chắc muốn xóa dịch vụ này? Hành động này không thể hoàn tác." confirmLabel="Xóa" isLoading={deleteMutation.isPending} onConfirm={handleConfirmDelete} />
     </div>
