@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -9,8 +9,9 @@ import {
   appointmentBookingsHooks,
   type AppointmentBookingListParams,
 } from "@/api/appointmentBookingsApi";
+import { doctorsHooks } from "@/api/doctorsApi";
 import { formatDateTime } from "@/lib/utils";
-import { FiRotateCcw, FiSliders } from "react-icons/fi";
+import { FiChevronDown, FiRotateCcw, FiSliders, FiX } from "react-icons/fi";
 
 // const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -60,6 +61,126 @@ function pruneEmptyFilters(filters: BookingFilters) {
   ) as Partial<BookingFilters>;
 }
 
+type DoctorFilterComboboxProps = {
+  /** Mã HIS bác sĩ (doctorid) đang chọn — dùng làm filter doctor_id. */
+  value: string;
+  onChange: (doctorId: string) => void;
+};
+
+function DoctorFilterCombobox({ value, onChange }: DoctorFilterComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data: doctors = [], isLoading } = doctorsHooks.useList(
+    { doctorname: debouncedSearch || undefined, pageSize: 20 },
+    { enabled: open },
+  );
+
+  const selectedDoctor = useMemo(
+    () => doctors.find((doctor) => doctor.doctorid === value),
+    [doctors, value],
+  );
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const displayLabel = value
+    ? selectedDoctor
+      ? `${selectedDoctor.doctorname} (${selectedDoctor.doctorid})`
+      : value
+    : "";
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-border bg-surface-secondary px-3 text-left text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
+      >
+        <span
+          className={displayLabel ? "truncate text-foreground" : "truncate text-muted-foreground"}
+        >
+          {displayLabel || "Tìm theo tên bác sĩ"}
+        </span>
+        {value ? (
+          <FiX
+            className="h-4 w-4 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange("");
+              setSearch("");
+            }}
+          />
+        ) : (
+          <FiChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-border bg-white shadow-lg">
+          <div className="border-b border-border p-2">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nhập tên bác sĩ..."
+              className="h-9 w-full rounded-lg border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none focus:border-primary-500 focus:bg-white"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {isLoading ? (
+              <div className="px-4 py-3 text-center text-sm text-muted-foreground">
+                Đang tải...
+              </div>
+            ) : doctors.length === 0 ? (
+              <div className="px-4 py-3 text-center text-sm text-muted-foreground">
+                Không tìm thấy bác sĩ phù hợp.
+              </div>
+            ) : (
+              doctors.map((doctor) => (
+                <button
+                  key={doctor.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(doctor.doctorid);
+                    setOpen(false);
+                  }}
+                  className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-primary-50 ${
+                    doctor.doctorid === value
+                      ? "bg-primary-100 text-primary-700"
+                      : "text-slate-700"
+                  }`}
+                >
+                  {doctor.doctorid
+                    ? `${doctor.doctorname} (${doctor.doctorid})`
+                    : doctor.doctorname}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PatientAppointmentBookingsPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -107,13 +228,13 @@ export default function PatientAppointmentBookingsPage() {
           Danh sách lịch khám
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quản lý lịch đặt khám của bệnh nhân từ dữ liệu /appointment-bookings.
+          Quản lý lịch đặt khám của bệnh nhân 
         </p>
       </div>
 
-      <Card className="p-4">
+      <Card className="overflow-visible p-4">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div>
+          {/* <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Mã cơ sở
             </label>
@@ -123,7 +244,7 @@ export default function PatientAppointmentBookingsPage() {
               placeholder="facility_id"
               className="h-11 w-full rounded-xl border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             />
-          </div>
+          </div> */}
           {/* <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Mã bệnh nhân
@@ -167,14 +288,12 @@ export default function PatientAppointmentBookingsPage() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Bác sĩ
             </label>
-            <input
+            <DoctorFilterCombobox
               value={draftFilters.doctor_id}
-              onChange={(e) => handleFilterChange("doctor_id", e.target.value)}
-              placeholder="doctor_id"
-              className="h-11 w-full rounded-xl border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
+              onChange={(doctorId) => handleFilterChange("doctor_id", doctorId)}
             />
           </div>
-          <div>
+          {/* <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Phòng
             </label>
@@ -184,8 +303,8 @@ export default function PatientAppointmentBookingsPage() {
               placeholder="room_id"
               className="h-11 w-full rounded-xl border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             />
-          </div>
-          <div>
+          </div> */}
+          {/* <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Dịch vụ
             </label>
@@ -195,8 +314,8 @@ export default function PatientAppointmentBookingsPage() {
               placeholder="service_id"
               className="h-11 w-full rounded-xl border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             />
-          </div>
-          <div>
+          </div> */}
+          {/* <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Nguồn
             </label>
@@ -206,7 +325,7 @@ export default function PatientAppointmentBookingsPage() {
               placeholder="APP / WEB / PORTAL"
               className="h-11 w-full rounded-xl border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             />
-          </div>
+          </div> */}
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               Từ ngày
@@ -344,13 +463,17 @@ export default function PatientAppointmentBookingsPage() {
                             "—"}
                         </td>
                         <td className="px-5 py-4 text-muted-foreground">
-                          {booking.doctor_id ?? "—"}
+                          {booking.doctor?.doctor_name ??
+                            booking.doctor_id ??
+                            "—"}
                         </td>
                         <td className="px-5 py-4 text-muted-foreground">
-                          {booking.room_id ?? "—"}
+                          {booking.room?.room_name ?? booking.room_id ?? "—"}
                         </td>
                         <td className="px-5 py-4 text-muted-foreground">
-                          {booking.service_id ?? "—"}
+                          {booking.service?.service_name ??
+                            booking.service_id ??
+                            "—"}
                         </td>
                         <td className="px-5 py-4 text-muted-foreground">
                           {booking.source ?? "—"}

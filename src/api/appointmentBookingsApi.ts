@@ -44,6 +44,31 @@ export interface AppointmentBooking {
     facility_name: string | null;
     idbv: string | null;
   };
+  doctor?: {
+    id: string;
+    facility_id: string | null;
+    doctor_id: string | null;
+    doctor_name: string | null;
+    specialty_id: string | null;
+    avatar_url: string | null;
+    description: string | null;
+  } | null;
+  room?: {
+    id: string;
+    facility_id: string | null;
+    room_id: string | null;
+    room_name: string | null;
+    service_id: string | null;
+    description: string | null;
+  } | null;
+  service?: {
+    id: string;
+    facility_id: string | null;
+    service_id: string | null;
+    service_name: string | null;
+    price: number | null;
+    specialty_id: string | null;
+  } | null;
 }
 
 export interface AppointmentBookingListParams extends PaginationParams {

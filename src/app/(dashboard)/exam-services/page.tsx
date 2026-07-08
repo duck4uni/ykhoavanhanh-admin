@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   ClipboardList,
@@ -17,7 +18,12 @@ import {
 } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
-import { hisServicesHooks, hisServicesService, type HisService } from "@/api/hisServicesApi";
+import { ConfirmDialog } from "@/components/shares/dialog-confirm";
+import {
+  hisServicesHooks,
+  hisServicesService,
+  type HisService,
+} from "@/api/hisServicesApi";
 import { toast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
 
@@ -36,17 +42,7 @@ function formatDateTime(value: string): string {
 }
 
 function getSpecialtyName(service: HisService): string {
-  const name = service.servicename.toLowerCase();
-  if (/nhi|bé|hồi sức/i.test(name)) return "Nhi khoa";
-  if (/tim/i.test(name)) return "Tim mạch";
-  if (/sản|phụ/i.test(name)) return "Sản phụ khoa";
-  if (/tai|mũi|họng/i.test(name)) return "Tai mũi họng";
-  if (/răng|hàm|mặt/i.test(name)) return "Răng hàm mặt";
-  if (/mắt/i.test(name)) return "Mắt";
-  if (/da liễu|da/i.test(name)) return "Da liễu";
-  if (/cấp cứu/i.test(name)) return "Cấp cứu";
-  if (/cơ xương|xương khớp/i.test(name)) return "Cơ xương khớp";
-  return "—";
+  return service.specialty?.name || "—";
 }
 
 function supportsInsurance(service: HisService): boolean {
@@ -62,6 +58,7 @@ function StatusBadge() {
 }
 
 export default function ExamServicesPage() {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [search, setSearch] = useState("");
@@ -71,7 +68,15 @@ export default function ExamServicesPage() {
   const [fromDate, setFromDate] = useState("");
   const [isExporting, setIsExporting] = useState(false);
 
-  const { data, isLoading } = hisServicesHooks.usePaginatedList({ page: currentPage, pageSize });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const deleteMutation = hisServicesHooks.useDelete({
+    onSuccess: () => toast.success("Xóa dịch vụ thành công"),
+    onError: (err) => toast.error(err.message || "Xóa dịch vụ thất bại"),
+  });
+
+  const { data, isLoading } = hisServicesHooks.usePaginatedList({ currentPage, pageSize });
   const services = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.count ?? 0;
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
@@ -141,6 +146,23 @@ export default function ExamServicesPage() {
     setCurrentPage(1);
   }
 
+  function openEdit(service: HisService) {
+    // Trang sửa dùng id = UUID (PK) trong DB, không phải mã dịch vụ HIS.
+    router.push(`/exam-services/${service.id}/edit`);
+  }
+
+  function openConfirmDelete(id: string) {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  }
+
+  function handleConfirmDelete() {
+    if (!pendingDeleteId) return;
+    deleteMutation.mutate(pendingDeleteId);
+    setPendingDeleteId(null);
+    setConfirmOpen(false);
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -159,7 +181,7 @@ export default function ExamServicesPage() {
           >
             <Download className="h-4 w-4" /> {isExporting ? "Đang xuất..." : "Xuất Excel"}
           </button>
-          <button onClick={() => toast.info("Chức năng thêm dịch vụ HIS đang được đồng bộ từ backend")} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
+          <button onClick={() => router.push("/exam-services/new")} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
             <Plus className="h-4 w-4" /> Thêm dịch vụ khám
           </button>
         </div>
@@ -247,10 +269,10 @@ export default function ExamServicesPage() {
                       <td className="px-5 py-4 text-slate-700">{getSpecialtyName(service)}</td>
                       <td className="px-5 py-4 text-slate-700">{service.servicetype}</td>
                       <td className="px-5 py-4 font-semibold text-slate-800">{formatCurrency(Number(service.price) || 0)}</td>
-                      <td className="px-5 py-4 text-slate-700">{supportsInsurance(service) ? "BHYT" : "Không BHYT"}</td>
+                      <td className="px-5 py-4 text-slate-700">{service.insurancetype && service.insurancetype !== "—" ? service.insurancetype : "—"}</td>
                       <td className="px-5 py-4"><StatusBadge /></td>
                       <td className="px-5 py-4 text-slate-600">{formatDateTime(service.updatetime || service.updated_at || "")}</td>
-                      <td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="Xem"><Eye className="h-4 w-4" /></button><button className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-primary hover:bg-primary-50" title="Sửa"><Pencil className="h-4 w-4" /></button><button className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50" title="Xóa"><Trash2 className="h-4 w-4" /></button></div></td>
+                      <td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button onClick={() => openEdit(service)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="Xem"><Eye className="h-4 w-4" /></button><button onClick={() => openEdit(service)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-primary hover:bg-primary-50" title="Sửa"><Pencil className="h-4 w-4" /></button><button onClick={() => openConfirmDelete(service.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50" title="Xóa"><Trash2 className="h-4 w-4" /></button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -262,6 +284,8 @@ export default function ExamServicesPage() {
           </>
         )}
       </div>
+
+      <ConfirmDialog open={confirmOpen} onOpenChange={setConfirmOpen} variant="delete" title="Xóa dịch vụ khám" description="Bạn có chắc muốn xóa dịch vụ này? Hành động này không thể hoàn tác." confirmLabel="Xóa" isLoading={deleteMutation.isPending} onConfirm={handleConfirmDelete} />
     </div>
   );
 }
