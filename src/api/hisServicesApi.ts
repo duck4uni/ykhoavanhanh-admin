@@ -27,9 +27,12 @@ export interface HisService {
   insurancetype: string;
   description: string | null;
   updatetime: string;
-  facility_id?: string | null;
   exam_area_id?: string | null;
   specialty_id?: string | null;
+  /** Quan hệ chuyên khoa kèm sẵn (include) — dùng để hiển thị tên mà không cần tra cứu riêng. */
+  specialty?: { id: string; name: string } | null;
+  /** Quan hệ khu vực khám kèm sẵn (include). */
+  exam_area?: { id: string; name: string } | null;
   synced_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -37,10 +40,18 @@ export interface HisService {
 }
 
 export interface HisServiceParams {
-  ip?: string;
+  /** Mã cơ sở y tế — dùng để đồng bộ từ HIS & xác định khu vực khám (GET list). */
   idbv?: string;
-  page?: number;
+  /** Trang hiện tại. Không truyền cùng pageSize → BE trả full data. */
+  currentPage?: number;
+  /** Số bản ghi/trang. Không truyền cùng currentPage → BE trả full data. */
   pageSize?: number;
+  /** Cú pháp `field<toán tử>value`, nhiều điều kiện nối bằng dấu phẩy (AND). */
+  filters?: string;
+  /** Mặc định `service_name` ở BE nếu không truyền. */
+  sortField?: string;
+  /** `ASC`/`DESC`, mặc định `ASC` ở BE nếu không truyền. */
+  sortOrder?: "ASC" | "DESC";
 }
 
 type HisServiceApiItem = Partial<HisService> & {
@@ -98,10 +109,6 @@ function normalizeHisServiceList(data: HisServicesListResponse): HisService[] {
 export type CreateHisServicePayload = {
   /** UUID khu vực khám — chọn từ GET /exam-areas. */
   exam_area_id?: string;
-  /** UUID cơ sở — ưu tiên dùng nếu có (doc mục 2.1). */
-  facility_id?: string;
-  /** Mã cơ sở HIS — dùng khi không truyền facility_id. */
-  idbv?: string;
   service_id: string;
   service_name: string;
   price?: number;
