@@ -43,17 +43,7 @@ function formatDateTime(value: string): string {
 }
 
 function getSpecialtyName(service: HisService): string {
-  const name = service.servicename.toLowerCase();
-  if (/nhi|bé|hồi sức/i.test(name)) return "Nhi khoa";
-  if (/tim/i.test(name)) return "Tim mạch";
-  if (/sản|phụ/i.test(name)) return "Sản phụ khoa";
-  if (/tai|mũi|họng/i.test(name)) return "Tai mũi họng";
-  if (/răng|hàm|mặt/i.test(name)) return "Răng hàm mặt";
-  if (/mắt/i.test(name)) return "Mắt";
-  if (/da liễu|da/i.test(name)) return "Da liễu";
-  if (/cấp cứu/i.test(name)) return "Cấp cứu";
-  if (/cơ xương|xương khớp/i.test(name)) return "Cơ xương khớp";
-  return "—";
+  return service.specialty?.name || "—";
 }
 
 function supportsInsurance(service: HisService): boolean {

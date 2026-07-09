@@ -51,7 +51,7 @@ export function LoginFormView() {
     >
       <div className="mx-auto grid min-h-screen max-w-[1400px] grid-cols-1 items-center gap-8 px-6 py-10 lg:grid-cols-2 lg:gap-16 lg:px-12">
         {/* ── Left: branding + features ── */}
-        <div className="hidden flex-col lg:flex">
+        <div className="hidden flex-col lg:flex lg:pl-10">
           {/* Logo */}
           <div className="mb-12 flex items-center gap-3">
             <Image
@@ -121,11 +121,15 @@ export function LoginFormView() {
             onSubmit={handleSubmit}
             className="rounded-3xl bg-white p-8 shadow-xl ring-1 ring-black/5 sm:p-10"
           >
-            {/* Shield badge */}
+            {/* Logo badge */}
             <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg">
-                <FiShield className="h-7 w-7" />
-              </div>
+              <Image
+                src="/assets/images/logo.png"
+                alt="Bệnh viện Vạn Hạnh"
+                width={56}
+                height={56}
+                className="h-14 w-14 rounded-full object-cover"
+              />
             </div>
 
             <h2 className="text-center text-2xl font-bold text-text-navy">Đăng nhập</h2>
