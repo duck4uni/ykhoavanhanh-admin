@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   CheckCircle2,
@@ -73,6 +75,12 @@ function formToPayload(form: AreaForm): CreateExamAreaPayload {
   };
 }
 
+function isValidVietnamesePhone(value: string): boolean {
+  const phone = value.trim();
+  if (!phone) return true;
+  return /^(?:\+84|84|0)(?:\d{9}|\d{10})$/.test(phone.replace(/[\s.-]/g, ""));
+}
+
 function StatusBadge({ status }: { status: ExamArea["status"] }) {
   const active = status === "ACTIVE";
   return (
@@ -91,30 +99,68 @@ function StatusBadge({ status }: { status: ExamArea["status"] }) {
 
 function RowMenu({
   item,
+  onView,
   onEdit,
+  onViewRooms,
   onToggle,
   onDelete,
 }: {
   item: ExamArea;
+  onView: () => void;
   onEdit: () => void;
+  onViewRooms: () => void;
   onToggle: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const MENU_WIDTH = 176; // w-44
+  const MENU_HEIGHT = 232; // ước lượng chiều cao menu
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // Mở lên trên nếu không đủ chỗ bên dưới
+    const top =
+      spaceBelow < MENU_HEIGHT ? rect.top - MENU_HEIGHT - 4 : rect.bottom + 4;
+    const left = Math.max(8, rect.right - MENU_WIDTH);
+    setCoords({ top, left });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    const handlePointer = (event: MouseEvent) => {
+      if (
+        triggerRef.current?.contains(event.target as Node) ||
+        menuRef.current?.contains(event.target as Node)
+      )
+        return;
+      setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const handleClose = () => setOpen(false);
+    document.addEventListener("mousedown", handlePointer);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative flex justify-end">
+    <div className="flex justify-end">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
@@ -123,49 +169,69 @@ function RowMenu({
         <MoreVertical className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
-          <button className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-            <Eye className="h-4 w-4" /> Chi tiết
-          </button>
-          <button
-            onClick={() => {
-              setOpen(false);
-              onEdit();
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+      {open &&
+        mounted &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{ top: coords.top, left: coords.left, width: MENU_WIDTH }}
+            className="fixed z-50 overflow-hidden rounded-xl border border-slate-100 bg-white py-1 shadow-lg"
           >
-            <Pencil className="h-4 w-4" /> Chỉnh sửa
-          </button>
-          <button className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-            <DoorOpen className="h-4 w-4" /> Xem phòng khám
-          </button>
-          <button
-            onClick={() => {
-              setOpen(false);
-              onToggle();
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <Power className="h-4 w-4" /> {item.status === "ACTIVE" ? "Tạm tắt" : "Kích hoạt"}
-          </button>
-          <div className="my-1 border-t border-slate-100" />
-          <button
-            onClick={() => {
-              setOpen(false);
-              onDelete();
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" /> Xóa
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => {
+                setOpen(false);
+                onView();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Eye className="h-4 w-4" /> Chi tiết
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Pencil className="h-4 w-4" /> Chỉnh sửa
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onViewRooms();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <DoorOpen className="h-4 w-4" /> Xem phòng khám
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onToggle();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Power className="h-4 w-4" /> {item.status === "ACTIVE" ? "Tạm tắt" : "Kích hoạt"}
+            </button>
+            <div className="my-1 border-t border-slate-100" />
+            <button
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" /> Xóa
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
 
 export default function ExamAreasPage() {
+  const router = useRouter();
   const { data, isLoading } = examAreasHooks.useList();
   const areas = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.count ?? areas.length;
@@ -179,6 +245,8 @@ export default function ExamAreasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AreaForm>(createInitialForm);
+
+  const [viewingArea, setViewingArea] = useState<ExamArea | null>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -205,6 +273,10 @@ export default function ExamAreasPage() {
   });
 
   const isMutating = createMutation.isPending || updateMutation.isPending;
+  const phoneError =
+    form.phone.trim() && !isValidVietnamesePhone(form.phone)
+      ? "Số điện thoại không đúng định dạng"
+      : undefined;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -269,6 +341,14 @@ export default function ExamAreasPage() {
     setModalOpen(true);
   }
 
+  function openView(item: ExamArea) {
+    setViewingArea(item);
+  }
+
+  function viewRooms(item: ExamArea) {
+    router.push(`/clinics?q=${encodeURIComponent(item.short_name || item.name)}`);
+  }
+
   function closeModal() {
     setModalOpen(false);
     setEditingId(null);
@@ -279,6 +359,10 @@ export default function ExamAreasPage() {
     event.preventDefault();
     if (!form.code.trim() || !form.name.trim()) {
       toast.error("Vui lòng nhập mã và tên khu vực khám");
+      return;
+    }
+    if (!isValidVietnamesePhone(form.phone)) {
+      toast.error("Số điện thoại không đúng định dạng");
       return;
     }
     if (editingId) {
@@ -430,7 +514,7 @@ export default function ExamAreasPage() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     <th className="px-5 py-3.5">STT</th>
-                    <th className="px-5 py-3.5">Mã khu vực</th>
+                    <th className="px-5 py-3.5">ID Nội bộ</th>
                     <th className="px-5 py-3.5">Tên khu vực</th>
                     <th className="px-5 py-3.5">Tên viết tắt</th>
                     <th className="px-5 py-3.5">Chi nhánh</th>
@@ -475,7 +559,9 @@ export default function ExamAreasPage() {
                         <td className="px-5 py-4">
                           <RowMenu
                             item={area}
+                            onView={() => openView(area)}
                             onEdit={() => openEdit(area)}
+                            onViewRooms={() => viewRooms(area)}
                             onToggle={() => toggleStatus(area)}
                             onDelete={() => openConfirmDelete(area.id)}
                           />
@@ -514,10 +600,17 @@ export default function ExamAreasPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input label="Mã khu vực *" value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} placeholder="VD: KV-001" />
+                <Input label="ID Nội bộ *" value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} placeholder="VD: KV-001" />
                 <Input label="Tên khu vực khám *" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="VD: Khu khám chuyên sâu" />
                 <Input label="Tên viết tắt" value={form.short_name} onChange={(e) => setForm((p) => ({ ...p, short_name: e.target.value }))} placeholder="VD: KCS" />
-                <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="VD: 0333748720000" />
+                <Input
+                  label="Số điện thoại"
+                  value={form.phone}
+                  onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                  placeholder="VD: 0333748720"
+                  inputMode="tel"
+                  error={phoneError}
+                />
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">Trạng thái</label>
                   <select
@@ -556,7 +649,7 @@ export default function ExamAreasPage() {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={isMutating}
+                  disabled={isMutating || Boolean(phoneError)}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
                 >
                   {isMutating && <Spinner size="sm" />}
@@ -567,6 +660,72 @@ export default function ExamAreasPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Detail modal */}
+      {viewingArea && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setViewingArea(null)} />
+          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-800">Chi tiết khu vực khám</h2>
+              <button onClick={() => setViewingArea(null)} className="text-slate-400 hover:text-slate-600">×</button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-sm font-semibold text-primary-600">{viewingArea.code}</span>
+                <StatusBadge status={viewingArea.status} />
+              </div>
+
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Tên khu vực</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-slate-800">{viewingArea.name}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Tên viết tắt</dt>
+                  <dd className="mt-0.5 text-sm text-slate-700">{viewingArea.short_name || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Số điện thoại</dt>
+                  <dd className="mt-0.5 text-sm text-slate-700">{viewingArea.phone || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Chi nhánh</dt>
+                  <dd className="mt-0.5 text-sm text-slate-700">Bệnh viện Vạn Hạnh</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-muted-foreground">Địa chỉ</dt>
+                  <dd className="mt-0.5 text-sm text-slate-700">{viewingArea.address || "—"}</dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs font-medium text-muted-foreground">Mô tả</dt>
+                  <dd className="mt-0.5 text-sm text-slate-700">{viewingArea.description || "—"}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button
+                onClick={() => {
+                  const area = viewingArea;
+                  setViewingArea(null);
+                  if (area) openEdit(area);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+              >
+                <Pencil className="h-4 w-4" /> Chỉnh sửa
+              </button>
+              <button
+                onClick={() => setViewingArea(null)}
+                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

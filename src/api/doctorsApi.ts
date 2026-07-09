@@ -95,6 +95,10 @@ export interface DoctorListParams {
   page?: number;
   pageSize?: number;
   doctorname?: string;
+  sortField?: string;
+  sortOrder?: "ASC" | "DESC";
+  /** Bộ lọc phía server (Sieve). `@=` là chứa, `==` là bằng. VD: `doctor_name@=Nguyễn Văn A`. */
+  filters?: string;
 }
 
 // ─── CRUD factory ─────────────────────────────────────────────────────────
@@ -112,7 +116,12 @@ export const doctorsService = {
   },
 
   getPaginatedList: async (params?: DoctorListParams): Promise<PaginatedDoctors> => {
-    const res = await apiGet<DoctorsListResponse>("/doctors", { params });
+    const queryParams: DoctorListParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<DoctorsListResponse>("/doctors", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       if (Array.isArray(res.data.responseData)) {
         const rows = normalizeDoctorList(res.data.responseData);
@@ -157,7 +166,7 @@ export const doctorsService = {
 
   update: async (id: string, data: Partial<HisDoctor>): Promise<HisDoctor> => {
     const res = await apiPut<DoctorApiItem>(`/doctors/${id}`, {
-      doctor_id: data.doctorid ?? id,
+      doctor_id: data.doctorid,
       doctor_name: data.doctorname,
       description: data.description,
       specialty_id: data.specialty_id,

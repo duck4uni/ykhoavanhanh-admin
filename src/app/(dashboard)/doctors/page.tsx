@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   CalendarCheck,
@@ -22,6 +22,7 @@ import { ConfirmDialog } from "@/components/shares/dialog-confirm";
 import { doctorsHooks, type HisDoctor } from "@/api/doctorsApi";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 
 const PAGE_SIZE = 10;
 const FALLBACK_FACILITY_ID = "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
@@ -117,9 +118,20 @@ function DoctorAvatar({ doctor }: { doctor: HisDoctor }) {
 
 export default function DoctorsPage() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo tên bác sĩ: filters=doctor_name@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `doctor_name@=${debouncedSearch.trim()}`
+    : undefined;
+
   const { data: doctorsData, isLoading } = doctorsHooks.usePaginatedList({
     page,
     pageSize: PAGE_SIZE,
+    filters: serverFilters,
+    sortField: "created_at",
+    sortOrder: "DESC",
   });
   const { data: specialtiesData } = specialtiesHooks.useList();
   const allDoctors = useMemo(() => doctorsData?.rows ?? [], [doctorsData]);
@@ -128,7 +140,6 @@ export default function DoctorsPage() {
   const getDoctorSpecialtyName = (doctor: HisDoctor) =>
     specialties.find((specialty) => specialty.id === doctor.specialty_id)?.name ?? inferSpecialtyName(doctor);
 
-  const [search, setSearch] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
   const [clinicFilter, setClinicFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -161,6 +172,11 @@ export default function DoctorsPage() {
 
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const specialtyOptions = useMemo(() => {
     return specialties.map((specialty) => specialty.name).filter(Boolean).sort();
   }, [specialties]);
@@ -170,24 +186,19 @@ export default function DoctorsPage() {
   }, [allDoctors]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Tìm kiếm theo tên đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return allDoctors.filter((doctor) => {
       const specialty = getDoctorSpecialtyName(doctor);
       const clinic = getClinicName(doctor);
       const status = getDoctorStatus(doctor).label;
       const scheduleCount = getScheduleCount(doctor);
-      const matchSearch =
-        !q ||
-        doctor.doctorid.toLowerCase().includes(q) ||
-        doctor.doctorname.toLowerCase().includes(q) ||
-        (doctor.description ?? "").toLowerCase().includes(q);
       const matchSpecialty = specialtyFilter === "all" || specialty === specialtyFilter;
       const matchClinic = clinicFilter === "all" || clinic === clinicFilter;
       const matchStatus = statusFilter === "all" || status === statusFilter;
       const matchSchedule = scheduleFilter === "all" || (scheduleFilter === "has" ? scheduleCount > 0 : scheduleCount === 0);
-      return matchSearch && matchSpecialty && matchClinic && matchStatus && matchSchedule;
+      return matchSpecialty && matchClinic && matchStatus && matchSchedule;
     });
-  }, [allDoctors, search, specialtyFilter, clinicFilter, statusFilter, scheduleFilter]);
+  }, [allDoctors, specialtyFilter, clinicFilter, statusFilter, scheduleFilter]);
 
   const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered;
@@ -213,8 +224,8 @@ export default function DoctorsPage() {
   }
 
   function openEdit(item: HisDoctor) {
-    // PUT /doctors/{id} dùng mã bác sĩ HIS (doctor_id), không phải UUID DB.
-    setEditingId(item.doctorid);
+    // PUT /doctors/{id} dùng UUID bản ghi DB, không phải mã bác sĩ HIS (doctor_id).
+    setEditingId(item.id);
 
     const inferredSpecialtyName = inferSpecialtyName(item);
     const fallbackSpecialtyId = specialties.find((specialty) => specialty.name === inferredSpecialtyName)?.id ?? "";

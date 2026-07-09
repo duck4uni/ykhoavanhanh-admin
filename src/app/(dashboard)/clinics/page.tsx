@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Building2,
   CheckCircle2,
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/Input";
 import { LoadingSection, Spinner } from "@/components/ui/Spinner";
 import { roomsHooks, type HisRoom } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 
 const PAGE_SIZE = 10;
 
@@ -69,19 +71,39 @@ function mapRoomToForm(room: HisRoom): RoomForm {
 
 export default function ClinicsPage() {
   const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo tên phòng khám: filters=room_name@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `room_name@=${debouncedSearch.trim()}`
+    : undefined;
+
   const { data: roomsData, isLoading } = roomsHooks.usePaginatedList({
     page,
     pageSize: PAGE_SIZE,
+    filters: serverFilters,
   });
   const allRooms = useMemo(() => roomsData?.rows ?? [], [roomsData]);
 
-  const [search, setSearch] = useState("");
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const [areaFilter, setAreaFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [hisFilter, setHisFilter] = useState("all");
   const [editingRoom, setEditingRoom] = useState<HisRoom | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [form, setForm] = useState<RoomForm>({ room_id: "", room_name: "", description: "" });
+
+  // Điền sẵn ô tìm kiếm khi điều hướng từ trang "Xem phòng khám"
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
+  }, [searchParams]);
 
   const updateMutation = roomsHooks.useUpdate({
     onSuccess: () => {
@@ -104,21 +126,15 @@ export default function ClinicsPage() {
   }, [allRooms]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Tìm kiếm theo tên phòng đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return allRooms.filter((room) => {
       const areaName = getExamAreaName(room);
-      const matchSearch =
-        !q ||
-        room.roomid.toLowerCase().includes(q) ||
-        room.roomname.toLowerCase().includes(q) ||
-        (room.description ?? "").toLowerCase().includes(q) ||
-        room.mavp.toLowerCase().includes(q);
       const matchArea = areaFilter === "all" || areaName === areaFilter;
       const matchStatus = statusFilter === "all" || statusFilter === "ACTIVE";
       const matchHis = hisFilter === "all" || (hisFilter === "has" ? hasHisCode(room) : !hasHisCode(room));
-      return matchSearch && matchArea && matchStatus && matchHis;
+      return matchArea && matchStatus && matchHis;
     });
-  }, [allRooms, search, areaFilter, statusFilter, hisFilter]);
+  }, [allRooms, areaFilter, statusFilter, hisFilter]);
 
   const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered;

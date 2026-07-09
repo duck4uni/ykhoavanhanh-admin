@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,7 @@ import {
   type MedicalRecord,
 } from "@/api/medicalRecordsApi";
 import { specialtiesHooks } from "@/api/specialtiesApi";
+import { useDebounce } from "@/hooks/useApiHelpers";
 import {
   FiFileText,
   FiCalendar,
@@ -48,12 +49,24 @@ export default function MedicalRecordsPage() {
   const [toDate, setToDate] = useState("");
   const [specialtyId, setSpecialtyId] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo mã hồ sơ: filters=record_code@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `record_code@=${debouncedSearch.trim()}`
+    : undefined;
+
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const { data, isLoading } = medicalRecordsHooks.useList({
     page,
     pageSize: PAGE_SIZE,
     sortField: "examined_at",
     sortOrder: "DESC",
+    filters: serverFilters,
     ...(paymentStatus ? { payment_status: paymentStatus } : {}),
   });
 
@@ -65,21 +78,16 @@ export default function MedicalRecordsPage() {
   const totalItems = data?.count ?? 0;
   const totalPages = data?.totalPages ?? 1;
 
-  // Lọc client-side: từ khóa, khoảng ngày, chuyên khoa (API list chưa hỗ trợ)
+  // Tìm kiếm theo mã hồ sơ đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return serverRows.filter((r) => {
-      const matchQuery =
-        !q ||
-        (r.patient?.patient_full_name ?? "").toLowerCase().includes(q) ||
-        (r.record_code ?? "").toLowerCase().includes(q);
       const day = r.examined_at?.slice(0, 10) ?? "";
       const matchFrom = !fromDate || day >= fromDate;
       const matchTo = !toDate || day <= toDate;
       const matchSpecialty = !specialtyId || r.specialty_id === specialtyId;
-      return matchQuery && matchFrom && matchTo && matchSpecialty;
+      return matchFrom && matchTo && matchSpecialty;
     });
-  }, [serverRows, search, fromDate, toDate, specialtyId]);
+  }, [serverRows, fromDate, toDate, specialtyId]);
 
   const resetFilters = () => {
     setSearch("");

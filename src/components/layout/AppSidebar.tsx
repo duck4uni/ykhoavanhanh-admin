@@ -313,9 +313,18 @@ export function AppSidebar() {
                 {!collapsed && isExpanded && (
                   <div className="ml-7 mt-0.5 space-y-0.5">
                     {visibleChildren.map((child) => {
+                      // Chỉ tính prefix-match khi không có child khác khớp cụ thể hơn
+                      // (VD: /patients không được active khi đang ở /patients/appointment-bookings).
+                      const matchesChild = (href: string) =>
+                        pathname === href || pathname.startsWith(href + "/");
                       const childActive =
-                        pathname === child.href ||
-                        pathname.startsWith(child.href + "/");
+                        matchesChild(child.href) &&
+                        !visibleChildren.some(
+                          (other) =>
+                            other.href !== child.href &&
+                            other.href.startsWith(child.href + "/") &&
+                            matchesChild(other.href)
+                        );
                       return (
                         <Link
                           key={child.href}

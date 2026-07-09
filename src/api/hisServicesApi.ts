@@ -41,6 +41,10 @@ export interface HisServiceParams {
   idbv?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: "ASC" | "DESC";
+  /** Bộ lọc phía server (Sieve). `@=` là chứa, `==` là bằng. VD: `service_name@=Khám`. */
+  filters?: string;
 }
 
 type HisServiceApiItem = Partial<HisService> & {
@@ -128,7 +132,12 @@ export const hisServicesKeys = {
 export const hisServicesService = {
   /** Lấy danh sách dịch vụ từ HIS */
   getList: async (params?: HisServiceParams): Promise<HisService[]> => {
-    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
+    const queryParams: HisServiceParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeHisServiceList(res.data.responseData);
     }
@@ -137,7 +146,12 @@ export const hisServicesService = {
 
   /** Lấy danh sách dịch vụ từ HIS kèm thông tin phân trang */
   getPaginatedList: async (params?: HisServiceParams): Promise<PaginatedHisServices> => {
-    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
+    const queryParams: HisServiceParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       if (Array.isArray(res.data.responseData)) {
         const rows = normalizeHisServiceList(res.data.responseData);

@@ -70,6 +70,8 @@ export interface RoomListParams {
   idbv?: string;
   page?: number;
   pageSize?: number;
+  /** Bộ lọc phía server (Sieve). `@=` là chứa, `==` là bằng. VD: `room_name@=Phòng khám`. */
+  filters?: string;
 }
 
 export interface PaginatedRooms {
