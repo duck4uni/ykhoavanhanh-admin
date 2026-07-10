@@ -29,10 +29,24 @@ export interface HisService {
   updatetime: string;
   exam_area_id?: string | null;
   specialty_id?: string | null;
+  is_delete?: boolean;
+  booking_note?: string | null;
+  display_priority?: number | null;
+  display_group?: number | null;
+  room_visit_instruction?: string | null;
+  detail?: string | null;
   /** Quan hệ chuyên khoa kèm sẵn (include) — dùng để hiển thị tên mà không cần tra cứu riêng. */
-  specialty?: { id: string; name: string } | null;
+  specialty?: { id: string; name: string; description?: string | null; is_active?: boolean } | null;
   /** Quan hệ khu vực khám kèm sẵn (include). */
-  exam_area?: { id: string; name: string } | null;
+  exam_area?: {
+    id: string;
+    code?: string;
+    name: string;
+    short_name?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    status?: string;
+  } | null;
   synced_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -46,12 +60,10 @@ export interface HisServiceParams {
   currentPage?: number;
   /** Số bản ghi/trang. Không truyền cùng currentPage → BE trả full data. */
   pageSize?: number;
-  /** Cú pháp `field<toán tử>value`, nhiều điều kiện nối bằng dấu phẩy (AND). */
-  filters?: string;
-  /** Mặc định `service_name` ở BE nếu không truyền. */
   sortField?: string;
-  /** `ASC`/`DESC`, mặc định `ASC` ở BE nếu không truyền. */
   sortOrder?: "ASC" | "DESC";
+  /** Bộ lọc phía server (Sieve). `@=` là chứa, `==` là bằng. VD: `service_name@=Khám`. */
+  filters?: string;
 }
 
 type HisServiceApiItem = Partial<HisService> & {
@@ -113,6 +125,11 @@ export type CreateHisServicePayload = {
   service_name: string;
   price?: number;
   specialty_id?: string;
+  booking_note?: string | null;
+  display_priority?: number | null;
+  display_group?: number | null;
+  room_visit_instruction?: string | null;
+  detail?: string | null;
   /** Field mở rộng (servicetype/insurancetype/description...) ghi vào cột jsonb. */
   raw_data?: Record<string, unknown>;
   [key: string]: unknown;
@@ -135,7 +152,12 @@ export const hisServicesKeys = {
 export const hisServicesService = {
   /** Lấy danh sách dịch vụ từ HIS */
   getList: async (params?: HisServiceParams): Promise<HisService[]> => {
-    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
+    const queryParams: HisServiceParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeHisServiceList(res.data.responseData);
     }
@@ -144,7 +166,12 @@ export const hisServicesService = {
 
   /** Lấy danh sách dịch vụ từ HIS kèm thông tin phân trang */
   getPaginatedList: async (params?: HisServiceParams): Promise<PaginatedHisServices> => {
-    const res = await apiGet<HisServicesListResponse>("/his-services", { params });
+    const queryParams: HisServiceParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<HisServicesListResponse>("/his-services", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       if (Array.isArray(res.data.responseData)) {
         const rows = normalizeHisServiceList(res.data.responseData);

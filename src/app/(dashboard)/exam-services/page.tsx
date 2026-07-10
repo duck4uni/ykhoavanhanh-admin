@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -26,6 +26,7 @@ import {
 } from "@/api/hisServicesApi";
 import { toast } from "@/components/ui/Toast";
 import { formatCurrency } from "@/lib/utils";
+import { useDebounce } from "@/hooks/useApiHelpers";
 
 const PAGE_SIZE = 10;
 
@@ -76,26 +77,39 @@ export default function ExamServicesPage() {
     onError: (err) => toast.error(err.message || "Xóa dịch vụ thất bại"),
   });
 
-  const { data, isLoading } = hisServicesHooks.usePaginatedList({ currentPage, pageSize });
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo tên dịch vụ: filters=service_name@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `service_name@=${debouncedSearch.trim()}`
+    : undefined;
+
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading } = hisServicesHooks.usePaginatedList({
+    currentPage,
+    pageSize,
+    filters: serverFilters,
+    sortField: "created_at",
+    sortOrder: "DESC",
+  });
   const services = useMemo(() => data?.rows ?? [], [data]);
   const total = data?.count ?? 0;
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
 
   const filteredServices = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Tìm kiếm theo tên đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return services.filter((service) => {
-      const matchSearch =
-        !q ||
-        service.serviceid.toLowerCase().includes(q) ||
-        service.servicename.toLowerCase().includes(q) ||
-        service.servicetype.toLowerCase().includes(q);
       const matchType = serviceTypeFilter === "all" || service.servicetype === serviceTypeFilter;
       const matchInsurance = insuranceFilter === "all" || (insuranceFilter === "yes" ? supportsInsurance(service) : !supportsInsurance(service));
       const matchStatus = statusFilter === "all" || statusFilter === "active";
       const matchDate = !fromDate || service.updatetime.startsWith(fromDate) || service.fromdate.startsWith(fromDate);
-      return matchSearch && matchType && matchInsurance && matchStatus && matchDate;
+      return matchType && matchInsurance && matchStatus && matchDate;
     });
-  }, [services, search, serviceTypeFilter, insuranceFilter, statusFilter, fromDate]);
+  }, [services, serviceTypeFilter, insuranceFilter, statusFilter, fromDate]);
 
   const serviceTypes = useMemo(() => Array.from(new Set(services.map((s) => s.servicetype).filter(Boolean))).sort(), [services]);
   const activeCount = total;

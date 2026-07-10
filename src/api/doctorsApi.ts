@@ -11,6 +11,13 @@ import { createApi } from "./createApi";
 
 // ─── HIS Doctor Type (khớp api.md) ────────────────────────────────────────
 
+export interface DoctorSpecialty {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+}
+
 export interface HisDoctor {
   /** UUID nội bộ nếu API trả về; fallback về doctorid với response HIS cũ. */
   id: string;
@@ -20,13 +27,25 @@ export interface HisDoctor {
   doctorname: string;
   description: string | null;
   updatetime: string;
-  facility_id?: string | null;
   specialty_id?: string | null;
+  specialty?: DoctorSpecialty | null;
   avatar_url?: string | null;
   his_updated_at?: string | null;
   synced_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  is_delete?: boolean;
+  academic_degree?: string | null;
+  academic_title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  booking_note?: string | null;
+  booking_group?: string | null;
+  status?: string | null;
+  display_group?: number | null;
+  display_priority?: number | null;
   raw_data?: Record<string, unknown> | null;
 }
 
@@ -74,6 +93,28 @@ function normalizeDoctorList(data: DoctorsListResponse): HisDoctor[] {
   return rows.map(normalizeDoctor);
 }
 
+export interface CreateDoctorPayload {
+  doctor_id: string;
+  doctor_name: string;
+  description?: string | null;
+  specialty_id?: string;
+  avatar_url?: string | null;
+  his_updated_at?: string | null;
+  academic_degree?: string | null;
+  academic_title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  booking_note?: string | null;
+  booking_group?: string | null;
+  status?: string;
+  display_group?: number | null;
+  display_priority?: number | null;
+}
+
+export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;
+
 export interface DoctorImportResult {
   row: number;
   doctor_id: string;
@@ -90,11 +131,12 @@ export interface DoctorImportReport {
 }
 
 export interface DoctorListParams {
-  ip?: string;
-  idbv?: string;
-  page?: number;
+  currentPage?: number;
   pageSize?: number;
-  doctorname?: string;
+  sortField?: string;
+  sortOrder?: "ASC" | "DESC";
+  /** Bộ lọc phía server (Sieve). `@=` là chứa, `==` là bằng. VD: `doctor_name@=Nguyễn Văn A`. */
+  filters?: string;
 }
 
 // ─── CRUD factory ─────────────────────────────────────────────────────────
@@ -112,7 +154,12 @@ export const doctorsService = {
   },
 
   getPaginatedList: async (params?: DoctorListParams): Promise<PaginatedDoctors> => {
-    const res = await apiGet<DoctorsListResponse>("/doctors", { params });
+    const queryParams: DoctorListParams = {
+      sortField: "created_at",
+      sortOrder: "DESC",
+      ...params,
+    };
+    const res = await apiGet<DoctorsListResponse>("/doctors", { params: queryParams });
     if (res.data.status === "success" && res.data.responseData) {
       if (Array.isArray(res.data.responseData)) {
         const rows = normalizeDoctorList(res.data.responseData);
@@ -141,27 +188,16 @@ export const doctorsService = {
     throw new Error(res.data.message || "Không thể lấy thông tin bác sĩ");
   },
 
-  create: async (data: Partial<HisDoctor>): Promise<HisDoctor> => {
-    const res = await apiPost<DoctorApiItem>("/doctors", {
-      facility_id: data.facility_id,
-      doctor_id: data.doctorid,
-      doctor_name: data.doctorname,
-      description: data.description,
-      specialty_id: data.specialty_id,
-    });
+  create: async (data: CreateDoctorPayload): Promise<HisDoctor> => {
+    const res = await apiPost<DoctorApiItem>("/doctors", data);
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeDoctor(res.data.responseData);
     }
     throw new Error(res.data.message || "Tạo bác sĩ thất bại");
   },
 
-  update: async (id: string, data: Partial<HisDoctor>): Promise<HisDoctor> => {
-    const res = await apiPut<DoctorApiItem>(`/doctors/${id}`, {
-      doctor_id: data.doctorid ?? id,
-      doctor_name: data.doctorname,
-      description: data.description,
-      specialty_id: data.specialty_id,
-    });
+  update: async (id: string, data: UpdateDoctorPayload): Promise<HisDoctor> => {
+    const res = await apiPut<DoctorApiItem>(`/doctors/${id}`, data);
     if (res.data.status === "success" && res.data.responseData) {
       return normalizeDoctor(res.data.responseData);
     }
@@ -240,7 +276,7 @@ export const doctorsHooks = {
     const pageSize = options?.pageSize ?? 10;
     return useInfiniteQuery({
       queryKey: [...doctorsKeys.list(params as unknown as Record<string, unknown>), "infinite", pageSize],
-      queryFn: ({ pageParam }) => doctorsService.getPaginatedList({ ...params, page: pageParam, pageSize }),
+      queryFn: ({ pageParam }) => doctorsService.getPaginatedList({ ...params, currentPage: pageParam, pageSize }),
       initialPageParam: 1,
       getNextPageParam: (lastPage) =>
         lastPage.currentPage < lastPage.totalPages ? lastPage.currentPage + 1 : undefined,
@@ -263,11 +299,11 @@ export const doctorsHooks = {
   },
 
   useCreate: (
-    options?: UseMutationOptions<HisDoctor, Error, Partial<HisDoctor>>
+    options?: UseMutationOptions<HisDoctor, Error, CreateDoctorPayload>
   ) => {
     const qc = useQueryClient();
     const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
-    return useMutation<HisDoctor, Error, Partial<HisDoctor>>({
+    return useMutation<HisDoctor, Error, CreateDoctorPayload>({
       mutationFn: (data) => doctorsService.create(data),
       onSuccess: (data, variables, context) => {
         qc.invalidateQueries({ queryKey: doctorsKeys.all });
@@ -281,11 +317,11 @@ export const doctorsHooks = {
   },
 
   useUpdate: (
-    options?: UseMutationOptions<HisDoctor, Error, { id: string; data: Partial<HisDoctor> }>
+    options?: UseMutationOptions<HisDoctor, Error, { id: string; data: UpdateDoctorPayload }>
   ) => {
     const qc = useQueryClient();
     const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
-    return useMutation<HisDoctor, Error, { id: string; data: Partial<HisDoctor> }>({
+    return useMutation<HisDoctor, Error, { id: string; data: UpdateDoctorPayload }>({
       mutationFn: ({ id, data }) => doctorsService.update(id, data),
       onSuccess: (data, variables, context) => {
         qc.invalidateQueries({ queryKey: doctorsKeys.all });

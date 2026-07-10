@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
@@ -8,6 +8,7 @@ import { appointmentReviewsHooks, type AppointmentReview } from "@/api/appointme
 import { doctorsHooks } from "@/api/doctorsApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { formatDate } from "@/lib/utils";
+import { useDebounce } from "@/hooks/useApiHelpers";
 import {
   Star,
   MessageSquare,
@@ -146,12 +147,24 @@ export default function ReviewsPage() {
   const [areaFilter, setAreaFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo nội dung nhận xét: filters=comment@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `comment@=${debouncedSearch.trim()}`
+    : undefined;
+
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const { data, isLoading } = appointmentReviewsHooks.useList({
     page,
     pageSize: PAGE_SIZE,
     sortField: "created_at",
     sortOrder: "DESC",
+    filters: serverFilters,
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(doctorFilter ? { doctor_id: doctorFilter } : {}),
     ...(areaFilter ? { exam_area_id: areaFilter } : {}),
@@ -165,21 +178,15 @@ export default function ReviewsPage() {
 
   const serverRows = useMemo(() => data?.rows ?? [], [data]);
 
-  // Lọc client-side: từ khóa + khoảng ngày (API list chưa hỗ trợ 2 filter này)
+  // Tìm kiếm theo nội dung nhận xét đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return serverRows.filter((r) => {
-      const matchQuery =
-        !q ||
-        (r.patient?.patient_full_name ?? "").toLowerCase().includes(q) ||
-        (r.doctor?.doctor_name ?? "").toLowerCase().includes(q) ||
-        (r.comment ?? "").toLowerCase().includes(q);
       const created = r.created_at?.slice(0, 10) ?? "";
       const matchFrom = !fromDate || created >= fromDate;
       const matchTo = !toDate || created <= toDate;
-      return matchQuery && matchFrom && matchTo;
+      return matchFrom && matchTo;
     });
-  }, [serverRows, search, fromDate, toDate]);
+  }, [serverRows, fromDate, toDate]);
 
   const totalPages = data?.totalPages ?? 1;
   const totalItems = data?.count ?? 0;
@@ -277,7 +284,7 @@ export default function ReviewsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo bệnh nhân, bác sĩ, nội dung nhận xét..."
+              placeholder="Tìm theo nội dung nhận xét..."
               className={`${inputCls} pl-10`}
             />
           </div>

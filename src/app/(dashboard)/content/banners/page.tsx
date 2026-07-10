@@ -89,7 +89,7 @@ export default function BannersPage() {
     onError: (err) => toast.error(err.message || "Tạo banner thất bại"),
   });
 
-  const patchMutation = pageConfigHooks.usePatch({
+  const updateMutation = pageConfigHooks.useUpdate({
     onSuccess: () => {
       toast.success("Cập nhật banner thành công");
       closeModal();
@@ -155,7 +155,7 @@ export default function BannersPage() {
       content: form.content.trim() || undefined,
     };
     if (editingId) {
-      patchMutation.mutate({ id: editingId, data: payload });
+      updateMutation.mutate({ id: editingId, data: payload });
     } else {
       createMutation.mutate(payload);
     }
@@ -177,7 +177,7 @@ export default function BannersPage() {
     }
   }
 
-  const isMutating = createMutation.isPending || patchMutation.isPending || uploadMutation.isPending;
+  const isMutating = createMutation.isPending || updateMutation.isPending || uploadMutation.isPending;
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
 

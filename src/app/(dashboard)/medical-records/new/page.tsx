@@ -233,6 +233,14 @@ export default function NewMedicalRecordPage() {
       toast.error("Vui lòng chọn thời điểm khám.");
       return;
     }
+    if (!form.specialty_id) {
+      toast.error("Vui lòng chọn chuyên khoa.");
+      return;
+    }
+    if (!form.doctor_id) {
+      toast.error("Vui lòng chọn bác sĩ khám.");
+      return;
+    }
 
     createMutation.mutate({
       facility_id: selectedPatient.facility_id,
@@ -380,7 +388,7 @@ export default function NewMedicalRecordPage() {
                   required
                 />
                 <Select
-                  label="Chuyên khoa"
+                  label="Chuyên khoa *"
                   value={form.specialty_id}
                   onValueChange={(val) => setForm((prev) => ({ ...prev, specialty_id: val }))}
                   options={specialtyOptions}
@@ -389,7 +397,7 @@ export default function NewMedicalRecordPage() {
                 />
                 {/* Bác sĩ khám (Infinite Scroll Dropdown) */}
                 <div className="relative" ref={doctorDropdownRef}>
-                  <label className="mb-1 block text-sm font-medium text-foreground">Bác sĩ khám</label>
+                  <label className="mb-1 block text-sm font-medium text-foreground">Bác sĩ khám *</label>
                   <button
                     type="button"
                     onClick={() => setIsDoctorDropdownOpen((prev) => !prev)}

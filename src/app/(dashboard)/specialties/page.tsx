@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/shares/dialog-confirm";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { AdminSpecialty } from "@/types/hospital-admin";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 
 const PAGE_SIZE = 10;
 
@@ -149,11 +150,24 @@ export default function SpecialtiesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo tên chuyên khoa: filters=name@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `name@=${debouncedSearch.trim()}`
+    : undefined;
+
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
   const { data, isLoading } = specialtiesHooks.useList({
     page: currentPage,
     pageSize,
     sortField: "created_at",
     sortOrder: "DESC",
+    filters: serverFilters,
   });
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
@@ -186,22 +200,16 @@ export default function SpecialtiesPage() {
   );
 
   const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Tìm kiếm theo tên đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return rows.filter((item) => {
-      const matchSearch =
-        !q ||
-        item.name.toLowerCase().includes(q) ||
-        item.internal_id.toLowerCase().includes(q) ||
-        item.booking_group.toLowerCase().includes(q) ||
-        item.guide_room.toLowerCase().includes(q);
       const matchStatus = statusFilter === "all";
       const matchVisible =
         bookingVisibleFilter === "all" ||
         (bookingVisibleFilter === "show" ? !item.hide_search : item.hide_search);
       const matchGroup = bookingGroupFilter === "all" || item.booking_group === bookingGroupFilter;
-      return matchSearch && matchStatus && matchVisible && matchGroup;
+      return matchStatus && matchVisible && matchGroup;
     });
-  }, [rows, search, statusFilter, bookingVisibleFilter, bookingGroupFilter]);
+  }, [rows, statusFilter, bookingVisibleFilter, bookingGroupFilter]);
 
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
   const activeCount = rows.length;

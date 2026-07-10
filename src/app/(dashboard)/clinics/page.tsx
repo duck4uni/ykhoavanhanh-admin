@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
   CheckCircle2,
@@ -12,24 +13,26 @@ import {
   RotateCcw,
   Pencil,
   Trash2,
-  X,
 } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
-import { Input } from "@/components/ui/Input";
-import { LoadingSection, Spinner } from "@/components/ui/Spinner";
+import { LoadingSection } from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/shares/dialog-confirm";
 import { roomsHooks, type HisRoom } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 
 const PAGE_SIZE = 10;
 
 function getExamAreaName(room: HisRoom): string {
-  const text = `${room.roomname} ${room.description ?? ""}`.toUpperCase();
-  const match = text.match(/KHU\s*([A-Z])/);
-  return match ? `Khu ${match[1]}` : "Chưa phân khu";
+  return room.exam_area_description?.trim() || "Chưa phân khu";
 }
 
-function hasHisCode(room: HisRoom): boolean {
-  return Boolean(room.mavp && room.mavp.trim() && room.mavp !== "—");
+function getExamAreaLabel(room: HisRoom): string {
+  return room.exam_area?.name?.trim() || getExamAreaName(room);
+}
+
+function hasAssignedServices(room: HisRoom): boolean {
+  return (room.his_room_services?.length ?? 0) > 0;
 }
 
 function formatUpdatedAt(value: string): string {
@@ -44,59 +47,60 @@ function formatUpdatedAt(value: string): string {
   });
 }
 
-function StatusBadge() {
+function StatusBadge({ deleted }: { deleted?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-      Hoạt động
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+        deleted
+          ? "border-slate-200 bg-slate-100 text-slate-500"
+          : "border-emerald-200 bg-emerald-50 text-emerald-600"
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${deleted ? "bg-slate-400" : "bg-emerald-500"}`} />
+      {deleted ? "Đã xóa" : "Hoạt động"}
     </span>
   );
 }
 
-type RoomForm = {
-  room_id: string;
-  room_name: string;
-  description: string;
-};
-
-function mapRoomToForm(room: HisRoom): RoomForm {
-  return {
-    room_id: room.roomid,
-    room_name: room.roomname,
-    description: room.description ?? "",
-  };
-}
-
 export default function ClinicsPage() {
+  const router = useRouter();
   const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  // Bộ lọc phía server theo tên phòng khám: filters=room_name@=<giá trị>
+  const serverFilters = debouncedSearch.trim()
+    ? `room_name@=${debouncedSearch.trim()}`
+    : undefined;
+
   const { data: roomsData, isLoading } = roomsHooks.usePaginatedList({
-    page,
+    currentPage: page,
     pageSize: PAGE_SIZE,
+    filters: serverFilters,
   });
   const allRooms = useMemo(() => roomsData?.rows ?? [], [roomsData]);
 
-  const [search, setSearch] = useState("");
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const [areaFilter, setAreaFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [hisFilter, setHisFilter] = useState("all");
-  const [editingRoom, setEditingRoom] = useState<HisRoom | null>(null);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [form, setForm] = useState<RoomForm>({ room_id: "", room_name: "", description: "" });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const updateMutation = roomsHooks.useUpdate({
-    onSuccess: () => {
-      toast.success("Cập nhật phòng khám thành công");
-      closeEditModal();
-    },
-    onError: (err) => toast.error(err.message || "Cập nhật phòng khám thất bại"),
-  });
+  // Điền sẵn ô tìm kiếm khi điều hướng từ trang "Xem phòng khám"
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
+  }, [searchParams]);
 
-  const createMutation = roomsHooks.useCreate({
-    onSuccess: () => {
-      toast.success("Tạo phòng khám thành công");
-      closeCreateModal();
-    },
-    onError: (err) => toast.error(err.message || "Tạo phòng khám thất bại"),
+  const deleteMutation = roomsHooks.useDelete({
+    onSuccess: () => toast.success("Xóa phòng khám thành công"),
+    onError: (err) => toast.error(err.message || "Xóa phòng khám thất bại"),
   });
 
   const examAreaOptions = useMemo(() => {
@@ -104,37 +108,33 @@ export default function ClinicsPage() {
   }, [allRooms]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Tìm kiếm theo tên phòng đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return allRooms.filter((room) => {
       const areaName = getExamAreaName(room);
-      const matchSearch =
-        !q ||
-        room.roomid.toLowerCase().includes(q) ||
-        room.roomname.toLowerCase().includes(q) ||
-        (room.description ?? "").toLowerCase().includes(q) ||
-        room.mavp.toLowerCase().includes(q);
       const matchArea = areaFilter === "all" || areaName === areaFilter;
-      const matchStatus = statusFilter === "all" || statusFilter === "ACTIVE";
-      const matchHis = hisFilter === "all" || (hisFilter === "has" ? hasHisCode(room) : !hasHisCode(room));
-      return matchSearch && matchArea && matchStatus && matchHis;
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "ACTIVE" ? !room.is_delete : room.is_delete);
+      const matchHis = hisFilter === "all" || (hisFilter === "has" ? hasAssignedServices(room) : !hasAssignedServices(room));
+      return matchArea && matchStatus && matchHis;
     });
-  }, [allRooms, search, areaFilter, statusFilter, hisFilter]);
+  }, [allRooms, areaFilter, statusFilter, hisFilter]);
 
   const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered;
 
   const totalRooms = roomsData?.count ?? allRooms.length;
-  const activeRooms = allRooms.length;
-  const withHis = allRooms.filter(hasHisCode).length;
+  const activeRooms = allRooms.filter((room) => !room.is_delete).length;
+  const withServiceCode = allRooms.filter(hasAssignedServices).length;
   const withoutDescription = allRooms.filter((room) => !room.description?.trim()).length;
   const activePct = totalRooms > 0 ? ((activeRooms / totalRooms) * 100).toFixed(2) : "0";
-  const withHisPct = totalRooms > 0 ? ((withHis / totalRooms) * 100).toFixed(2) : "0";
+  const withServiceCodePct = totalRooms > 0 ? ((withServiceCode / totalRooms) * 100).toFixed(2) : "0";
   const noDescPct = totalRooms > 0 ? ((withoutDescription / totalRooms) * 100).toFixed(2) : "0";
 
   const stats = [
-    { label: "Tổng phòng khám", value: totalRooms, sub: "Tất cả khu khám", icon: Building2, tone: "bg-primary-100 text-primary-600" },
+    { label: "Tổng phòng khám", value: totalRooms, sub: "Tất cả phòng khám", icon: Building2, tone: "bg-primary-100 text-primary-600" },
     { label: "Đang hoạt động", value: activeRooms, sub: `${activePct}% tổng số`, icon: CheckCircle2, tone: "bg-success-light text-success" },
-    { label: "Có mã HIS", value: withHis, sub: `${withHisPct}% tổng số`, icon: FileText, tone: "bg-purple-100 text-purple-600" },
+    { label: "Đã gán dịch vụ", value: withServiceCode, sub: `${withServiceCodePct}% tổng số`, icon: FileText, tone: "bg-purple-100 text-purple-600" },
     { label: "Chưa có mô tả", value: withoutDescription, sub: `${noDescPct}% tổng số`, icon: Info, tone: "bg-warning-light text-warning" },
   ];
 
@@ -146,63 +146,16 @@ export default function ClinicsPage() {
     setPage(1);
   }
 
-  function showHisOnlyNotice(action: string) {
-    toast.info(`Chưa hỗ trợ ${action} phòng khám từ HIS API`);
+  function openConfirmDelete(id: string) {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
   }
 
-  function openEditModal(room: HisRoom) {
-    setEditingRoom(room);
-    setForm(mapRoomToForm(room));
-  }
-
-  function closeEditModal() {
-    setEditingRoom(null);
-    setForm({ room_id: "", room_name: "", description: "" });
-  }
-
-  function openCreateModal() {
-    setForm({ room_id: "", room_name: "", description: "" });
-    setCreateModalOpen(true);
-  }
-
-  function closeCreateModal() {
-    setCreateModalOpen(false);
-    setForm({ room_id: "", room_name: "", description: "" });
-  }
-
-  async function handleCreateRoom(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.room_id.trim() || !form.room_name.trim()) {
-      toast.error("Vui lòng nhập mã phòng và tên phòng khám");
-      return;
-    }
-
-    const facilityId = allRooms[0]?.facility_id || "6b7caa40-1a83-4449-8b69-e8d19567c0f7";
-
-    await createMutation.mutateAsync({
-      facility_id: facilityId,
-      room_id: form.room_id.trim(),
-      room_name: form.room_name.trim(),
-      description: form.description.trim() || null,
-    });
-  }
-
-  async function handleUpdateRoom(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingRoom) return;
-    if (!form.room_id.trim() || !form.room_name.trim()) {
-      toast.error("Vui lòng nhập mã phòng và tên phòng khám");
-      return;
-    }
-
-    await updateMutation.mutateAsync({
-      id: editingRoom.id,
-      data: {
-        room_id: form.room_id.trim(),
-        room_name: form.room_name.trim(),
-        description: form.description.trim() || null,
-      },
-    });
+  function handleConfirmDelete() {
+    if (!pendingDeleteId) return;
+    deleteMutation.mutate(pendingDeleteId);
+    setPendingDeleteId(null);
+    setConfirmOpen(false);
   }
 
   return (
@@ -212,11 +165,11 @@ export default function ClinicsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Phòng khám</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý danh sách phòng khám, khu khám và mã đồng bộ HIS
+            Quản lý danh sách phòng khám, khu khám và dịch vụ đã gán
           </p>
         </div>
         <button
-          onClick={openCreateModal}
+          onClick={() => router.push("/clinics/new")}
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" /> Thêm phòng khám
@@ -292,11 +245,12 @@ export default function ClinicsPage() {
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="ACTIVE">Hoạt động</option>
+              <option value="DELETED">Đã xóa</option>
             </select>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Mã HIS</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Dịch vụ đã gán</label>
             <select
               value={hisFilter}
               onChange={(event) => {
@@ -306,8 +260,8 @@ export default function ClinicsPage() {
               className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             >
               <option value="all">Tất cả</option>
-              <option value="has">Có mã HIS</option>
-              <option value="none">Chưa có mã HIS</option>
+              <option value="has">Đã gán dịch vụ</option>
+              <option value="none">Chưa gán dịch vụ</option>
             </select>
           </div>
 
@@ -339,8 +293,8 @@ export default function ClinicsPage() {
                     <th className="px-5 py-3.5">STT</th>
                     <th className="px-5 py-3.5">Mã phòng</th>
                     <th className="px-5 py-3.5">Tên phòng khám</th>
-                    <th className="px-5 py-3.5">Khu khám</th>
-                    <th className="px-5 py-3.5">Mã HIS</th>
+                    <th className="px-5 py-3.5">Loại phòng khám</th>
+                    <th className="px-5 py-3.5">Khu khám bệnh</th>
                     <th className="px-5 py-3.5">Trạng thái</th>
                     <th className="px-5 py-3.5">Cập nhật lúc</th>
                     <th className="px-5 py-3.5 text-right">Thao tác</th>
@@ -362,22 +316,22 @@ export default function ClinicsPage() {
                           </span>
                         </td>
                         <td className="px-5 py-4 font-mono font-semibold text-slate-800">{room.roomid}</td>
-                        <td className="px-5 py-4 font-semibold text-slate-800">{room.roomname}</td>
-                        <td className="px-5 py-4 text-slate-700">{getExamAreaName(room)}</td>
-                        <td className="px-5 py-4 font-mono text-slate-700">{hasHisCode(room) ? room.mavp : "—"}</td>
-                        <td className="px-5 py-4"><StatusBadge /></td>
-                        <td className="px-5 py-4 text-slate-600">{formatUpdatedAt(room.updatetime)}</td>
+                        <td className="max-w-xs px-5 py-4 font-semibold text-slate-800">{room.roomname}</td>
+                        <td className="px-5 py-4 text-slate-700">{room.clinic_type || "—"}</td>
+                        <td className="max-w-xs px-5 py-4 text-slate-700">{getExamAreaLabel(room) || "—"}</td>
+                        <td className="px-5 py-4"><StatusBadge deleted={room.is_delete} /></td>
+                        <td className="px-5 py-4 text-slate-600">{formatUpdatedAt(room.updated_at || room.synced_at || room.updatetime)}</td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => openEditModal(room)}
+                              onClick={() => router.push(`/clinics/${room.id}/edit`) }
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-primary transition-colors hover:bg-primary-50"
                               title="Sửa"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => showHisOnlyNotice("xóa")}
+                              onClick={() => openConfirmDelete(room.id)}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 text-red-500 transition-colors hover:bg-red-50"
                               title="Xóa"
                             >
@@ -405,122 +359,16 @@ export default function ClinicsPage() {
         )}
       </div>
 
-      {editingRoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeEditModal} />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-xl font-bold text-slate-900">Chỉnh sửa phòng khám</h2>
-              <button onClick={closeEditModal} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateRoom} className="space-y-5 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Mã phòng *"
-                  value={form.room_id}
-                  onChange={(event) => setForm((current) => ({ ...current, room_id: event.target.value }))}
-                  required
-                />
-                <Input
-                  label="Tên phòng khám *"
-                  value={form.room_name}
-                  onChange={(event) => setForm((current) => ({ ...current, room_name: event.target.value }))}
-                  required
-                />
-                <div className="md:col-span-2">
-                  <Input
-                    label="Mô tả"
-                    value={form.description}
-                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Nhập mô tả phòng khám"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  disabled={updateMutation.isPending}
-                  className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-60"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
-                >
-                  {updateMutation.isPending && <Spinner size="sm" />}
-                  Lưu thay đổi
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeCreateModal} />
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h2 className="text-xl font-bold text-slate-900">Thêm phòng khám mới</h2>
-              <button onClick={closeCreateModal} className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateRoom} className="space-y-5 p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Mã phòng *"
-                  value={form.room_id}
-                  onChange={(event) => setForm((current) => ({ ...current, room_id: event.target.value }))}
-                  required
-                />
-                <Input
-                  label="Tên phòng khám *"
-                  value={form.room_name}
-                  onChange={(event) => setForm((current) => ({ ...current, room_name: event.target.value }))}
-                  required
-                />
-                <div className="md:col-span-2">
-                  <Input
-                    label="Mô tả"
-                    value={form.description}
-                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                    placeholder="Nhập mô tả phòng khám"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5">
-                <button
-                  type="button"
-                  onClick={closeCreateModal}
-                  disabled={createMutation.isPending}
-                  className="rounded-xl bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-60"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
-                >
-                  {createMutation.isPending && <Spinner size="sm" />}
-                  Tạo phòng khám
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        variant="delete"
+        title="Xóa phòng khám"
+        description="Bạn có chắc muốn xóa phòng khám này? Hành động này sẽ đánh dấu phòng khám đã xóa."
+        confirmLabel="Xóa"
+        isLoading={deleteMutation.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
