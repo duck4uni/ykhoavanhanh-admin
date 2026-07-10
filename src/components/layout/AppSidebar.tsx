@@ -220,9 +220,10 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "sticky top-0 z-40 flex h-screen flex-col border-r border-border bg-white transition-all duration-300",
+        "sticky top-0 z-40 flex h-screen flex-col border-r border-border bg-white bg-cover bg-center bg-no-repeat transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
+      style={{ backgroundImage: "url('/images/background_sidebar.png')" }}
     >
       {/* Header: logo + collapse toggle */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">

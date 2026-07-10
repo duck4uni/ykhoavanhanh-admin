@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardList, MapPin, ShieldPlus, Stethoscope, Tag } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
+import { TextEditor } from "@/components/shares/rich-text-editor";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { formatCurrency } from "@/lib/utils";
@@ -26,6 +27,11 @@ export type ServiceFormValues = {
   exam_area_id: string;
   specialty_id: string;
   description: string;
+  booking_note: string;
+  display_group: string;
+  display_priority: string;
+  room_visit_instruction: string;
+  detail: string;
 };
 
 export function createInitialServiceForm(): ServiceFormValues {
@@ -38,6 +44,11 @@ export function createInitialServiceForm(): ServiceFormValues {
     exam_area_id: "",
     specialty_id: "",
     description: "",
+    booking_note: "",
+    display_group: "",
+    display_priority: "",
+    room_visit_instruction: "",
+    detail: "",
   };
 }
 
@@ -77,6 +88,10 @@ export function ServiceForm({
   const specialties = specialtiesData?.rows ?? [];
   const { data: examAreasData } = examAreasHooks.useList();
   const examAreas = examAreasData?.rows ?? [];
+
+  useEffect(() => {
+    setForm(initialForm);
+  }, [initialForm]);
 
   function toggleInsurance(value: string) {
     setForm((p) => ({
@@ -200,6 +215,45 @@ export function ServiceForm({
               </select>
             </div>
             <Input
+              label="Chi tiết dịch vụ"
+              value={form.detail}
+              onChange={(e) => setForm((p) => ({ ...p, detail: e.target.value }))}
+              placeholder="VD: Dịch vụ khám tổng quát"
+            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Hướng dẫn vào phòng khám</label>
+              <div className="service-instruction-editor min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">
+                <TextEditor
+                  key={`${form.service_id}-${initialForm.room_visit_instruction}`}
+                  content={form.room_visit_instruction}
+                  onChangeContent={(content) => setForm((p) => ({ ...p, room_visit_instruction: content }))}
+                  contentClassName="min-h-[180px] [overflow-wrap:anywhere]"
+                />
+              </div>
+            </div>
+            <Input
+              label="Ghi chú đặt khám"
+              value={form.booking_note}
+              onChange={(e) => setForm((p) => ({ ...p, booking_note: e.target.value }))}
+              placeholder="VD: Cần nhịn ăn trước khi khám"
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Nhóm hiển thị"
+                type="number"
+                value={form.display_group}
+                onChange={(e) => setForm((p) => ({ ...p, display_group: e.target.value }))}
+                placeholder="VD: 1"
+              />
+              <Input
+                label="Ưu tiên hiển thị"
+                type="number"
+                value={form.display_priority}
+                onChange={(e) => setForm((p) => ({ ...p, display_priority: e.target.value }))}
+                placeholder="VD: 10"
+              />
+            </div>
+            <Input
               label="Mô tả"
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -290,6 +344,27 @@ export function ServiceForm({
                 </div>
               </dl>
 
+              {form.detail.trim() && (
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs text-muted-foreground">Chi tiết dịch vụ</p>
+                  <p className="mt-1 text-sm text-slate-700">{form.detail.trim()}</p>
+                </div>
+              )}
+              {form.room_visit_instruction.trim() && (
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs text-muted-foreground">Hướng dẫn vào phòng khám</p>
+                  <div
+                    className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
+                    dangerouslySetInnerHTML={{ __html: form.room_visit_instruction }}
+                  />
+                </div>
+              )}
+              {form.booking_note.trim() && (
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs text-muted-foreground">Ghi chú đặt khám</p>
+                  <p className="mt-1 text-sm text-slate-700">{form.booking_note.trim()}</p>
+                </div>
+              )}
               {form.description.trim() && (
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Mô tả</p>

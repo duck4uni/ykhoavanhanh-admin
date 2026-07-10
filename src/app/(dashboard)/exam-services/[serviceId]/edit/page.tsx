@@ -26,6 +26,11 @@ function mapServiceToForm(service: HisService): ServiceFormValues {
     exam_area_id: service.exam_area_id ?? "",
     specialty_id: service.specialty_id ?? "",
     description: service.description ?? "",
+    booking_note: service.booking_note ?? "",
+    display_group: service.display_group?.toString() ?? "",
+    display_priority: service.display_priority?.toString() ?? "",
+    room_visit_instruction: service.room_visit_instruction ?? "",
+    detail: service.detail ?? "",
   };
 }
 
@@ -56,6 +61,11 @@ export default function EditExamServicePage({
       price: form.price.trim() ? Number(form.price) : undefined,
       exam_area_id: form.exam_area_id || undefined,
       specialty_id: form.specialty_id || undefined,
+      booking_note: form.booking_note.trim() || null,
+      display_group: form.display_group.trim() ? Number(form.display_group) : null,
+      display_priority: form.display_priority.trim() ? Number(form.display_priority) : null,
+      room_visit_instruction: form.room_visit_instruction.trim() || null,
+      detail: form.detail.trim() || null,
       servicetype: form.service_type.trim() || undefined,
       insurancetype: form.insurance_types.join("/") || undefined,
       description: form.description.trim() || undefined,

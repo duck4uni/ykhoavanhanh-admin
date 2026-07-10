@@ -29,10 +29,24 @@ export interface HisService {
   updatetime: string;
   exam_area_id?: string | null;
   specialty_id?: string | null;
+  is_delete?: boolean;
+  booking_note?: string | null;
+  display_priority?: number | null;
+  display_group?: number | null;
+  room_visit_instruction?: string | null;
+  detail?: string | null;
   /** Quan hệ chuyên khoa kèm sẵn (include) — dùng để hiển thị tên mà không cần tra cứu riêng. */
-  specialty?: { id: string; name: string } | null;
+  specialty?: { id: string; name: string; description?: string | null; is_active?: boolean } | null;
   /** Quan hệ khu vực khám kèm sẵn (include). */
-  exam_area?: { id: string; name: string } | null;
+  exam_area?: {
+    id: string;
+    code?: string;
+    name: string;
+    short_name?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    status?: string;
+  } | null;
   synced_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -111,6 +125,11 @@ export type CreateHisServicePayload = {
   service_name: string;
   price?: number;
   specialty_id?: string;
+  booking_note?: string | null;
+  display_priority?: number | null;
+  display_group?: number | null;
+  room_visit_instruction?: string | null;
+  detail?: string | null;
   /** Field mở rộng (servicetype/insurancetype/description...) ghi vào cột jsonb. */
   raw_data?: Record<string, unknown>;
   [key: string]: unknown;

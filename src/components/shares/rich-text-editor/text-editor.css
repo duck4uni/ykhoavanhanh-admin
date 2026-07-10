@@ -1,6 +1,15 @@
 .rte-editor-content {
   -webkit-user-select: text;
   user-select: text;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rte-editor-content * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rte-editor-content ::selection {
@@ -30,4 +39,25 @@
   border: 0 !important;
   outline: 0 !important;
   background: transparent !important;
+}
+
+.clinic-instruction-editor .reactjs-tiptap-editor,
+.service-instruction-editor .reactjs-tiptap-editor {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.clinic-instruction-editor .ProseMirror,
+.service-instruction-editor .ProseMirror {
+  min-height: 180px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  padding: 12px !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.clinic-instruction-editor .ProseMirror p,
+.service-instruction-editor .ProseMirror p {
+  margin: 0 !important;
 }

@@ -90,7 +90,7 @@ export default function ExamServicesPage() {
   }, [debouncedSearch]);
 
   const { data, isLoading } = hisServicesHooks.usePaginatedList({
-    page: currentPage,
+    currentPage,
     pageSize,
     filters: serverFilters,
     sortField: "created_at",
