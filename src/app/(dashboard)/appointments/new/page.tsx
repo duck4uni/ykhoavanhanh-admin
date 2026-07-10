@@ -214,7 +214,7 @@ export default function NewAppointmentSchedulePage() {
   const [doctorList, setDoctorList] = useState<HisDoctor[]>([]);
 
   const { data: doctorsData, isLoading: isLoadingDoctors, isFetching: isFetchingDoctors } = doctorsHooks.usePaginatedList({
-    page: doctorPage,
+    currentPage: doctorPage,
     pageSize: 10,
   });
 

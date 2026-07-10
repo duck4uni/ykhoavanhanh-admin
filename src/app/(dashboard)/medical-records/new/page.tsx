@@ -161,7 +161,7 @@ export default function NewMedicalRecordPage() {
     isFetchingNextPage: isFetchingNextDoctorPage,
     isLoading: isDoctorsLoading,
   } = doctorsHooks.useInfiniteList(
-    { doctorname: committedDoctorSearch || undefined },
+    { filters: committedDoctorSearch ? `doctorname@=${committedDoctorSearch}` : undefined },
     { pageSize: 10 }
   );
 

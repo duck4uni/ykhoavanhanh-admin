@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { useCreateAdminPatient } from "@/api/adminPatientsApi";
 import { useProvinces, useWards } from "@/api/addressesApi";
-import { roomsHooks } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
 import {
   ArrowLeft,
@@ -90,11 +89,10 @@ export default function NewPatientPage() {
     country_name: "Việt Nam",
   });
 
-  const { data: rooms } = roomsHooks.useList();
   const { data: provinces } = useProvinces();
   const { data: wards } = useWards(form.province_code || null);
 
-  const facilityId = rooms?.find((r) => r.facility_id)?.facility_id || FALLBACK_FACILITY_ID;
+  const facilityId = FALLBACK_FACILITY_ID;
 
   const createMutation = useCreateAdminPatient({
     onSuccess: () => {
@@ -328,7 +326,7 @@ export default function NewPatientPage() {
                 <SummaryRow icon={CalendarDays} label="Ngày sinh" value={formatDateLabel(form.birthday)} />
                 <SummaryRow icon={Phone} label="SĐT" value={form.phone_number || "Chưa nhập"} />
                 <SummaryRow icon={ShieldCheck} label="BHYT" value={form.insurance_number || "Chưa nhập"} />
-                <SummaryRow icon={Building2} label="Cơ sở" value={rooms?.find((r) => r.facility_id)?.facility_id ? "Đã xác định" : "Mặc định"} />
+                <SummaryRow icon={Building2} label="Cơ sở" value={facilityId !== FALLBACK_FACILITY_ID ? "Đã xác định" : "Mặc định"} />
               </div>
 
               <div className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">

@@ -79,7 +79,7 @@ function DoctorFilterCombobox({ value, onChange }: DoctorFilterComboboxProps) {
   }, [search]);
 
   const { data: doctors = [], isLoading } = doctorsHooks.useList(
-    { doctorname: debouncedSearch || undefined, pageSize: 20 },
+    { filters: debouncedSearch ? `doctorname@=${debouncedSearch}` : undefined, pageSize: 20 },
     { enabled: open },
   );
 
