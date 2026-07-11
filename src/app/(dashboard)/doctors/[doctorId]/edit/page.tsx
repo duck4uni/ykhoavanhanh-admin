@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { doctorsHooks, type CreateDoctorPayload } from "@/api/doctorsApi";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { toast } from "@/components/ui/Toast";
-import { DoctorForm, createInitialDoctorForm, mapDoctorToForm, type DoctorFormValues } from "../../_components/DoctorForm";
+import { DoctorForm, createInitialDoctorForm, isValidPhoneNumber, mapDoctorToForm, type DoctorFormValues } from "../../_components/DoctorForm";
 
 function toPayload(form: DoctorFormValues): CreateDoctorPayload {
   return {
@@ -15,7 +15,7 @@ function toPayload(form: DoctorFormValues): CreateDoctorPayload {
     avatar_url: form.avatar_url.trim() || null,
     academic_degree: form.academic_degree.trim() || null,
     academic_title: form.academic_title.trim() || null,
-    phone: form.phone.trim() || null,
+    phone: form.phone.replace(/[\s.\-()]/g, "") || null,
     email: form.email.trim() || null,
     gender: form.gender || null,
     date_of_birth: form.date_of_birth || null,
@@ -44,6 +44,10 @@ export default function EditDoctorPage() {
   function handleSubmit(form: DoctorFormValues) {
     if (!form.doctorid.trim() || !form.doctorname.trim()) {
       toast.error("Vui lòng nhập mã và tên bác sĩ");
+      return;
+    }
+    if (!isValidPhoneNumber(form.phone)) {
+      toast.error("Số điện thoại không hợp lệ. Vui lòng nhập số bắt đầu bằng 0 hoặc +84");
       return;
     }
     updateMutation.mutate({ id: doctorId, data: toPayload(form) });

@@ -57,6 +57,12 @@ function getImageSrc(path: string | null | undefined): string | null {
   return `${process.env.NEXT_PUBLIC_API_URL ?? ""}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+export function isValidPhoneNumber(value: string): boolean {
+  const phone = value.replace(/[\s.\-()]/g, "");
+  if (!phone) return true;
+  return /^(0\d{9,10}|84\d{9,10}|\+84\d{9,10})$/.test(phone);
+}
+
 export function mapDoctorToForm(doctor: HisDoctor): DoctorFormValues {
   return {
     doctorid: doctor.doctorid,
@@ -158,7 +164,7 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="VD: 0909000000" />
+              <Input label="Số điện thoại" type="tel" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="VD: 0909000000" />
               <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="doctor@example.com" />
             </div>
 

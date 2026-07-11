@@ -16,10 +16,7 @@ import {
   MailOpen,
   Mail,
   Plus,
-  Pencil,
-  Trash2,
 } from "lucide-react";
-import { useDeleteConfirmation } from "@/components/ui/useDeleteConfirmation";
 import { LoadingSection, Spinner } from "@/components/ui/Spinner";
 
 const PAGE_SIZE = 10;
@@ -74,7 +71,6 @@ export default function NotificationsPage() {
     },
   });
   const markOneMutation = notificationsHooks.useMarkAsReadById();
-  const deleteMutation = notificationsHooks.useDelete();
 
   const activeFilterCount =
     (filterCategory !== "ALL" ? 1 : 0) + (filterRead !== "ALL" ? 1 : 0);
@@ -216,8 +212,6 @@ export default function NotificationsPage() {
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">Tiêu đề</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">Loại</th>
                   <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">Thời gian gửi</th>
-                  <th className="text-center text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">Trạng thái</th>
-                  <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wide px-6 py-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -226,7 +220,6 @@ export default function NotificationsPage() {
                     key={notif.id}
                     notif={notif}
                     markOneMutation={markOneMutation}
-                    onDelete={(id) => deleteMutation.mutate(id)}
                   />
                 ))}
               </tbody>
@@ -288,18 +281,10 @@ export default function NotificationsPage() {
 function NotificationRow({
   notif,
   markOneMutation,
-  onDelete,
 }: {
   notif: Notification;
   markOneMutation: ReturnType<typeof notificationsHooks.useMarkAsReadById>;
-  onDelete: (id: string) => void;
 }) {
-  const { open, ConfirmDialog } = useDeleteConfirmation({
-    title: "Xác nhận xóa",
-    description: "Bạn có chắc muốn xóa thông báo này? Hành động này không thể hoàn tác.",
-    onConfirm: () => onDelete(notif.id),
-  });
-
   const handleRowClick = () => {
     if (!notif.has_user_read) {
       markOneMutation.mutate(notif.id);
@@ -336,49 +321,6 @@ function NotificationRow({
         </td>
         <td className="px-6 py-4 text-sm text-slate-500">
           {notif.sent_time ? formatDateTime(notif.sent_time) : "—"}
-        </td>
-        <td className="px-6 py-4 text-center">
-          {notif.has_user_read ? (
-            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-              <MailOpen className="w-3.5 h-3.5" />
-              Đã đọc
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-              <Mail className="w-3.5 h-3.5" />
-              Chưa đọc
-            </span>
-          )}
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity justify-end">
-            {!notif.has_user_read && (
-              <button
-                onClick={(e) => { e.stopPropagation(); markOneMutation.mutate(notif.id); }}
-                disabled={markOneMutation.isPending && markOneMutation.variables === notif.id}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-                title="Đánh dấu đã đọc"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <Link
-              href={`/notifications/${notif.id}/edit`}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-primary hover:bg-primary-50 transition-colors"
-              title="Chỉnh sửa"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </Link>
-            <button
-              onClick={(e) => { e.stopPropagation(); open(); }}
-              className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-              title="Xóa"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          {ConfirmDialog}
         </td>
       </tr>
     </>
