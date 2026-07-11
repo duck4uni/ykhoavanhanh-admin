@@ -227,9 +227,9 @@ export default function ReviewsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
+          {/* <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
             <Download className="h-4 w-4" /> Xuất Excel
-          </button>
+          </button> */}
           <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
             <FileBarChart className="h-4 w-4" /> Báo cáo đánh giá
           </button>

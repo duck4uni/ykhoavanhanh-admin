@@ -17,12 +17,12 @@ export default function MergePatientsPage() {
 
   const mergeMutation = useMergePatients({
     onSuccess: () => {
-      toast.success("Gop benh nhan thanh cong!");
+      toast.success("Gộp bệnh nhân thành công!");
       setKeepCode("");
       setMergeCode("");
     },
     onError: (error) => {
-      toast.error(error.message || "Gop benh nhan that bai");
+      toast.error(error.message || "Gộp bệnh nhân thất bại");
     },
   });
 
@@ -30,11 +30,11 @@ export default function MergePatientsPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!keepCode.trim() || !mergeCode.trim()) {
-        toast.error("Vui long nhap ma benh nhan");
+        toast.error("Vui lòng nhập mã bệnh nhân");
         return;
       }
       if (keepCode.trim() === mergeCode.trim()) {
-        toast.error("Hai ma benh nhan phai khac nhau");
+        toast.error("Hai mã bệnh nhân phải khác nhau");
         return;
       }
       mergeMutation.mutate({
@@ -51,12 +51,12 @@ export default function MergePatientsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => router.back()}>
-          ← Quay lai
+          ← Quay lại
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gop benh nhan</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Gộp bệnh nhân</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Gop hai ban benh nhan trung nhau thanh mot ban
+            Gộp hai bản bệnh nhân trùng nhau thành một bản
           </p>
         </div>
       </div>
@@ -65,16 +65,16 @@ export default function MergePatientsPage() {
         <div className="col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Thong tin gop</CardTitle>
+              <CardTitle>Thông tin gộp</CardTitle>
               <CardDescription>
-                Nhap ma benh nhan can gop (se bi xoa) va ma benh nhan duoc giu lai.
+                Nhập mã bệnh nhân cần gộp (sẽ bị xóa) và mã bệnh nhân được giữ lại.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Keep patient */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">
-                  Benh nhan duoc giu lai (chinh)
+                  Bệnh nhân được giữ lại (chính)
                 </label>
                 <Input
                   value={keepCode}
@@ -82,7 +82,7 @@ export default function MergePatientsPage() {
                   placeholder="VD: BN001"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Toan bo lich su kham chua se duoc giu lai
+                  Toàn bộ lịch sử khám chữa sẽ được giữ lại
                 </p>
               </div>
 

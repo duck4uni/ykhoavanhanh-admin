@@ -62,7 +62,7 @@ export default function MedicalRecordsPage() {
   }, [debouncedSearch]);
 
   const { data, isLoading } = medicalRecordsHooks.useList({
-    page,
+    currentPage: page,
     pageSize: PAGE_SIZE,
     sortField: "examined_at",
     sortOrder: "DESC",
@@ -103,8 +103,8 @@ export default function MedicalRecordsPage() {
   const statCards = [
     {
       label: "Tổng hồ sơ",
-      value: stats ? stats.totalRecords.toLocaleString("vi-VN") : "—",
-      sub: "Tất cả thời gian",
+      value: data ? totalItems.toLocaleString("vi-VN") : "—",
+      sub: "Theo kết quả API",
       icon: FiFileText,
       tone: "bg-primary-100 text-primary-600",
       delta: undefined as string | undefined,
@@ -119,15 +119,15 @@ export default function MedicalRecordsPage() {
       delta: stats ? `${Math.abs(stats.monthChangePercent)}%` : undefined,
       deltaUp: monthUp,
     },
-    {
-      label: "Tổng chi phí",
-      value: stats ? formatCurrency(stats.totalCost) : "—",
-      sub: "Tất cả thời gian",
-      icon: FiCreditCard,
-      tone: "bg-warning-light text-warning",
-      delta: undefined,
-      deltaUp: true,
-    },
+    // {
+    //   label: "Tổng chi phí",
+    //   value: stats ? formatCurrency(stats.totalCost) : "—",
+    //   sub: "Tất cả thời gian",
+    //   icon: FiCreditCard,
+    //   tone: "bg-warning-light text-warning",
+    //   delta: undefined,
+    //   deltaUp: true,
+    // },
     {
       label: "Lần khám gần nhất",
       value: stats?.lastVisitAt ? formatDate(stats.lastVisitAt) : "—",
@@ -148,9 +148,9 @@ export default function MedicalRecordsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Lịch sử khám bệnh của bệnh nhân</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" className="gap-2">
+          {/* <Button variant="outline" className="gap-2">
             <FiDownload className="h-4 w-4" /> Xuất Excel
-          </Button>
+          </Button> */}
           <Link href="/medical-records/new">
             <Button variant="primary" className="gap-2">
               <FiPlus className="h-4 w-4" /> Tạo hồ sơ
@@ -248,9 +248,9 @@ export default function MedicalRecordsPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="primary" className="h-11 gap-2 rounded-xl" onClick={() => setPage(1)}>
+            {/* <Button variant="primary" className="h-11 gap-2 rounded-xl" onClick={() => setPage(1)}>
               <FiFilter className="h-4 w-4" /> Lọc
-            </Button>
+            </Button> */}
             <Button variant="outline" className="h-11 gap-2 rounded-xl" onClick={resetFilters}>
               <FiRefreshCw className="h-4 w-4" /> Đặt lại
             </Button>
@@ -274,7 +274,7 @@ export default function MedicalRecordsPage() {
                     <th className="px-5 py-3.5">Chuyên khoa</th>
                     <th className="px-5 py-3.5">Ngày khám</th>
                     <th className="px-5 py-3.5">Chẩn đoán</th>
-                    <th className="px-5 py-3.5">Chi phí</th>
+                    {/* <th className="px-5 py-3.5">Chi phí</th> */}
                     <th className="px-5 py-3.5">Trạng thái</th>
                     <th className="px-5 py-3.5 text-center">Thao tác</th>
                   </tr>
@@ -305,7 +305,7 @@ export default function MedicalRecordsPage() {
                         <td className="max-w-xs px-5 py-4 text-muted-foreground">
                           <p className="truncate">{r.diagnosis ?? "—"}</p>
                         </td>
-                        <td className="px-5 py-4 font-semibold text-foreground">{formatCurrency(toNumber(r.total_amount))}</td>
+                        {/* <td className="px-5 py-4 font-semibold text-foreground">{formatCurrency(toNumber(r.total_amount))}</td> */}
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}>
                             {badge.label}

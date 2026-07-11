@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { roomsHooks, type CreateRoomPayload } from "@/api/roomsApi";
 import { examAreasHooks } from "@/api/examAreasApi";
+import { specialtiesHooks } from "@/api/specialtiesApi";
 import { hisServicesHooks, type HisService } from "@/api/hisServicesApi";
+import type { AdminSpecialty } from "@/types/hospital-admin";
 import { toast } from "@/components/ui/Toast";
 import { TextEditor } from "@/components/shares/rich-text-editor";
 import { useDebounce } from "@/hooks/useApiHelpers";
@@ -20,9 +22,11 @@ type ClinicFormValues = {
   visit_instruction: string;
   clinic_type: string;
   exam_area_id: string;
+  specialty_ids: string[];
   service_ids: string[];
 };
 
+const SPECIALTY_PAGE_SIZE = 20;
 const SERVICE_PAGE_SIZE = 20;
 
 const EMPTY_FORM: ClinicFormValues = {
@@ -33,19 +37,33 @@ const EMPTY_FORM: ClinicFormValues = {
   visit_instruction: "",
   clinic_type: "",
   exam_area_id: "",
+  specialty_ids: [],
   service_ids: [],
 };
 
 export default function NewClinicPage() {
   const router = useRouter();
   const [form, setForm] = useState<ClinicFormValues>(EMPTY_FORM);
+  const [specialtySearch, setSpecialtySearch] = useState("");
+  const [specialtyPage, setSpecialtyPage] = useState(1);
+  const [specialties, setSpecialties] = useState<AdminSpecialty[]>([]);
   const [serviceSearch, setServiceSearch] = useState("");
   const [servicePage, setServicePage] = useState(1);
   const [services, setServices] = useState<HisService[]>([]);
+  const debouncedSpecialtySearch = useDebounce(specialtySearch, 400);
   const debouncedServiceSearch = useDebounce(serviceSearch, 400);
 
   const { data: examAreasData } = examAreasHooks.useList({ pageSize: 100 });
   const examAreas = examAreasData?.rows ?? [];
+  const specialtyFilters = debouncedSpecialtySearch.trim()
+    ? `name@=${debouncedSpecialtySearch.trim()}`
+    : undefined;
+  const { data: specialtiesData, isFetching: isFetchingSpecialties } = specialtiesHooks.useList({
+    currentPage: specialtyPage,
+    pageSize: SPECIALTY_PAGE_SIZE,
+    filters: specialtyFilters,
+  });
+  const hasMoreSpecialties = specialtyPage < (specialtiesData?.totalPages ?? 1);
   const serviceFilters = debouncedServiceSearch.trim()
     ? `service_name@=${debouncedServiceSearch.trim()}`
     : undefined;
@@ -55,6 +73,24 @@ export default function NewClinicPage() {
     filters: serviceFilters,
   });
   const hasMoreServices = servicePage < (servicesData?.totalPages ?? 1);
+
+  useEffect(() => {
+    setSpecialtyPage(1);
+    setSpecialties([]);
+  }, [debouncedSpecialtySearch]);
+
+  useEffect(() => {
+    const rows = specialtiesData?.rows ?? [];
+    setSpecialties((current) => {
+      const next = specialtyPage === 1 ? [] : [...current];
+      for (const specialty of rows) {
+        if (!next.some((item) => item.id === specialty.id)) {
+          next.push(specialty);
+        }
+      }
+      return next;
+    });
+  }, [specialtyPage, specialtiesData]);
 
   useEffect(() => {
     setServicePage(1);
@@ -80,6 +116,9 @@ export default function NewClinicPage() {
   const assignServicesMutation = roomsHooks.useAssignServices({
     onError: (err) => toast.error(err.message || "Gán dịch vụ cho phòng khám thất bại"),
   });
+  const assignSpecialtiesMutation = roomsHooks.useAssignSpecialties({
+    onError: (err) => toast.error(err.message || "Gán chuyên khoa cho phòng khám thất bại"),
+  });
 
   function toggleService(serviceId: string) {
     setForm((current) => ({
@@ -88,6 +127,23 @@ export default function NewClinicPage() {
         ? current.service_ids.filter((id) => id !== serviceId)
         : [...current.service_ids, serviceId],
     }));
+  }
+
+  function toggleSpecialty(specialtyId: string) {
+    setForm((current) => ({
+      ...current,
+      specialty_ids: current.specialty_ids.includes(specialtyId)
+        ? current.specialty_ids.filter((id) => id !== specialtyId)
+        : [...current.specialty_ids, specialtyId],
+    }));
+  }
+
+  function handleSpecialtiesScroll(event: React.UIEvent<HTMLDivElement>) {
+    const target = event.currentTarget;
+    const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    if (distanceToBottom < 48 && hasMoreSpecialties && !isFetchingSpecialties) {
+      setSpecialtyPage((current) => current + 1);
+    }
   }
 
   function handleServicesScroll(event: React.UIEvent<HTMLDivElement>) {
@@ -116,6 +172,9 @@ export default function NewClinicPage() {
     };
 
     const createdRoom = await createMutation.mutateAsync(payload);
+    if (form.specialty_ids.length > 0) {
+      await assignSpecialtiesMutation.mutateAsync({ id: createdRoom.id, specialtyIds: form.specialty_ids });
+    }
     if (form.service_ids.length > 0) {
       await assignServicesMutation.mutateAsync({ id: createdRoom.id, serviceIds: form.service_ids });
     }
@@ -183,6 +242,53 @@ export default function NewClinicPage() {
                 onChange={(e) => setForm((p) => ({ ...p, clinic_type: e.target.value }))}
                 placeholder="VD: OUTPATIENT"
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Chuyên khoa của phòng khám</label>
+              <Input
+                value={specialtySearch}
+                onChange={(e) => setSpecialtySearch(e.target.value)}
+                placeholder="Tìm theo tên chuyên khoa..."
+              />
+              <div
+                onScroll={handleSpecialtiesScroll}
+                className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3"
+              >
+                {specialties.length === 0 && !isFetchingSpecialties ? (
+                  <p className="text-sm text-muted-foreground">Không tìm thấy chuyên khoa phù hợp.</p>
+                ) : (
+                  specialties.map((specialty) => {
+                    const checked = form.specialty_ids.includes(specialty.id);
+                    return (
+                      <label
+                        key={specialty.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                          checked
+                            ? "border-primary-200 bg-primary-50 text-primary-700"
+                            : "border-slate-100 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSpecialty(specialty.id)}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="min-w-0">
+                          <span className="block font-medium">{specialty.name}</span>
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+                {isFetchingSpecialties && (
+                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                    <Spinner size="sm" /> Đang tải chuyên khoa...
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Có thể chọn nhiều chuyên khoa cho cùng một phòng khám. Cuộn xuống để tải thêm.</p>
             </div>
 
             <div>
@@ -259,10 +365,10 @@ export default function NewClinicPage() {
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
-                disabled={createMutation.isPending || assignServicesMutation.isPending}
+                disabled={createMutation.isPending || assignServicesMutation.isPending || assignSpecialtiesMutation.isPending}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
-                {(createMutation.isPending || assignServicesMutation.isPending) && <Spinner size="sm" />}Tạo phòng khám
+                {(createMutation.isPending || assignServicesMutation.isPending || assignSpecialtiesMutation.isPending) && <Spinner size="sm" />}Tạo phòng khám
               </button>
               <button
                 type="button"
@@ -314,6 +420,19 @@ export default function NewClinicPage() {
                   </dt>
                   <dd className="font-medium text-slate-700">
                     {form.clinic_type.trim() || "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <Tag className="h-4 w-4" /> Chuyên khoa
+                  </dt>
+                  <dd className="max-w-[60%] text-right font-medium text-slate-700">
+                    {form.specialty_ids.length > 0
+                      ? form.specialty_ids
+                          .map((id) => specialties.find((specialty) => specialty.id === id)?.name)
+                          .filter(Boolean)
+                          .join(", ")
+                      : "—"}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">

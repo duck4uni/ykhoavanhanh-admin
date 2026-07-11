@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   ClipboardList,
-  Download,
-  EyeOff,
   MoreVertical,
   Plus,
   RefreshCw,
   Search,
   Stethoscope,
   Trash2,
-  Users,
   X,
   Pencil,
 } from "lucide-react";
@@ -29,61 +27,45 @@ const PAGE_SIZE = 10;
 
 type SpecialtyForm = {
   name: string;
-  guide_room: string;
+  description: string;
+  is_active: boolean;
+  room_visit_instruction: string;
   booking_note: string;
-  internal_id: string;
   booking_group: string;
   display_priority: number;
-  hide_search: boolean;
 };
 
 const createInitialForm = (): SpecialtyForm => ({
   name: "",
-  guide_room: "",
+  description: "",
+  is_active: true,
+  room_visit_instruction: "",
   booking_note: "",
-  internal_id: "",
   booking_group: "",
   display_priority: 1,
-  hide_search: false,
 });
 
 function mapItemToForm(item: AdminSpecialty): SpecialtyForm {
   return {
     name: item.name,
-    guide_room: item.guide_room,
-    booking_note: item.booking_note,
-    internal_id: item.internal_id,
-    booking_group: item.booking_group,
-    display_priority: item.display_priority,
-    hide_search: item.hide_search,
+    description: item.description ?? "",
+    is_active: item.is_active,
+    room_visit_instruction: item.room_visit_instruction ?? "",
+    booking_note: item.booking_note ?? "",
+    booking_group: item.booking_group ?? "",
+    display_priority: item.display_priority ?? 1,
   };
 }
 
-function getSoftCount(item: AdminSpecialty, keys: string[]): number | null {
-  const record = item as unknown as Record<string, unknown>;
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "number") return value;
-  }
-  return null;
-}
-
-function StatusBadge() {
-  return (
+function StatusBadge({ isActive }: { isActive: boolean }) {
+  return isActive ? (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Hoạt động
     </span>
-  );
-}
-
-function BookingSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button type="button" onClick={onChange} className="inline-flex items-center gap-2 text-sm text-slate-700">
-      <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? "bg-emerald-500" : "bg-slate-200"}`}>
-        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
-      </span>
-      {checked ? "Hiển thị" : "Ẩn"}
-    </button>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+      <span className="h-1.5 w-1.5 rounded-full bg-current" /> Tạm ngưng
+    </span>
   );
 }
 
@@ -137,11 +119,11 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
 }
 
 export default function SpecialtiesPage() {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [bookingVisibleFilter, setBookingVisibleFilter] = useState("all");
   const [bookingGroupFilter, setBookingGroupFilter] = useState("all");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -163,7 +145,7 @@ export default function SpecialtiesPage() {
   }, [debouncedSearch]);
 
   const { data, isLoading } = specialtiesHooks.useList({
-    page: currentPage,
+    currentPage,
     pageSize,
     sortField: "created_at",
     sortOrder: "DESC",
@@ -195,41 +177,36 @@ export default function SpecialtiesPage() {
   const isMutating = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const bookingGroups = useMemo(
-    () => Array.from(new Set(rows.map((item) => item.booking_group).filter(Boolean))).sort(),
+    () => Array.from(new Set(rows.map((item) => item.booking_group).filter((group): group is string => Boolean(group)))).sort(),
     [rows]
   );
 
   const filteredRows = useMemo(() => {
     // Tìm kiếm theo tên đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
     return rows.filter((item) => {
-      const matchStatus = statusFilter === "all";
-      const matchVisible =
-        bookingVisibleFilter === "all" ||
-        (bookingVisibleFilter === "show" ? !item.hide_search : item.hide_search);
+      const matchStatus = statusFilter === "all" || (statusFilter === "active" ? item.is_active : !item.is_active);
       const matchGroup = bookingGroupFilter === "all" || item.booking_group === bookingGroupFilter;
-      return matchStatus && matchVisible && matchGroup;
+      return matchStatus && matchGroup;
     });
-  }, [rows, statusFilter, bookingVisibleFilter, bookingGroupFilter]);
+  }, [rows, statusFilter, bookingGroupFilter]);
 
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
-  const activeCount = rows.length;
-  const hiddenCount = rows.filter((item) => item.hide_search).length;
-  const withDoctors = rows.filter((item) => (getSoftCount(item, ["doctor_count", "doctors_count", "total_doctors"]) ?? 0) > 0).length;
-  const withServices = rows.filter((item) => (getSoftCount(item, ["service_count", "services_count", "total_services"]) ?? 0) > 0).length;
+  const activeCount = rows.filter((item) => item.is_active).length;
+  const inactiveCount = rows.filter((item) => !item.is_active).length;
+  const withRoomInstruction = rows.filter((item) => Boolean(item.room_visit_instruction)).length;
+  const withBookingNote = rows.filter((item) => Boolean(item.booking_note)).length;
   const activePct = total > 0 ? Math.round((activeCount / total) * 100) : 0;
 
   const stats = [
     { label: "Tổng chuyên khoa", value: total, sub: "Chuyên khoa", icon: Stethoscope, tone: "bg-primary-100 text-primary-600" },
     { label: "Đang hoạt động", value: activeCount, sub: `${activePct}%`, icon: CheckCircle2, tone: "bg-success-light text-success" },
-    { label: "Có bác sĩ", value: withDoctors, sub: "Chuyên khoa", icon: Users, tone: "bg-warning-light text-warning" },
-    { label: "Có dịch vụ khám", value: withServices, sub: "Chuyên khoa", icon: ClipboardList, tone: "bg-purple-100 text-purple-600" },
-    { label: "Đang ẩn tìm kiếm", value: hiddenCount, sub: "Chuyên khoa", icon: EyeOff, tone: "bg-slate-100 text-slate-500" },
+    { label: "Có hướng dẫn phòng", value: withRoomInstruction, sub: "Chuyên khoa", icon: ClipboardList, tone: "bg-warning-light text-warning" },
+    { label: "Có ghi chú đặt khám", value: withBookingNote, sub: "Chuyên khoa", icon: ClipboardList, tone: "bg-purple-100 text-purple-600" },
+    { label: "Tạm ngưng", value: inactiveCount, sub: "Chuyên khoa", icon: X, tone: "bg-slate-100 text-slate-500" },
   ];
 
   function openCreate() {
-    setEditingId(null);
-    setForm(createInitialForm());
-    setModalOpen(true);
+    router.push("/specialties/new");
   }
 
   function openEdit(item: AdminSpecialty) {
@@ -257,14 +234,9 @@ export default function SpecialtiesPage() {
     }
   }
 
-  function toggleBookingVisible(item: AdminSpecialty) {
-    updateMutation.mutate({ id: item.id, data: { hide_search: !item.hide_search } as Partial<AdminSpecialty> });
-  }
-
   function resetFilters() {
     setSearch("");
     setStatusFilter("all");
-    setBookingVisibleFilter("all");
     setBookingGroupFilter("all");
     setCurrentPage(1);
   }
@@ -341,15 +313,7 @@ export default function SpecialtiesPage() {
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10">
               <option value="all">Tất cả</option>
               <option value="active">Hoạt động</option>
-            </select>
-          </div>
-
-          <div className="min-w-[170px]">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Hiển thị đặt khám</label>
-            <select value={bookingVisibleFilter} onChange={(e) => setBookingVisibleFilter(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10">
-              <option value="all">Tất cả</option>
-              <option value="show">Hiển thị</option>
-              <option value="hide">Ẩn</option>
+              <option value="inactive">Tạm ngưng</option>
             </select>
           </div>
 
@@ -366,9 +330,9 @@ export default function SpecialtiesPage() {
           <button onClick={resetFilters} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
             <RefreshCw className="h-4 w-4" /> Đặt lại
           </button>
-          <button onClick={() => toast.info("Chưa cấu hình API xuất Excel chuyên khoa")} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
+          {/* <button onClick={() => toast.info("Chưa cấu hình API xuất Excel chuyên khoa")} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
             <Download className="h-4 w-4" /> Xuất Excel
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -384,38 +348,28 @@ export default function SpecialtiesPage() {
                   <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                     <th className="px-5 py-3.5">STT</th>
                     <th className="px-5 py-3.5">Tên chuyên khoa</th>
-                    <th className="px-5 py-3.5">Mã chuyên khoa</th>
-                    <th className="px-5 py-3.5">Số bác sĩ</th>
-                    <th className="px-5 py-3.5">Số dịch vụ</th>
-                    <th className="px-5 py-3.5">Phòng / khu vực khám</th>
+                    <th className="px-5 py-3.5">Mô tả</th>
+                    <th className="px-5 py-3.5">Nhóm đặt khám</th>
                     <th className="px-5 py-3.5">Ưu tiên</th>
-                    <th className="px-5 py-3.5">Hiển thị đặt khám</th>
                     <th className="px-5 py-3.5">Trạng thái</th>
                     <th className="px-5 py-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredRows.length === 0 ? (
-                    <tr><td colSpan={10} className="px-5 py-12 text-center text-sm text-muted-foreground">Không tìm thấy chuyên khoa phù hợp.</td></tr>
+                    <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-muted-foreground">Không tìm thấy chuyên khoa phù hợp.</td></tr>
                   ) : (
-                    filteredRows.map((item, index) => {
-                      const doctorCount = getSoftCount(item, ["doctor_count", "doctors_count", "total_doctors"]);
-                      const serviceCount = getSoftCount(item, ["service_count", "services_count", "total_services"]);
-                      return (
-                        <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
-                          <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(currentPage - 1) * pageSize + index + 1}</span></td>
-                          <td className="px-5 py-4 font-semibold text-slate-800">{item.name}</td>
-                          <td className="px-5 py-4"><span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-600">{item.internal_id || "—"}</span></td>
-                          <td className="px-5 py-4 font-medium text-primary-600">{doctorCount === null ? "—" : `${doctorCount} bác sĩ`}</td>
-                          <td className="px-5 py-4 font-medium text-primary-600">{serviceCount === null ? "—" : `${serviceCount} dịch vụ`}</td>
-                          <td className="max-w-xs px-5 py-4"><p className="font-semibold text-slate-800">{item.guide_room || "—"}</p>{item.booking_note && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{item.booking_note}</p>}</td>
-                          <td className="px-5 py-4 font-semibold text-slate-700">{item.display_priority}</td>
-                          <td className="px-5 py-4"><BookingSwitch checked={!item.hide_search} onChange={() => toggleBookingVisible(item)} /></td>
-                          <td className="px-5 py-4"><StatusBadge /></td>
-                          <td className="px-5 py-4"><RowMenu onEdit={() => openEdit(item)} onDelete={() => openConfirmDelete(item.id)} /></td>
-                        </tr>
-                      );
-                    })
+                    filteredRows.map((item, index) => (
+                      <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
+                        <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(currentPage - 1) * pageSize + index + 1}</span></td>
+                        <td className="px-5 py-4 font-semibold text-slate-800">{item.name}</td>
+                        <td className="max-w-xs px-5 py-4 text-slate-600"><p className="line-clamp-2">{item.description || "—"}</p></td>
+                        <td className="px-5 py-4 text-slate-700">{item.booking_group || "—"}</td>
+                        <td className="px-5 py-4 font-semibold text-slate-700">{item.display_priority ?? "—"}</td>
+                        <td className="px-5 py-4"><StatusBadge isActive={item.is_active} /></td>
+                        <td className="px-5 py-4"><RowMenu onEdit={() => openEdit(item)} onDelete={() => openConfirmDelete(item.id)} /></td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -440,18 +394,24 @@ export default function SpecialtiesPage() {
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="Tên chuyên khoa *" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="VD: Nội khoa" />
-                <Input label="Phòng hướng dẫn vào khám" value={form.guide_room} onChange={(e) => setForm((p) => ({ ...p, guide_room: e.target.value }))} placeholder="VD: Khu khám chuyên sâu" />
-                <Input label="ID nội bộ" value={form.internal_id} onChange={(e) => setForm((p) => ({ ...p, internal_id: e.target.value }))} placeholder="VD: CK-NHI" hint="Cho phép bắt đầu bằng số 0." />
-                <Input label="Nhóm đặt khám" value={form.booking_group} onChange={(e) => setForm((p) => ({ ...p, booking_group: e.target.value }))} placeholder="VD: nhi-khoa" />
+                <Input label="Nhóm đặt khám" value={form.booking_group} onChange={(e) => setForm((p) => ({ ...p, booking_group: e.target.value }))} placeholder="VD: NHOM_1" />
                 <Input label="Ưu tiên hiển thị" type="number" value={String(form.display_priority)} onChange={(e) => setForm((p) => ({ ...p, display_priority: Number(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Mô tả</label>
+                <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500" placeholder="Nhập mô tả chuyên khoa" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Hướng dẫn đến phòng khám</label>
+                <textarea value={form.room_visit_instruction} onChange={(e) => setForm((p) => ({ ...p, room_visit_instruction: e.target.value }))} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500" placeholder="VD: Tầng 2, khu A" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Ghi chú đặt khám</label>
                 <textarea value={form.booking_note} onChange={(e) => setForm((p) => ({ ...p, booking_note: e.target.value }))} rows={3} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500" placeholder="Nhập lưu ý khi bệnh nhân đặt khám" />
               </div>
               <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-                <span><span className="block text-sm font-medium text-slate-700">Ẩn tìm kiếm</span><span className="text-xs text-slate-400">Bật nếu chuyên khoa chỉ dùng nội bộ.</span></span>
-                <input type="checkbox" checked={form.hide_search} onChange={(e) => setForm((p) => ({ ...p, hide_search: e.target.checked }))} className="h-4 w-4 accent-primary" />
+                <span><span className="block text-sm font-medium text-slate-700">Hoạt động</span><span className="text-xs text-slate-400">Tắt nếu chuyên khoa tạm ngưng sử dụng.</span></span>
+                <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} className="h-4 w-4 accent-primary" />
               </label>
               <div className="flex items-center gap-3 pt-2">
                 <button type="submit" disabled={isMutating} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60">{isMutating && <Spinner size="sm" />}{editingId ? "Lưu thay đổi" : "Tạo chuyên khoa"}</button>

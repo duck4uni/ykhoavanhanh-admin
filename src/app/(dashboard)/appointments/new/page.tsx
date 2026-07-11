@@ -12,6 +12,7 @@ import {
   type CreateDoctorWorkScheduleV2Payload,
   type WorkScheduleTimeSlotV2,
 } from "@/api/doctorWorkSchedulesApi";
+import { weekdayLabels } from "@/lib/hospital-admin";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { roomsHooks } from "@/api/roomsApi";
@@ -62,6 +63,7 @@ type TimeSlotRow = {
   start: string;
   end: string;
   slot_limit: number;
+  weekdays: number[];
   scopeMode: "all" | "custom";
   scope_ids: string[];
 };
@@ -95,6 +97,16 @@ function todayISO(): string {
 
 function formatFee(value: number): string {
   return `${value.toLocaleString("vi-VN")}đ`;
+}
+
+const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
+
+function sortWeekdays(weekdays: number[]): number[] {
+  return [...weekdays].sort((a, b) => weekdayOrder.indexOf(a) - weekdayOrder.indexOf(b));
+}
+
+function weekdayShortLabel(weekday: number): string {
+  return weekday === 0 ? "CN" : `T${weekday + 1}`;
 }
 
 // ─── Doctor combobox (giữ nguyên từ bản cũ) ──────────────────────────────────
@@ -376,8 +388,8 @@ export default function NewAppointmentSchedulePage() {
   const [timeSlots, setTimeSlots] = useState<TimeSlotRow[]>([]);
 
   // ── Danh mục cho thẻ đếm năng lực (đếm tổng, chỉ cần count) ──
-  const { data: specialtyCountData } = specialtiesHooks.useList({ page: 1, pageSize: 1 });
-  const { data: areaCountData } = examAreasHooks.useList({ page: 1, pageSize: 1 });
+  const { data: specialtyCountData } = specialtiesHooks.useList({ currentPage: 1, pageSize: 1 });
+  const { data: areaCountData } = examAreasHooks.useList({ currentPage: 1, pageSize: 1 });
   const { data: serviceCountData } = hisServicesHooks.usePaginatedList({ currentPage: 1, pageSize: 1 });
   const specialtyTotal = specialtyCountData?.count ?? 0;
   const areaTotal = areaCountData?.count ?? 0;
@@ -389,7 +401,7 @@ export default function NewAppointmentSchedulePage() {
   const debouncedSpecialtySearch = useDebounce(specialtySearch, 400);
   useEffect(() => setSpecialtyPage(1), [debouncedSpecialtySearch]);
   const { data: specialtyPageData, isFetching: isFetchingSpecialties } = specialtiesHooks.useList({
-    page: specialtyPage,
+    currentPage: specialtyPage,
     pageSize: 10,
     filters: debouncedSpecialtySearch.trim() ? `name@=${debouncedSpecialtySearch.trim()}` : undefined,
   });
@@ -406,7 +418,7 @@ export default function NewAppointmentSchedulePage() {
   const debouncedAreaSearch = useDebounce(areaSearch, 400);
   useEffect(() => setAreaPage(1), [debouncedAreaSearch]);
   const { data: areaPageData, isFetching: isFetchingAreas } = examAreasHooks.useList({
-    page: areaPage,
+    currentPage: areaPage,
     pageSize: 10,
     filters: debouncedAreaSearch.trim() ? `name@=${debouncedAreaSearch.trim()}` : undefined,
   });
@@ -592,7 +604,7 @@ export default function NewAppointmentSchedulePage() {
       const start = prev[prev.length - 1]?.end ?? "08:00";
       return [
         ...prev,
-        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, scopeMode: "all", scope_ids: [] },
+        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, weekdays: [], scopeMode: "all", scope_ids: [] },
       ];
     });
   }
@@ -620,6 +632,25 @@ export default function NewAppointmentSchedulePage() {
     );
   }
 
+  function toggleSlotWeekday(slotId: string, weekday: number) {
+    setTimeSlots((prev) =>
+      prev.map((slot) => {
+        if (slot.id !== slotId) return slot;
+        const exists = slot.weekdays.includes(weekday);
+        return {
+          ...slot,
+          weekdays: exists
+            ? slot.weekdays.filter((day) => day !== weekday)
+            : sortWeekdays([...slot.weekdays, weekday]),
+        };
+      })
+    );
+  }
+
+  function setSlotWeekdays(slotId: string, weekdays: number[]) {
+    setTimeSlots((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, weekdays } : slot)));
+  }
+
   // ── Modal state: tự sinh khung giờ ──
   const [autoGenOpen, setAutoGenOpen] = useState(false);
   const [autoGen, setAutoGen] = useState({ start: "08:00", end: "12:00", stepMinutes: 30, slotLimit: 20 });
@@ -643,6 +674,7 @@ export default function NewAppointmentSchedulePage() {
         start: cursor,
         end: clamped,
         slot_limit: autoGen.slotLimit,
+        weekdays: [],
         scopeMode: "all",
         scope_ids: [],
       });
@@ -666,6 +698,7 @@ export default function NewAppointmentSchedulePage() {
     if (!form.schedule_date) list.push("Chưa chọn ngày khám");
     if (scopes.length === 0) list.push("Chưa có phạm vi khám");
     if (timeSlots.length === 0) list.push("Chưa có khung giờ làm việc");
+    if (timeSlots.some((s) => s.weekdays.length === 0)) list.push("Có khung giờ chưa chọn thứ áp dụng");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
     if (timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0))
       list.push("Có khung giờ chưa chọn phạm vi áp dụng");
@@ -677,6 +710,7 @@ export default function NewAppointmentSchedulePage() {
     Boolean(form.schedule_date) &&
     scopes.length > 0 &&
     timeSlots.length > 0 &&
+    !timeSlots.some((s) => s.weekdays.length === 0) &&
     !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0);
 
   const createMutation = doctorWorkSchedulesHooks.useCreateV2({
@@ -689,18 +723,24 @@ export default function NewAppointmentSchedulePage() {
   const isSaving = createMutation.isPending;
 
   function buildPayload(): CreateDoctorWorkScheduleV2Payload {
-    const time_slots: WorkScheduleTimeSlotV2[] = timeSlots.map((slot) => ({
-      start_time: toApiTime(slot.start),
-      end_time: toApiTime(slot.end),
-      slot_limit: slot.slot_limit,
-      scope_ids: slot.scopeMode === "all" ? "all" : slot.scope_ids,
-    }));
+    const selectedWeekdays = sortWeekdays(Array.from(new Set(timeSlots.flatMap((slot) => slot.weekdays))));
+    const time_slots: WorkScheduleTimeSlotV2[] = timeSlots.flatMap((slot) =>
+      slot.weekdays.map((weekday) => ({
+        start_time: toApiTime(slot.start),
+        end_time: toApiTime(slot.end),
+        slot_limit: slot.slot_limit,
+        weekday,
+        scope_ids: slot.scopeMode === "all" ? "all" : slot.scope_ids,
+      }))
+    );
     return {
       doctor_id: form.doctor_id,
       date: form.schedule_date,
+      weekdays: selectedWeekdays,
       status: form.status,
       note: form.note || undefined,
       scopes: scopes.map((s) => ({
+        client_id: s.clientId,
         specialty_id: s.specialty_id,
         area_id: s.area_id,
         room_id: s.room_id,
@@ -903,16 +943,17 @@ export default function NewAppointmentSchedulePage() {
 
             <div className="p-6">
               <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="grid grid-cols-[1fr_1fr_110px_1.4fr_64px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                <div className="grid grid-cols-[1fr_1fr_110px_1.5fr_1.4fr_64px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
                   <span>Bắt đầu</span>
                   <span>Kết thúc</span>
                   <span>Slot khám</span>
+                  <span>Thứ áp dụng</span>
                   <span>Áp dụng cho</span>
                   <span className="text-center">Thao tác</span>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {timeSlots.map((slot) => (
-                    <div key={slot.id} className="grid grid-cols-[1fr_1fr_110px_1.4fr_64px] items-start gap-3 px-3 py-2.5">
+                    <div key={slot.id} className="grid grid-cols-[1fr_1fr_110px_1.5fr_1.4fr_64px] items-start gap-3 px-3 py-2.5">
                       <div className="relative">
                         <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -938,6 +979,49 @@ export default function NewAppointmentSchedulePage() {
                         onChange={(e) => updateSlot(slot.id, { slot_limit: Number(e.target.value) || 0 })}
                         className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
                       />
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {weekdayOrder.map((weekday) => {
+                            const label = weekdayLabels[weekday];
+                            const checked = slot.weekdays.includes(weekday);
+                            return (
+                              <button
+                                key={weekday}
+                                type="button"
+                                title={label}
+                                onClick={() => toggleSlotWeekday(slot.id, weekday)}
+                                className={`h-8 rounded-lg text-xs font-semibold transition-colors ${
+                                  checked
+                                    ? "bg-primary-100 text-primary-700 ring-1 ring-primary-300"
+                                    : "bg-slate-50 text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100"
+                                }`}
+                              >
+                                {weekdayShortLabel(weekday)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-1.5 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setSlotWeekdays(slot.id, weekdayOrder)}
+                            className="font-medium text-primary-600 hover:text-primary-700"
+                          >
+                            Chọn cả tuần
+                          </button>
+                          <span className="text-slate-300">·</span>
+                          <button
+                            type="button"
+                            onClick={() => setSlotWeekdays(slot.id, [])}
+                            className="font-medium text-slate-500 hover:text-slate-700"
+                          >
+                            Bỏ chọn
+                          </button>
+                        </div>
+                        {slot.weekdays.length === 0 && (
+                          <p className="text-[11px] text-amber-600">Chưa chọn thứ áp dụng</p>
+                        )}
+                      </div>
                       <div className="space-y-1.5">
                         <select
                           value={slot.scopeMode}
@@ -998,7 +1082,7 @@ export default function NewAppointmentSchedulePage() {
               </div>
               {timeSlots.length > 0 && (
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Tổng cộng: <b>{timeSlots.length}</b> khung giờ · <b>{totalSlotCount}</b> slot khám
+                  Tổng cộng: <b>{timeSlots.length}</b> khung giờ · <b>{totalSlotCount}</b> slot khám · Chọn thứ áp dụng từ Thứ 2 đến Chủ nhật cho từng khung giờ
                 </p>
               )}
             </div>
@@ -1029,6 +1113,14 @@ export default function NewAppointmentSchedulePage() {
               <div className="flex justify-between gap-4">
                 <span className="text-slate-500">Khung giờ</span>
                 <span className="font-medium text-slate-800">{timeSlots.length}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Thứ áp dụng</span>
+                <span className="max-w-[60%] text-right font-medium text-slate-800">
+                  {sortWeekdays(Array.from(new Set(timeSlots.flatMap((slot) => slot.weekdays))))
+                    .map((weekday) => weekdayShortLabel(weekday))
+                    .join(", ") || "Chưa chọn"}
+                </span>
               </div>
               <div className="flex justify-between gap-4">
                 <span className="text-slate-500">Tổng slot</span>

@@ -135,7 +135,7 @@ export default function PatientDetailPage() {
   const appointmentBookingParams = useMemo(
     () => ({
       patient_id: patient?.id ?? patientId,
-      page: 1,
+      currentPage: 1,
       pageSize: 10,
       sortField: "appointment_time",
       sortOrder: "DESC" as const,
@@ -151,7 +151,7 @@ export default function PatientDetailPage() {
     medicalRecordsHooks.useList(
       {
         patient_id: patientId,
-        page: 1,
+        currentPage: 1,
         pageSize: 5,
         sortField: "examined_at",
         sortOrder: "DESC",
@@ -161,7 +161,7 @@ export default function PatientDetailPage() {
   const { data: reviewsData } = appointmentReviewsHooks.useList(
     {
       patient_id: patientId,
-      page: 1,
+      currentPage: 1,
       pageSize: 1,
       sortField: "created_at",
       sortOrder: "DESC",
@@ -400,7 +400,7 @@ export default function PatientDetailPage() {
                       <th className="px-4 py-3">Phòng khám</th>
                       <th className="px-4 py-3">Dịch vụ</th>
                       <th className="px-4 py-3">Trạng thái</th>
-                      <th className="px-4 py-3">Thanh toán</th>
+                      {/* <th className="px-4 py-3">Thanh toán</th> */}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -426,11 +426,11 @@ export default function PatientDetailPage() {
                             Đã khám
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-semibold text-slate-800">
+                        {/* <td className="px-4 py-3 font-semibold text-slate-800">
                           {formatCurrency(
                             toNumber(r.paid_amount || r.total_amount),
                           )}
-                        </td>
+                        </td> */}
                       </tr>
                     ))}
                   </tbody>

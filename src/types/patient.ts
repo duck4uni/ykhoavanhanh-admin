@@ -39,7 +39,7 @@ export interface Patient {
 export interface SearchPatientParams {
   ip?: string;
   /** Trang hiện tại */
-  page?: number;
+  currentPage?: number;
   /** Số bản ghi mỗi trang (tối đa 100) */
   pageSize?: number;
   /** Mã đơn vị (lọc theo cơ sở) */

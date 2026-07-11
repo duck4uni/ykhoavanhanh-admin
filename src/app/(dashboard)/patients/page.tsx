@@ -92,7 +92,7 @@ export default function PatientsPage() {
 
   const { data: patientsData, isLoading } = useSearchPatients({
     ...searchParams,
-    page,
+    currentPage: page,
     pageSize: PAGE_SIZE,
   });
 
@@ -240,9 +240,9 @@ export default function PatientsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-11 gap-2 rounded-xl" onClick={handleSearch}>
+            {/* <Button variant="outline" className="h-11 gap-2 rounded-xl" onClick={handleSearch}>
               <FiSliders className="h-4 w-4" /> Bộ lọc nâng cao
-            </Button>
+            </Button> */}
             <Button variant="outline" className="h-11 gap-2 rounded-xl" onClick={resetFilters}>
               <FiRotateCcw className="h-4 w-4" /> Đặt lại
             </Button>

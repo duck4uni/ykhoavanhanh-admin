@@ -137,7 +137,7 @@ export function useInfinitePatients(
   const pageSize = options?.pageSize ?? 10;
   const query = useInfiniteQuery({
     queryKey: [...patientKeys.list(params), "infinite", pageSize],
-    queryFn: ({ pageParam }) => searchPatients({ ...params, page: pageParam, pageSize }),
+    queryFn: ({ pageParam }) => searchPatients({ ...params, currentPage: pageParam, pageSize }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.currentPage < lastPage.totalPages ? lastPage.currentPage + 1 : undefined,

@@ -190,7 +190,7 @@ export default function PatientAppointmentBookingsPage() {
 
   const params = useMemo<AppointmentBookingListParams>(
     () => ({
-      page,
+      currentPage: page,
       pageSize,
       sortField: "appointment_time",
       sortOrder: "DESC",

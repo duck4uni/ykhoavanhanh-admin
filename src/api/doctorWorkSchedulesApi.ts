@@ -93,6 +93,8 @@ export type UpdateDoctorWorkSchedulePayload = Partial<CreateDoctorWorkSchedulePa
 // bộ ("all") hoặc một số phạm vi cụ thể (mảng client-id của phạm vi).
 
 export type WorkScheduleScope = {
+  /** ID tạm do frontend tạo, dùng để map time_slots.scope_ids khi tạo cùng lúc. */
+  client_id: string;
   specialty_id: string;
   /** exam_area_id */
   area_id: string;
@@ -109,6 +111,8 @@ export type WorkScheduleTimeSlotV2 = {
   /** "08:30" */
   end_time: string;
   slot_limit: number;
+  /** 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7 */
+  weekday?: number;
   /** "all" hoặc mảng client-id của phạm vi khám. */
   scope_ids: "all" | string[];
 };
@@ -117,6 +121,8 @@ export type CreateDoctorWorkScheduleV2Payload = {
   doctor_id: string;
   /** YYYY-MM-DD */
   date: string;
+  /** 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7 */
+  weekdays?: number[];
   status: "ACTIVE" | "INACTIVE";
   note?: string;
   scopes: WorkScheduleScope[];

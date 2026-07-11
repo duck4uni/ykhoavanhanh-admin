@@ -409,14 +409,14 @@ export default function ExamAreasPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          {/* <button
             onClick={handleExportExcel}
             disabled={isExporting}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface-secondary disabled:opacity-60"
           >
             <Download className="h-4 w-4" />
             {isExporting ? "Đang xuất..." : "Xuất Excel"}
-          </button>
+          </button> */}
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
@@ -466,7 +466,7 @@ export default function ExamAreasPage() {
             />
           </div>
 
-          <div className="min-w-[180px]">
+          {/* <div className="min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Chi nhánh</label>
             <select
               value={branch}
@@ -476,7 +476,7 @@ export default function ExamAreasPage() {
               <option value="all">Tất cả</option>
               <option value="vh">Bệnh viện Vạn Hạnh</option>
             </select>
-          </div>
+          </div> */}
 
           <div className="min-w-[180px]">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Trạng thái</label>

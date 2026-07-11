@@ -161,12 +161,12 @@ export default function PaymentsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface-secondary">
+          {/* <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface-secondary">
             <RefreshCw className="h-4 w-4" /> Đối soát VCB
           </button>
           <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface-secondary">
             <Download className="h-4 w-4" /> Xuất Excel
-          </button>
+          </button> */}
           <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
             <Plus className="h-4 w-4" /> Tạo thanh toán
           </button>
