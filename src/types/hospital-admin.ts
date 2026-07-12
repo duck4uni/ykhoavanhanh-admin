@@ -45,12 +45,12 @@ export interface Post {
 export interface AdminSpecialty extends AuditFields {
   id: string;
   name: string;
-  guide_room: string;
-  booking_note: string;
-  internal_id: string;
-  booking_group: string;
-  display_priority: number;
-  hide_search: boolean;
+  description: string | null;
+  is_active: boolean;
+  room_visit_instruction: string | null;
+  booking_note: string | null;
+  booking_group: string | null;
+  display_priority: number | null;
 }
 
 export interface ExamArea extends AuditFields {

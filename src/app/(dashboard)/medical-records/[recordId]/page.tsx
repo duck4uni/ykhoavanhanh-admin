@@ -105,7 +105,7 @@ export default function MedicalRecordDetailPage() {
       </Card>
 
       {/* Chi phí */}
-      <Card>
+      {/* <Card>
         <CardHeader><CardTitle>Chi phí</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -123,7 +123,7 @@ export default function MedicalRecordDetailPage() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

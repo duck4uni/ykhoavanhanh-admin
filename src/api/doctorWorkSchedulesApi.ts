@@ -5,7 +5,8 @@
  */
 
 import { createApi, type PaginatedResult } from "@/api/createApi";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
+import { apiPost } from "@/lib/axios";
 import type { PaginationParams } from "@/types/api-response";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -86,6 +87,48 @@ export type CreateDoctorWorkSchedulePayload = {
 
 export type UpdateDoctorWorkSchedulePayload = Partial<CreateDoctorWorkSchedulePayload>;
 
+// ─── Payload V2 (nhiều phạm vi khám / khung giờ theo phạm vi) ───────────────
+// Một lịch khám có thể chứa nhiều "phạm vi khám" (tổ hợp chuyên khoa + khu vực
+// + phòng + dịch vụ + phí) và nhiều khung giờ; mỗi khung giờ áp dụng cho toàn
+// bộ ("all") hoặc một số phạm vi cụ thể (mảng client-id của phạm vi).
+
+export type WorkScheduleScope = {
+  /** ID tạm do frontend tạo, dùng để map time_slots.scope_ids khi tạo cùng lúc. */
+  client_id: string;
+  specialty_id: string;
+  /** exam_area_id */
+  area_id: string;
+  room_id: string;
+  service_id: string;
+  fee: number;
+  status: "ACTIVE" | "INACTIVE";
+  note?: string;
+};
+
+export type WorkScheduleTimeSlotV2 = {
+  /** "08:00" */
+  start_time: string;
+  /** "08:30" */
+  end_time: string;
+  slot_limit: number;
+  /** 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7 */
+  weekday?: number;
+  /** "all" hoặc mảng client-id của phạm vi khám. */
+  scope_ids: "all" | string[];
+};
+
+export type CreateDoctorWorkScheduleV2Payload = {
+  doctor_id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7 */
+  weekdays?: number[];
+  status: "ACTIVE" | "INACTIVE";
+  note?: string;
+  scopes: WorkScheduleScope[];
+  time_slots: WorkScheduleTimeSlotV2[];
+};
+
 // ─── Create API via factory ────────────────────────────────────────────────
 
 const { service, keys, hooks } = createApi<DoctorWorkSchedule>("doctor-work-schedules");
@@ -98,6 +141,14 @@ export const doctorWorkSchedulesService = {
   ...service,
   getList: async (params?: DoctorWorkScheduleListParams): Promise<PaginatedResult<DoctorWorkSchedule>> => {
     return service.getList(params as PaginationParams);
+  },
+  /** Tạo lịch khám với payload nhiều phạm vi khám (V2). */
+  createV2: async (payload: CreateDoctorWorkScheduleV2Payload): Promise<DoctorWorkSchedule> => {
+    const res = await apiPost<DoctorWorkSchedule>("/doctor-work-schedules", payload);
+    if (res.data.status === "success" && res.data.responseData) {
+      return res.data.responseData;
+    }
+    throw new Error(res.data.message || "Tạo lịch khám thất bại");
   },
 };
 
@@ -115,6 +166,24 @@ export const doctorWorkSchedulesHooks = {
       staleTime: 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
       ...options,
+    });
+  },
+  /** Tạo lịch khám với payload nhiều phạm vi khám (V2). */
+  useCreateV2: (
+    options?: UseMutationOptions<DoctorWorkSchedule, Error, CreateDoctorWorkScheduleV2Payload>
+  ) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<DoctorWorkSchedule, Error, CreateDoctorWorkScheduleV2Payload>({
+      mutationFn: (payload) => doctorWorkSchedulesService.createV2(payload),
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: keys.all });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => {
+        onError?.(error, variables, context, mutation);
+      },
+      ...rest,
     });
   },
 };

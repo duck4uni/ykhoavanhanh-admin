@@ -64,6 +64,7 @@ export interface MedicalRecord {
 }
 
 export interface MedicalRecordListParams extends PaginationParams {
+  currentPage?: number;
   facility_id?: string;
   patient_id?: string;
   doctor_id?: string;

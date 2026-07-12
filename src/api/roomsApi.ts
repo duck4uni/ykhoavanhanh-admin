@@ -21,6 +21,16 @@ export interface HisRoomService {
   } | null;
 }
 
+export interface HisRoomSpecialty {
+  id: string;
+  specialty_id: string;
+  specialty?: {
+    id: string;
+    name: string;
+    description?: string | null;
+  } | null;
+}
+
 export interface HisRoom {
   id: string;
   roomid: string;
@@ -39,6 +49,7 @@ export interface HisRoom {
   /** Quan hệ khu vực khám kèm sẵn (include). */
   exam_area?: { id: string; code?: string; name: string; short_name?: string | null } | null;
   his_room_services?: HisRoomService[];
+  his_room_specialties?: HisRoomSpecialty[];
   raw_data?: Record<string, unknown> | null;
 }
 
@@ -72,6 +83,7 @@ function normalizeRoom(item: RoomApiItem): HisRoom {
     description: item.description ?? (typeof raw?.description === "string" ? raw.description : null),
     updatetime: item.updatetime ?? rawUpdateTime ?? item.updated_at ?? item.synced_at ?? "",
     his_room_services: item.his_room_services ?? [],
+    his_room_specialties: item.his_room_specialties ?? [],
     raw_data: raw,
   };
 }
@@ -125,6 +137,15 @@ export interface AssignRoomServicesPayload {
 
 export interface AssignRoomServicesResult {
   created: HisRoomService[];
+  skipped: string[];
+}
+
+export interface AssignRoomSpecialtiesPayload {
+  specialty_ids: string[];
+}
+
+export interface AssignRoomSpecialtiesResult {
+  created: HisRoomSpecialty[];
   skipped: string[];
 }
 
@@ -202,10 +223,25 @@ export const roomsService = {
     throw new Error(res.data.message || "Gán dịch vụ cho phòng khám thất bại");
   },
 
+  assignSpecialties: async (id: string, payload: AssignRoomSpecialtiesPayload): Promise<AssignRoomSpecialtiesResult> => {
+    const res = await apiPost<AssignRoomSpecialtiesResult>(`/rooms/${id}/specialties`, payload);
+    if (res.data.status === "success" && res.data.responseData) {
+      return res.data.responseData;
+    }
+    throw new Error(res.data.message || "Gán chuyên khoa cho phòng khám thất bại");
+  },
+
   unassignService: async (id: string, serviceId: string): Promise<void> => {
     const res = await apiDelete(`/rooms/${id}/services/${serviceId}`);
     if (res.data.status === "fail") {
       throw new Error(res.data.message || "Bỏ gán dịch vụ khỏi phòng khám thất bại");
+    }
+  },
+
+  unassignSpecialty: async (id: string, specialtyId: string): Promise<void> => {
+    const res = await apiDelete(`/rooms/${id}/specialties/${specialtyId}`);
+    if (res.data.status === "fail") {
+      throw new Error(res.data.message || "Bỏ gán chuyên khoa khỏi phòng khám thất bại");
     }
   },
 
@@ -326,6 +362,46 @@ export const roomsHooks = {
 
     return useMutation<void, Error, { id: string; serviceId: string }>({
       mutationFn: ({ id, serviceId }) => roomsService.unassignService(id, serviceId),
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: roomsKeys.all });
+        queryClient.invalidateQueries({ queryKey: roomsKeys.detail(variables.id) });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => {
+        onError?.(error, variables, context, mutation);
+      },
+      ...rest,
+    });
+  },
+
+  useAssignSpecialties: (
+    options?: UseMutationOptions<AssignRoomSpecialtiesResult, Error, { id: string; specialtyIds: string[] }>
+  ) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+
+    return useMutation<AssignRoomSpecialtiesResult, Error, { id: string; specialtyIds: string[] }>({
+      mutationFn: ({ id, specialtyIds }) => roomsService.assignSpecialties(id, { specialty_ids: specialtyIds }),
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: roomsKeys.all });
+        queryClient.invalidateQueries({ queryKey: roomsKeys.detail(variables.id) });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => {
+        onError?.(error, variables, context, mutation);
+      },
+      ...rest,
+    });
+  },
+
+  useUnassignSpecialty: (
+    options?: UseMutationOptions<void, Error, { id: string; specialtyId: string }>
+  ) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+
+    return useMutation<void, Error, { id: string; specialtyId: string }>({
+      mutationFn: ({ id, specialtyId }) => roomsService.unassignSpecialty(id, specialtyId),
       onSuccess: (data, variables, context, mutation) => {
         queryClient.invalidateQueries({ queryKey: roomsKeys.all });
         queryClient.invalidateQueries({ queryKey: roomsKeys.detail(variables.id) });

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, GraduationCap, ImageIcon, Mail, Phone, Stethoscope, UserRound } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
+import { TextEditor } from "@/components/shares/rich-text-editor";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { filesHooks } from "@/api/filesApi";
 import { toast } from "@/components/ui/Toast";
@@ -55,6 +56,12 @@ function getImageSrc(path: string | null | undefined): string | null {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   return `${process.env.NEXT_PUBLIC_API_URL ?? ""}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function isValidPhoneNumber(value: string): boolean {
+  const phone = value.replace(/[\s.\-()]/g, "");
+  if (!phone) return true;
+  return /^(0\d{9,10}|84\d{9,10}|\+84\d{9,10})$/.test(phone);
 }
 
 export function mapDoctorToForm(doctor: HisDoctor): DoctorFormValues {
@@ -158,7 +165,7 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Số điện thoại" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="VD: 0909000000" />
+              <Input label="Số điện thoại" type="tel" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="VD: 0909000000" />
               <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="doctor@example.com" />
             </div>
 
@@ -227,7 +234,17 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
             </div>
 
             <Input label="Ghi chú đặt khám" value={form.booking_note} onChange={(e) => setForm((p) => ({ ...p, booking_note: e.target.value }))} placeholder="VD: Chỉ nhận lịch buổi sáng" />
-            <Input label="Mô tả" value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="VD: Bác sĩ khoa Tim mạch" />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">Mô tả</label>
+              <div className="doctor-description-editor min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">
+                <TextEditor
+                  key={`${form.doctorid}-${initialForm.description}`}
+                  content={form.description}
+                  onChangeContent={(content) => setForm((p) => ({ ...p, description: content }))}
+                  contentClassName="min-h-[180px] [overflow-wrap:anywhere]"
+                />
+              </div>
+            </div>
 
             <div className="flex items-center gap-3 pt-2">
               <button type="submit" disabled={isSubmitting || uploadMutation.isPending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60">
@@ -284,6 +301,15 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Ghi chú đặt khám</p>
                   <p className="mt-1 text-sm text-slate-700">{form.booking_note.trim()}</p>
+                </div>
+              )}
+              {form.description.trim() && (
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs text-muted-foreground">Mô tả</p>
+                  <div
+                    className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
+                    dangerouslySetInnerHTML={{ __html: form.description }}
+                  />
                 </div>
               )}
             </div>

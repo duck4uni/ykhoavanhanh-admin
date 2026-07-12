@@ -42,22 +42,39 @@
 }
 
 .clinic-instruction-editor .reactjs-tiptap-editor,
-.service-instruction-editor .reactjs-tiptap-editor {
+.service-instruction-editor .reactjs-tiptap-editor,
+.doctor-description-editor .reactjs-tiptap-editor,
+.specialty-instruction-editor .reactjs-tiptap-editor {
   border: 0 !important;
   box-shadow: none !important;
 }
 
 .clinic-instruction-editor .ProseMirror,
-.service-instruction-editor .ProseMirror {
+.service-instruction-editor .ProseMirror,
+.doctor-description-editor .ProseMirror {
   min-height: 180px !important;
   border: 0 !important;
   outline: 0 !important;
-  padding: 12px !important;
+  padding: 8px !important;
   margin: 0 !important;
   background: transparent !important;
 }
 
 .clinic-instruction-editor .ProseMirror p,
-.service-instruction-editor .ProseMirror p {
+.service-instruction-editor .ProseMirror p,
+.doctor-description-editor .ProseMirror p {
+  margin: 0 !important;
+}
+
+.specialty-instruction-editor .ProseMirror {
+  min-height: 180px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  padding: 4px !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.specialty-instruction-editor .ProseMirror p {
   margin: 0 !important;
 }

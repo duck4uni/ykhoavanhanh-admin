@@ -98,6 +98,7 @@ export interface PaginatedResponse<T> {
 
 export interface PaginationParams {
   page?: number;
+  currentPage?: number;
   pageSize?: number;
   sortField?: string;
   sortOrder?: "ASC" | "DESC";

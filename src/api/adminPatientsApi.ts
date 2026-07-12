@@ -108,8 +108,11 @@ export const adminPatientsService = {
     const data = res.data as AdminPatientResponse;
     const responseData = data.responseData ?? data.data;
 
-    if ((data.status === "success" || data.success === true) && responseData) {
-      return responseData;
+    // Backend tạo trên HIS trước, rồi best-effort lưu DB nội bộ. Khi API báo
+    // success (kể cả khi không kèm data) thì coi là tạo thành công, không throw
+    // để tránh hiển thị toast lỗi (đỏ) dù bệnh nhân đã được tạo.
+    if (data.status === "success" || data.success === true) {
+      return (responseData ?? ({} as AdminPatient));
     }
 
     throw new Error(data.message || "Tạo hồ sơ bệnh nhân thất bại");
