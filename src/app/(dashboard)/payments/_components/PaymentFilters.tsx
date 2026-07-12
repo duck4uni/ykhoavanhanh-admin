@@ -50,9 +50,9 @@ export function PaymentFilters({ ctrl }: { ctrl: PaymentListController }) {
           <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary pl-10 pr-3 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10" />
         </div>
 
-        <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50">
+        {/* <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50">
           <SlidersHorizontal className="h-4 w-4" /> Bộ lọc nâng cao
-        </button>
+        </button> */}
       </div>
     </div>
   );

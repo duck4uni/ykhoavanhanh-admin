@@ -106,7 +106,7 @@ export function RecordsTab({
                 <th className="px-4 py-3">Ngày khám</th>
                 <th className="px-4 py-3">Bác sĩ</th>
                 <th className="px-4 py-3">Chẩn đoán</th>
-                <th className="px-4 py-3">Thanh toán</th>
+                {/* <th className="px-4 py-3">Thanh toán</th> */}
                 <th className="px-4 py-3">Trạng thái</th>
               </tr>
             </thead>
@@ -117,9 +117,9 @@ export function RecordsTab({
                   <td className="px-4 py-3 text-slate-700">{formatDate(record.examined_at)}</td>
                   <td className="px-4 py-3 text-slate-600">{record.doctor?.doctor_name ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{record.diagnosis ?? record.conclusion ?? "—"}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">
+                  {/* <td className="px-4 py-3 font-semibold text-slate-800">
                     {formatCurrency(toNumber(record.paid_amount || record.total_amount))}
-                  </td>
+                  </td> */}
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success">
                       {formatStatus(record.record_status)}
