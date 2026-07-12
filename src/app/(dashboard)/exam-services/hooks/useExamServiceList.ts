@@ -1,0 +1,130 @@
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { hisServicesHooks, type HisService } from "@/api/hisServicesApi";
+import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
+import { EXAM_SERVICES_PAGE_SIZE, supportsInsurance } from "../list-helpers";
+
+/** State + dữ liệu cho trang danh sách dịch vụ khám. */
+export function useExamServiceList() {
+  const router = useRouter();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(EXAM_SERVICES_PAGE_SIZE);
+  const [search, setSearch] = useState("");
+  const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
+  const [insuranceFilter, setInsuranceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const deleteMutation = hisServicesHooks.useDelete({
+    onSuccess: () => toast.success("Xóa dịch vụ thành công"),
+    onError: (err) => toast.error(err.message || "Xóa dịch vụ thất bại"),
+  });
+
+  const debouncedSearch = useDebounce(search, 400);
+  const serverFilters = debouncedSearch.trim() ? `service_name@=${debouncedSearch.trim()}` : undefined;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading } = hisServicesHooks.usePaginatedList({
+    currentPage,
+    pageSize,
+    filters: serverFilters,
+    sortField: "created_at",
+    sortOrder: "DESC",
+  });
+  const services = useMemo(() => data?.rows ?? [], [data]);
+  const total = data?.count ?? 0;
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
+
+  const filteredServices = useMemo(() => {
+    return services.filter((service) => {
+      const matchType = serviceTypeFilter === "all" || service.servicetype === serviceTypeFilter;
+      const matchInsurance = insuranceFilter === "all" || (insuranceFilter === "yes" ? supportsInsurance(service) : !supportsInsurance(service));
+      const matchStatus = statusFilter === "all" || statusFilter === "active";
+      const matchDate = !fromDate || service.updatetime.startsWith(fromDate) || service.fromdate.startsWith(fromDate);
+      return matchType && matchInsurance && matchStatus && matchDate;
+    });
+  }, [services, serviceTypeFilter, insuranceFilter, statusFilter, fromDate]);
+
+  const serviceTypes = useMemo(() => Array.from(new Set(services.map((s) => s.servicetype).filter(Boolean))).sort(), [services]);
+
+  const activeCount = total;
+  const insuranceCount = services.filter(supportsInsurance).length;
+  const updatedThisMonth = services.filter((service) => {
+    const value = service.updatetime || service.updated_at || "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    const now = new Date();
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  }).length;
+  const activePct = total > 0 ? ((activeCount / total) * 100).toFixed(1) : "0";
+  const insurancePct = total > 0 ? Math.round((insuranceCount / Math.max(services.length, 1)) * 100) : 0;
+
+  function resetFilters() {
+    setSearch("");
+    setServiceTypeFilter("all");
+    setInsuranceFilter("all");
+    setStatusFilter("all");
+    setFromDate("");
+    setCurrentPage(1);
+  }
+
+  function openEdit(service: HisService) {
+    // Trang sửa dùng id = UUID (PK) trong DB, không phải mã dịch vụ HIS.
+    router.push(`/exam-services/${service.id}/edit`);
+  }
+
+  function openConfirmDelete(id: string) {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  }
+
+  function handleConfirmDelete() {
+    if (!pendingDeleteId) return;
+    deleteMutation.mutate(pendingDeleteId);
+    setPendingDeleteId(null);
+    setConfirmOpen(false);
+  }
+
+  return {
+    router,
+    isLoading,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    setPageSize,
+    total,
+    totalPages,
+    filteredServices,
+    serviceTypes,
+    // filters
+    search,
+    setSearch,
+    serviceTypeFilter,
+    setServiceTypeFilter,
+    insuranceFilter,
+    setInsuranceFilter,
+    statusFilter,
+    setStatusFilter,
+    fromDate,
+    setFromDate,
+    resetFilters,
+    // stats
+    stats: { total, activeCount, insuranceCount, updatedThisMonth, activePct, insurancePct },
+    // actions
+    openEdit,
+    confirmOpen,
+    setConfirmOpen,
+    openConfirmDelete,
+    handleConfirmDelete,
+    isDeleting: deleteMutation.isPending,
+  };
+}
+
+export type ExamServiceListController = ReturnType<typeof useExamServiceList>;
