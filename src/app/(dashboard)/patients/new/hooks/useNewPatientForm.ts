@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCreateAdminPatient } from "@/api/adminPatientsApi";
 import { useProvinces, useWards } from "@/api/addressesApi";
-import { roomsHooks } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
 import { FALLBACK_FACILITY_ID, createInitialForm } from "../types";
 
@@ -11,11 +10,10 @@ export function useNewPatientForm() {
   const router = useRouter();
   const [form, setForm] = useState(createInitialForm);
 
-  const { data: rooms } = roomsHooks.useList();
   const { data: provinces } = useProvinces();
   const { data: wards } = useWards(form.province_code || null);
 
-  const facilityId = rooms?.find((r) => r.facility_id)?.facility_id || FALLBACK_FACILITY_ID;
+  const facilityId = FALLBACK_FACILITY_ID;
 
   const createMutation = useCreateAdminPatient({
     onSuccess: () => {
@@ -100,7 +98,6 @@ export function useNewPatientForm() {
     fullName,
     handleSubmit,
     isSaving: createMutation.isPending,
-    rooms,
     provinces,
     wards,
     isLoadingAddress,

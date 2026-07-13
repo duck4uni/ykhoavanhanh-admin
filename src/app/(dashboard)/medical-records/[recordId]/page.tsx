@@ -6,12 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { medicalRecordsHooks } from "@/api/medicalRecordsApi";
-import { formatDateTime, formatCurrency } from "@/lib/utils";
-
-function toNumber(v: string | number | null): number {
-  if (v == null) return 0;
-  return typeof v === "number" ? v : Number(v) || 0;
-}
+import { formatDateTime } from "@/lib/utils";
 
 const PAYMENT_LABEL: Record<string, { label: string; variant: "success" | "warning" | "info" }> = {
   PAID: { label: "Đã thanh toán", variant: "success" },
@@ -46,9 +41,6 @@ export default function MedicalRecordDetailPage() {
     );
 
   const payment = PAYMENT_LABEL[record.payment_status] ?? { label: record.payment_status || "—", variant: "info" as const };
-  const total = toNumber(record.total_amount);
-  const paid = toNumber(record.paid_amount);
-  const remaining = Math.max(0, total - paid);
 
   return (
     <div className="space-y-6">
