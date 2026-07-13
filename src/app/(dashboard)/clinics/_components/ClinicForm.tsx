@@ -49,7 +49,6 @@ export function ClinicForm({
   isSubmitting,
   onSubmit,
   initialSelectedSpecialties,
-  service,
   editorResetKey,
 }: ClinicFormProps) {
   const router = useRouter();

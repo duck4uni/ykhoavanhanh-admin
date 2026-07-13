@@ -6,7 +6,7 @@ import { LoadingSection } from "@/components/ui/Spinner";
 import { formatDate } from "@/lib/utils";
 import type { MedicalRecord } from "@/api/medicalRecordsApi";
 import { FiEye } from "react-icons/fi";
-import { MEDICAL_RECORD_PAGE_SIZE, PAYMENT_BADGE } from "../types";
+import { MEDICAL_RECORD_PAGE_SIZE } from "../types";
 
 interface MedicalRecordTableProps {
   rows: MedicalRecord[];
@@ -40,10 +40,6 @@ export function MedicalRecordTable({ rows, isLoading, page, totalPages, totalIte
               </thead>
               <tbody>
                 {rows.map((record) => {
-                  const badge = PAYMENT_BADGE[record.payment_status] ?? {
-                    label: record.payment_status || "—",
-                    className: "bg-surface-secondary text-muted-foreground",
-                  };
                   return (
                     <tr key={record.id} className="border-b border-border transition-colors last:border-0 hover:bg-surface-secondary/40">
                       <td className="px-5 py-4 font-medium text-primary-600">{record.record_code}</td>

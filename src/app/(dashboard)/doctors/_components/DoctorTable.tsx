@@ -3,7 +3,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { DoctorAvatar } from "./DoctorAvatar";
-import { DOCTORS_PAGE_SIZE, formatUpdatedAt, getClinicName, getDoctorStatus } from "../list-helpers";
+import { DOCTORS_PAGE_SIZE, formatUpdatedAt, getDoctorStatus } from "../list-helpers";
 import type { DoctorListController } from "../hooks/useDoctorList";
 
 /** Bảng bác sĩ + phân trang. */
