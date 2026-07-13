@@ -1,4 +1,5 @@
 import type { DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
+import { getScheduleCapacity } from "../types";
 
 export function SlotBar({ booked, max }: { booked: number; max: number }) {
   const pct = max > 0 ? Math.min(100, Math.round((booked / max) * 100)) : 0;
@@ -14,7 +15,7 @@ export function SlotBar({ booked, max }: { booked: number; max: number }) {
 }
 
 export function StatusBadge({ item }: { item: DoctorWorkSchedule }) {
-  const max = item.max_appointments ?? 0;
+  const max = getScheduleCapacity(item);
   const full = max > 0 && item.booked_count >= max;
   let label: string;
   let className: string;

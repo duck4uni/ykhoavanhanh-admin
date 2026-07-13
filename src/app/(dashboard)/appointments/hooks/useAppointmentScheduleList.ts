@@ -3,7 +3,12 @@ import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorW
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
 import { toast } from "@/components/ui/Toast";
-import { APPOINTMENT_PAGE_SIZE } from "../types";
+import {
+  APPOINTMENT_PAGE_SIZE,
+  getScheduleCapacity,
+  getScheduleShiftCode,
+  scheduleIncludesDate,
+} from "../types";
 
 /** State + dữ liệu cho trang danh sách lịch khám (doctor work schedules). */
 export function useAppointmentScheduleList() {
@@ -53,8 +58,8 @@ export function useAppointmentScheduleList() {
         !q ||
         (schedule.doctor?.doctor_name ?? "").toLowerCase().includes(q) ||
         (schedule.exam_area?.name ?? "").toLowerCase().includes(q);
-      const matchDate = !dateFilter || schedule.schedule_date === dateFilter;
-      const matchShift = !shiftFilter || schedule.shift_code === shiftFilter;
+      const matchDate = scheduleIncludesDate(schedule, dateFilter);
+      const matchShift = !shiftFilter || getScheduleShiftCode(schedule) === shiftFilter;
       const matchStatus = !statusFilter || schedule.status === statusFilter;
       return matchQuery && matchDate && matchShift && matchStatus;
     });
@@ -65,7 +70,7 @@ export function useAppointmentScheduleList() {
 
   const stats = useMemo(() => {
     const activeCount = schedules.filter((schedule) => schedule.status === "ACTIVE").length;
-    const totalSlots = schedules.reduce((sum, schedule) => sum + (schedule.max_appointments ?? 0), 0);
+    const totalSlots = schedules.reduce((sum, schedule) => sum + getScheduleCapacity(schedule), 0);
     const totalBooked = schedules.reduce((sum, schedule) => sum + (schedule.booked_count ?? 0), 0);
     return { totalCount, activeCount, totalSlots, totalBooked };
   }, [schedules, totalCount]);

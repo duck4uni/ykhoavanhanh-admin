@@ -51,6 +51,28 @@ function normalizeTime(time?: string): string {
   return time?.slice(0, 5) || "";
 }
 
+function getSlotStart(slot: DoctorWorkSchedule["time_slots"][number]): string {
+  return normalizeTime(slot.start_time ?? slot.start);
+}
+
+function getSlotEnd(slot: DoctorWorkSchedule["time_slots"][number]): string {
+  return normalizeTime(slot.end_time ?? slot.end);
+}
+
+function formatIsoDate(value?: string): string {
+  if (!value) return "";
+  const [year, month, day] = value.slice(0, 10).split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+export function getScheduleDateText(item: DoctorWorkSchedule): string {
+  if (item.schedule_date) return formatIsoDate(item.schedule_date);
+  const start = formatIsoDate(item.start_date);
+  const end = formatIsoDate(item.end_date);
+  if (!start && !end) return "—";
+  return !end || start === end ? start || end : `${start || "—"} - ${end}`;
+}
+
 export function getScheduleTimeText(item: DoctorWorkSchedule): string {
   const slots = item.time_slots ?? [];
   if (!slots.length) {
@@ -58,8 +80,42 @@ export function getScheduleTimeText(item: DoctorWorkSchedule): string {
     const end = normalizeTime(item.end_time);
     return start || end ? `${start || "—"} - ${end || "—"}` : "—";
   }
-  const first = slots[0];
-  const last = slots[slots.length - 1];
-  const range = `${normalizeTime(first.start) || "—"} - ${normalizeTime(last.end) || "—"}`;
+  const starts = slots.map(getSlotStart).filter(Boolean).sort();
+  const ends = slots.map(getSlotEnd).filter(Boolean).sort();
+  const range = `${starts[0] || "—"} - ${ends.at(-1) || "—"}`;
   return slots.length === 1 ? range : `${range} (${slots.length} khung)`;
+}
+
+export function getScheduleCapacity(item: DoctorWorkSchedule): number {
+  if ((item.max_appointments ?? 0) > 0) return item.max_appointments ?? 0;
+  return (item.time_slots ?? []).reduce(
+    (total, slot) => total + (slot.slot_limit ?? slot.max_appointments ?? 0),
+    0,
+  );
+}
+
+export function getScheduleShiftCode(item: DoctorWorkSchedule): string {
+  if (item.shift_code) return item.shift_code;
+  const firstStart = (item.time_slots ?? []).map(getSlotStart).filter(Boolean).sort()[0];
+  if (!firstStart) return "";
+  const hour = Number(firstStart.slice(0, 2));
+  if (hour < 6) return "NIGHT";
+  if (hour < 12) return "MORNING";
+  if (hour < 18) return "AFTERNOON";
+  if (hour < 22) return "EVENING";
+  return "NIGHT";
+}
+
+export function scheduleIncludesDate(item: DoctorWorkSchedule, date: string): boolean {
+  if (!date) return true;
+  if (item.schedule_date) return item.schedule_date.slice(0, 10) === date;
+  if (!item.start_date || !item.end_date || date < item.start_date.slice(0, 10) || date > item.end_date.slice(0, 10)) {
+    return false;
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const weekdays = item.weekdays?.length
+    ? item.weekdays
+    : (item.time_slots ?? []).map((slot) => slot.weekday).filter((value): value is number => value !== undefined);
+  return weekdays.length === 0 || weekdays.includes(weekday);
 }

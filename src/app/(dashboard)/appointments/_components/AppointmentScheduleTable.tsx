@@ -4,7 +4,14 @@ import { LoadingSection } from "@/components/ui/Spinner";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
-import { APPOINTMENT_PAGE_SIZE, SHIFT_LABEL, getScheduleTimeText } from "../types";
+import {
+  APPOINTMENT_PAGE_SIZE,
+  SHIFT_LABEL,
+  getScheduleCapacity,
+  getScheduleDateText,
+  getScheduleShiftCode,
+  getScheduleTimeText,
+} from "../types";
 import { SlotBar } from "./ScheduleBadges";
 
 interface AppointmentScheduleTableProps {
@@ -61,21 +68,24 @@ export function AppointmentScheduleTable({
                     </td>
                   </tr>
                 ) : (
-                  rows.map((item, index) => (
+                  rows.map((item, index) => {
+                    const capacity = getScheduleCapacity(item);
+                    const shiftCode = getScheduleShiftCode(item);
+                    return (
                     <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
                       <td className="px-6 py-4 text-slate-500">{(page - 1) * APPOINTMENT_PAGE_SIZE + index + 1}</td>
                       <td className="px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
                       <td className="px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
-                      <td className="px-6 py-4 text-slate-600">{item.schedule_date}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
                       <td className="px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
-                      <td className="px-6 py-4 text-slate-600">{SHIFT_LABEL[item.shift_code ?? ""] ?? (item.shift_code || "—")}</td>
-                      <td className="px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={item.max_appointments ?? 0} /></td>
+                      <td className="px-6 py-4 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
+                      <td className="px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={capacity} /></td>
                       <td className="px-6 py-4">
                         <StatusSwitch
                           checked={item.status === "ACTIVE"}
                           loading={togglingId === item.id}
                           onChange={() => onToggleStatus(item)}
-                          activeLabel={(item.max_appointments ?? 0) > 0 && item.booked_count >= (item.max_appointments ?? 0) ? "Đã đầy" : "Hoạt động"}
+                          activeLabel={capacity > 0 && item.booked_count >= capacity ? "Đã đầy" : "Hoạt động"}
                           inactiveLabel="Tạm ngưng"
                         />
                       </td>
@@ -90,7 +100,8 @@ export function AppointmentScheduleTable({
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

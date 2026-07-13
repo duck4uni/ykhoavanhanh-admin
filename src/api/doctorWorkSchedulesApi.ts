@@ -9,8 +9,15 @@ import { apiGet, apiPost, apiPut } from "@/lib/axios";
 import type { PaginationParams } from "@/types/api-response";
 
 export type DoctorWorkScheduleTimeSlot = {
-  start: string;
-  end: string;
+  id?: string;
+  weekday?: number;
+  start_time?: string;
+  end_time?: string;
+  slot_limit?: number;
+  scope_ids?: "all" | string[];
+  /** Legacy list schema. */
+  start?: string;
+  end?: string;
   max_appointments?: number;
 };
 
@@ -21,7 +28,10 @@ export interface DoctorWorkSchedule {
   exam_area_id: string;
   specialty_id: string | null;
   room_id: string | null;
-  schedule_date: string;
+  schedule_date?: string;
+  start_date?: string;
+  end_date?: string;
+  weekdays?: number[];
   start_time?: string;
   end_time?: string;
   shift_code: string | null;
@@ -39,7 +49,7 @@ export interface DoctorWorkSchedule {
   created_at: string;
   updated_at: string;
   doctor?: { id: string; doctor_id: string; doctor_name: string };
-  exam_area?: { id: string; code: string; name: string; short_name: string };
+  exam_area?: { id: string; code: string; name: string; short_name: string | null };
 }
 
 export interface DoctorWorkScheduleListParams extends PaginationParams {
