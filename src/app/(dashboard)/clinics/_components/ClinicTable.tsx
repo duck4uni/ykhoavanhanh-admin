@@ -41,7 +41,7 @@ export function ClinicTable({
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-3.5">STT</th>
-                  <th className="px-5 py-3.5">Mã phòng</th>
+                  <th className="px-5 py-3.5">ID nội bộ</th>
                   <th className="px-5 py-3.5">Tên phòng khám</th>
                   <th className="px-5 py-3.5">Loại phòng khám</th>
                   <th className="px-5 py-3.5">Khu khám bệnh</th>
@@ -69,7 +69,7 @@ export function ClinicTable({
                       <td className="max-w-xs px-5 py-4 font-semibold text-slate-800">{room.roomname}</td>
                       <td className="px-5 py-4 text-slate-700">{room.clinic_type || "—"}</td>
                       <td className="max-w-xs px-5 py-4 text-slate-700">{getExamAreaLabel(room) || "—"}</td>
-                      <td className="px-5 py-4"><StatusSwitch checked={!room.is_delete} loading={togglingId === room.id} onChange={() => onToggleStatus(room)} /></td>
+                      <td className="px-5 py-4"><StatusSwitch checked={room.status === "ACTIVE"} loading={togglingId === room.id} onChange={() => onToggleStatus(room)} /></td>
                       <td className="px-5 py-4 text-slate-600">{formatUpdatedAt(room.updated_at || room.synced_at || room.updatetime)}</td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">

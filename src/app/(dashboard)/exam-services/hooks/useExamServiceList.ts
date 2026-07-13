@@ -27,7 +27,7 @@ export function useExamServiceList() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const statusMutation = hisServicesHooks.useUpdate({
     onSuccess: (_data, variables) => {
-      toast.success(variables.data.is_delete ? "Đã tắt dịch vụ" : "Đã bật dịch vụ");
+      toast.success(variables.data.status === "ACTIVE" ? "Đã bật dịch vụ" : "Đã tắt dịch vụ");
     },
     onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
     onSettled: () => setTogglingId(null),
@@ -35,7 +35,8 @@ export function useExamServiceList() {
 
   function toggleServiceStatus(service: HisService) {
     setTogglingId(service.id);
-    statusMutation.mutate({ id: service.id, data: { is_delete: !service.is_delete } });
+    const nextStatus = service.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    statusMutation.mutate({ id: service.id, data: { status: nextStatus } });
   }
 
   const debouncedSearch = useDebounce(search, 400);
@@ -60,7 +61,8 @@ export function useExamServiceList() {
     return services.filter((service) => {
       const matchType = serviceTypeFilter === "all" || service.servicetype === serviceTypeFilter;
       const matchInsurance = insuranceFilter === "all" || (insuranceFilter === "yes" ? supportsInsurance(service) : !supportsInsurance(service));
-      const matchStatus = statusFilter === "all" || statusFilter === "active";
+      const isActive = service.status !== "INACTIVE";
+      const matchStatus = statusFilter === "all" || (statusFilter === "active" ? isActive : !isActive);
       const matchDate = !fromDate || service.updatetime.startsWith(fromDate) || service.fromdate.startsWith(fromDate);
       return matchType && matchInsurance && matchStatus && matchDate;
     });
@@ -68,7 +70,7 @@ export function useExamServiceList() {
 
   const serviceTypes = useMemo(() => Array.from(new Set(services.map((s) => s.servicetype).filter(Boolean))).sort(), [services]);
 
-  const activeCount = total;
+  const activeCount = services.filter((service) => service.status !== "INACTIVE").length;
   const insuranceCount = services.filter(supportsInsurance).length;
   const updatedThisMonth = services.filter((service) => {
     const value = service.updatetime || service.updated_at || "";

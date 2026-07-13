@@ -1,14 +1,15 @@
-import { Building2, Layers, Stethoscope } from "lucide-react";
+import { CalendarDays } from "lucide-react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { StepBadge } from "./StepBadge";
 import { DoctorCombobox } from "./DoctorCombobox";
 import { todayISO, type ScheduleForm } from "../types";
-import type { NewScheduleController } from "../hooks/useNewScheduleForm";
+import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Khối 1: Thông tin lịch khám (bác sĩ, ngày, trạng thái, ghi chú). */
-export function ScheduleInfoSection({ ctrl }: { ctrl: NewScheduleController }) {
-  const { form, setForm, doctor, specialtyTotal, serviceTotal, areaTotal } = ctrl;
+export function ScheduleInfoSection({ ctrl }: { ctrl: ScheduleEditorController }) {
+  const { form, setForm, doctor, dateRangeError, mode } = ctrl;
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -18,7 +19,7 @@ export function ScheduleInfoSection({ ctrl }: { ctrl: NewScheduleController }) {
         </h2>
       </div>
       <div className="space-y-4 p-6">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DoctorCombobox
             value={form.doctor_id}
             doctors={doctor.list}
@@ -29,12 +30,20 @@ export function ScheduleInfoSection({ ctrl }: { ctrl: NewScheduleController }) {
             onSearchChange={doctor.setSearch}
             onLoadMore={doctor.loadMore}
           />
-          <Input
-            label="Ngày khám *"
-            type="date"
-            min={todayISO()}
-            value={form.schedule_date}
-            onChange={(e) => setForm((p) => ({ ...p, schedule_date: e.target.value }))}
+          <DatePicker
+            label="Ngày bắt đầu"
+            required
+            min={mode === "create" ? todayISO() : undefined}
+            value={form.start_date}
+            onChange={(startDate) => setForm((p) => ({ ...p, start_date: startDate }))}
+          />
+          <DatePicker
+            label="Ngày kết thúc"
+            required
+            min={form.start_date || (mode === "create" ? todayISO() : undefined)}
+            value={form.end_date}
+            error={dateRangeError}
+            onChange={(endDate) => setForm((p) => ({ ...p, end_date: endDate }))}
           />
           <Select
             label="Trạng thái"
@@ -47,32 +56,17 @@ export function ScheduleInfoSection({ ctrl }: { ctrl: NewScheduleController }) {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,320px)_1fr]">
-          {/* Mini card năng lực (tổng danh mục) */}
-          <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-2">
-            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-2 py-3 text-center">
-              <Stethoscope className="mb-1 h-4 w-4 text-primary-600" />
-              <span className="text-base font-bold text-slate-900">{specialtyTotal}</span>
-              <span className="text-[11px] text-muted-foreground">chuyên khoa</span>
-            </div>
-            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-2 py-3 text-center">
-              <Layers className="mb-1 h-4 w-4 text-primary-600" />
-              <span className="text-base font-bold text-slate-900">{serviceTotal}</span>
-              <span className="text-[11px] text-muted-foreground">dịch vụ</span>
-            </div>
-            <div className="flex flex-col items-center justify-center rounded-lg bg-white px-2 py-3 text-center">
-              <Building2 className="mb-1 h-4 w-4 text-primary-600" />
-              <span className="text-base font-bold text-slate-900">{areaTotal}</span>
-              <span className="text-[11px] text-muted-foreground">khu vực khám</span>
-            </div>
-          </div>
-          <Input
-            label="Ghi chú"
-            value={form.note}
-            onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
-            placeholder="VD: Ca sáng thứ Tư"
-          />
+        <div className="flex items-start gap-2 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-700">
+          <CalendarDays className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <p>Lịch sẽ lặp theo các thứ đã chọn trong toàn bộ khoảng ngày, bao gồm cả ngày bắt đầu và ngày kết thúc.</p>
         </div>
+
+        <Input
+          label="Ghi chú"
+          value={form.note}
+          onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
+          placeholder="VD: Lịch khám buổi sáng trong tháng"
+        />
       </div>
     </section>
   );

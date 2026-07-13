@@ -2,7 +2,7 @@ import { Info } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PaginatedCombobox } from "./PaginatedCombobox";
 import { scopeControlClass, type ScopeRow } from "../types";
-import type { NewScheduleController } from "../hooks/useNewScheduleForm";
+import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Field dạng label-trái / input-phải cho modal phạm vi. */
 function ScopeField({
@@ -26,7 +26,7 @@ function ScopeField({
 }
 
 /** Modal thêm/sửa phạm vi khám. */
-export function ScopeModal({ ctrl }: { ctrl: NewScheduleController }) {
+export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
   const {
     scopeModalOpen,
     setScopeModalOpen,

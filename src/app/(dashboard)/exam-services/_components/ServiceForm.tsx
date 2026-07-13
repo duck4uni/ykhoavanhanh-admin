@@ -135,7 +135,7 @@ export function ServiceForm({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Input
-                label="Mã dịch vụ *"
+                label="ID Nội Bộ *"
                 value={form.service_id}
                 onChange={(e) => setForm((p) => ({ ...p, service_id: e.target.value }))}
                 placeholder="VD: 51582"

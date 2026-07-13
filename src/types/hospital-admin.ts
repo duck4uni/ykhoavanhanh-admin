@@ -42,6 +42,23 @@ export interface Post {
   deleted_at?: string | null;
 }
 
+export interface SpecialtyExamArea {
+  id: string;
+  exam_area_id: string;
+  is_active: boolean;
+  display_priority: number | null;
+  exam_area?: {
+    id: string;
+    code?: string;
+    name: string;
+    short_name?: string | null;
+    address?: string | null;
+    phone?: string | null;
+    description?: string | null;
+    status?: string;
+  } | null;
+}
+
 export interface AdminSpecialty extends AuditFields {
   id: string;
   name: string;
@@ -51,6 +68,8 @@ export interface AdminSpecialty extends AuditFields {
   booking_note: string | null;
   booking_group: string | null;
   display_priority: number | null;
+  /** Khu vực khám đã gán cho chuyên khoa (bảng nối specialty_exam_areas). */
+  specialty_exam_areas?: SpecialtyExamArea[];
 }
 
 export interface ExamArea extends AuditFields {

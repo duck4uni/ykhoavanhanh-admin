@@ -11,28 +11,10 @@ import { useSpecialtyList } from "./hooks/useSpecialtyList";
 import { SpecialtyStatsCards } from "./_components/SpecialtyStatsCards";
 import { SpecialtyFilters } from "./_components/SpecialtyFilters";
 import { SpecialtyTable } from "./_components/SpecialtyTable";
-import { SpecialtyEditModal } from "./_components/SpecialtyEditModal";
-import {
-  EMPTY_SPECIALTY_FORM,
-  buildSpecialtyPayload,
-  mapSpecialtyToForm,
-  type SpecialtyFormValues,
-} from "./types";
 
 export default function SpecialtiesPage() {
   const router = useRouter();
   const list = useSpecialtyList();
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<SpecialtyFormValues>(EMPTY_SPECIALTY_FORM);
-
-  const updateMutation = specialtiesHooks.useUpdate({
-    onSuccess: () => {
-      toast.success("Cập nhật chuyên khoa thành công");
-      closeModal();
-    },
-    onError: (err) => toast.error(err.message || "Cập nhật chuyên khoa thất bại"),
-  });
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const statusMutation = specialtiesHooks.useUpdate({
@@ -49,24 +31,7 @@ export default function SpecialtiesPage() {
   }
 
   function openEdit(item: AdminSpecialty) {
-    setEditingId(item.id);
-    setForm(mapSpecialtyToForm(item));
-  }
-
-  function closeModal() {
-    setEditingId(null);
-    setForm(EMPTY_SPECIALTY_FORM);
-  }
-
-  function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!form.name.trim()) {
-      toast.error("Vui lòng nhập tên chuyên khoa");
-      return;
-    }
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: buildSpecialtyPayload(form) as Partial<AdminSpecialty> });
-    }
+    router.push(`/specialties/${item.id}/edit`);
   }
 
   return (
@@ -116,15 +81,6 @@ export default function SpecialtiesPage() {
         onDelete={list.openConfirmDelete}
         onToggleStatus={toggleStatus}
         togglingId={togglingId}
-      />
-
-      <SpecialtyEditModal
-        open={editingId !== null}
-        form={form}
-        onChange={setForm}
-        onClose={closeModal}
-        onSubmit={handleSubmit}
-        isSubmitting={updateMutation.isPending}
       />
 
       <ConfirmDialog

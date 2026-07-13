@@ -69,7 +69,7 @@ export function ClinicForm({
 
   const specialtyItems: PickerItem[] = useMemo(
     () => specialtyPicker.specialties.map((s) => ({ id: s.id, title: s.name })),
-    [specialtyPicker.specialties]
+    [specialtyPicker.specialties],
   );
 
   function toggleFromList(key: "specialty_ids" | "service_ids", id: string) {
@@ -89,7 +89,9 @@ export function ClinicForm({
   const selectedSpecialtyNames =
     form.specialty_ids.length > 0
       ? form.specialty_ids
-          .map((id) => specialtyPicker.specialties.find((s) => s.id === id)?.name)
+          .map(
+            (id) => specialtyPicker.specialties.find((s) => s.id === id)?.name,
+          )
           .filter(Boolean)
           .join(", ")
       : "—";
@@ -119,43 +121,57 @@ export function ClinicForm({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <Input
-                label="Mã phòng *"
+                label="ID nội bộ *"
                 value={form.room_id}
-                onChange={(e) => setForm((p) => ({ ...p, room_id: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, room_id: e.target.value }))
+                }
                 placeholder="VD: PK01"
               />
               <Input
                 label="Tên phòng khám *"
                 value={form.room_name}
-                onChange={(e) => setForm((p) => ({ ...p, room_name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, room_name: e.target.value }))
+                }
                 placeholder="VD: Phòng khám Nội tổng quát"
               />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Khu khám bệnh</label>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Khu khám bệnh
+                </label>
                 <select
                   value={form.exam_area_id}
-                  onChange={(e) => setForm((p) => ({ ...p, exam_area_id: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, exam_area_id: e.target.value }))
+                  }
                   className={SELECT_CLASS}
                 >
                   <option value="">-- Chọn khu khám bệnh --</option>
                   {examAreas.map((area) => (
-                    <option key={area.id} value={area.id}>{area.name}</option>
+                    <option key={area.id} value={area.id}>
+                      {area.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <Input
                 label="Loại phòng khám"
                 value={form.clinic_type}
-                onChange={(e) => setForm((p) => ({ ...p, clinic_type: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, clinic_type: e.target.value }))
+                }
                 placeholder="VD: OUTPATIENT"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Chuyên khoa của phòng khám</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Chuyên khoa của phòng khám
+              </label>
               <Input
                 value={specialtyPicker.search}
                 onChange={(e) => specialtyPicker.setSearch(e.target.value)}
@@ -170,10 +186,13 @@ export function ClinicForm({
                 emptyText="Không tìm thấy chuyên khoa phù hợp."
                 loadingText="Đang tải chuyên khoa..."
               />
-              <p className="mt-1 text-xs text-muted-foreground">Có thể chọn nhiều chuyên khoa cho cùng một phòng khám. Cuộn xuống để tải thêm.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Có thể chọn nhiều chuyên khoa cho cùng một phòng khám. Cuộn
+                xuống để tải thêm.
+              </p>
             </div>
-
-            <div>
+            {/* Ẩn chọn dịch Dịch vụ của phòng khám sau này có thì mở ra */}
+            {/* <div>
               <label className="mb-1 block text-sm font-medium text-foreground">Dịch vụ của phòng khám</label>
               {service.onSearchChange && (
                 <Input
@@ -193,21 +212,30 @@ export function ClinicForm({
                 maxHeightClass="max-h-56"
               />
               <p className="mt-1 text-xs text-muted-foreground">Có thể chọn nhiều dịch vụ cho cùng một phòng khám.{service.onScroll ? " Cuộn xuống để tải thêm." : ""}</p>
-            </div>
+            </div> */}
 
             <Input
               label="Mô tả khu khám"
               value={form.exam_area_description}
-              onChange={(e) => setForm((p) => ({ ...p, exam_area_description: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({
+                  ...p,
+                  exam_area_description: e.target.value,
+                }))
+              }
               placeholder="VD: Khu khám tầng 2"
             />
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">Hướng dẫn vào khám</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Hướng dẫn vào khám
+              </label>
               <div className="clinic-instruction-editor min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">
                 <TextEditor
                   key={editorResetKey}
                   content={form.visit_instruction}
-                  onChangeContent={(content) => setForm((p) => ({ ...p, visit_instruction: content }))}
+                  onChangeContent={(content) =>
+                    setForm((p) => ({ ...p, visit_instruction: content }))
+                  }
                   contentClassName="min-h-[180px] break-words [overflow-wrap:anywhere]"
                 />
               </div>
@@ -215,7 +243,9 @@ export function ClinicForm({
             <Input
               label="Mô tả"
               value={form.description}
-              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, description: e.target.value }))
+              }
               placeholder="Nhập mô tả phòng khám (không bắt buộc)"
             />
 
@@ -225,7 +255,8 @@ export function ClinicForm({
                 disabled={isSubmitting}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
-                {isSubmitting && <Spinner size="sm" />}{submitLabel}
+                {isSubmitting && <Spinner size="sm" />}
+                {submitLabel}
               </button>
               <button
                 type="button"
@@ -243,7 +274,9 @@ export function ClinicForm({
           <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
             <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <p className="text-sm font-semibold text-slate-700">Xem trước</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Thông tin phòng khám sẽ hiển thị như bên dưới.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Thông tin phòng khám sẽ hiển thị như bên dưới.
+              </p>
             </div>
             <div className="space-y-4 p-5">
               <div className="flex items-start gap-3">
@@ -255,7 +288,7 @@ export function ClinicForm({
                     {form.room_name.trim() || "Tên phòng khám"}
                   </p>
                   <p className="mt-0.5 font-mono text-xs text-primary-600">
-                    {form.room_id.trim() || "Mã phòng"}
+                    {form.room_id.trim() || "ID nội bộ"}
                   </p>
                 </div>
               </div>
@@ -266,20 +299,25 @@ export function ClinicForm({
                     <MapPin className="h-4 w-4" /> Khu khám bệnh
                   </dt>
                   <dd className="max-w-[60%] truncate text-right font-medium text-slate-700">
-                    {examAreas.find((a) => a.id === form.exam_area_id)?.name || "—"}
+                    {examAreas.find((a) => a.id === form.exam_area_id)?.name ||
+                      "—"}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="flex items-center gap-2 text-muted-foreground">
                     <Tag className="h-4 w-4" /> Loại phòng khám
                   </dt>
-                  <dd className="font-medium text-slate-700">{form.clinic_type.trim() || "—"}</dd>
+                  <dd className="font-medium text-slate-700">
+                    {form.clinic_type.trim() || "—"}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="flex items-center gap-2 text-muted-foreground">
                     <Tag className="h-4 w-4" /> Chuyên khoa
                   </dt>
-                  <dd className="max-w-[60%] text-right font-medium text-slate-700">{selectedSpecialtyNames}</dd>
+                  <dd className="max-w-[60%] text-right font-medium text-slate-700">
+                    {selectedSpecialtyNames}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="flex items-center gap-2 text-muted-foreground">
@@ -293,7 +331,9 @@ export function ClinicForm({
 
               {form.visit_instruction.trim() && (
                 <div className="border-t border-slate-100 pt-3">
-                  <p className="text-xs text-muted-foreground">Hướng dẫn vào khám</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hướng dẫn vào khám
+                  </p>
                   <div
                     className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
                     dangerouslySetInnerHTML={{ __html: form.visit_instruction }}
@@ -304,7 +344,9 @@ export function ClinicForm({
               {form.description.trim() && (
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Mô tả</p>
-                  <p className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]">{form.description.trim()}</p>
+                  <p className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]">
+                    {form.description.trim()}
+                  </p>
                 </div>
               )}
             </div>

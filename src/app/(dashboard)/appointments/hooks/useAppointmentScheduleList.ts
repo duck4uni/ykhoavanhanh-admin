@@ -30,7 +30,7 @@ export function useAppointmentScheduleList() {
   });
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const statusMutation = doctorWorkSchedulesHooks.usePatch({
+  const statusMutation = doctorWorkSchedulesHooks.useUpdate({
     onSuccess: (_data, variables) => {
       toast.success(variables.data.status === "ACTIVE" ? "Đã bật lịch khám" : "Đã tạm ngưng lịch khám");
     },

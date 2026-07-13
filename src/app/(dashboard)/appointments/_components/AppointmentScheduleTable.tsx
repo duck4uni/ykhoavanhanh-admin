@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -14,7 +15,6 @@ interface AppointmentScheduleTableProps {
   filteredCount: number;
   isDeleting: boolean;
   onPageChange: (page: number) => void;
-  onEdit: (item: DoctorWorkSchedule) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (item: DoctorWorkSchedule) => void;
   togglingId: string | null;
@@ -28,7 +28,6 @@ export function AppointmentScheduleTable({
   filteredCount,
   isDeleting,
   onPageChange,
-  onEdit,
   onDelete,
   onToggleStatus,
   togglingId,
@@ -49,7 +48,7 @@ export function AppointmentScheduleTable({
                   <th className="px-6 py-3.5">Ngày khám</th>
                   <th className="px-6 py-3.5">Giờ khám</th>
                   <th className="px-6 py-3.5">Ca</th>
-                  <th className="px-6 py-3.5">Slot</th>
+                  <th className="px-6 py-3.5">Số phiếu khám</th>
                   <th className="px-6 py-3.5">Trạng thái</th>
                   <th className="px-6 py-3.5 text-right">Thao tác</th>
                 </tr>
@@ -82,9 +81,9 @@ export function AppointmentScheduleTable({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => onEdit(item)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:text-primary">
+                          <Link href={`/appointments/${item.id}/edit`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:text-primary">
                             <Pencil className="h-3.5 w-3.5" /> Sửa
-                          </button>
+                          </Link>
                           <button onClick={() => onDelete(item.id)} disabled={isDeleting} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-red-500 transition-colors hover:border-red-200 hover:bg-red-50 disabled:opacity-50">
                             <Trash2 className="h-3.5 w-3.5" /> Xóa
                           </button>

@@ -118,7 +118,7 @@ export function ExamInfoSection({ ctrl }: { ctrl: NewMedicalRecordController }) 
                             >
                               <div>
                                 <p className="font-medium text-slate-900">{d.doctorname}</p>
-                                {d.doctorid && <p className="text-xs text-muted-foreground">Mã BS: {d.doctorid}</p>}
+                                {d.doctorid && <p className="text-xs text-muted-foreground">ID Nội Bộ: {d.doctorid}</p>}
                               </div>
                               {form.doctor_id === d.id && (
                                 <span className="text-xs font-semibold text-primary-600">Đang chọn</span>

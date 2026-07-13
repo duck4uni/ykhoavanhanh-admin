@@ -39,10 +39,10 @@ export function ExamAreaDetailModal({ area, onClose, onEdit }: ExamAreaDetailMod
               <dt className="text-xs font-medium text-muted-foreground">Số điện thoại</dt>
               <dd className="mt-0.5 text-sm text-slate-700">{area.phone || "—"}</dd>
             </div>
-            <div>
+            {/* <div>
               <dt className="text-xs font-medium text-muted-foreground">Chi nhánh</dt>
               <dd className="mt-0.5 text-sm text-slate-700">Bệnh viện Vạn Hạnh</dd>
-            </div>
+            </div> */}
             <div className="sm:col-span-2">
               <dt className="text-xs font-medium text-muted-foreground">Địa chỉ</dt>
               <dd className="mt-0.5 text-sm text-slate-700">{area.address || "—"}</dd>

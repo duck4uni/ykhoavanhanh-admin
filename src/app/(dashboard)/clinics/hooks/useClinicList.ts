@@ -48,7 +48,7 @@ export function useClinicList() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const statusMutation = roomsHooks.useUpdate({
     onSuccess: (data) => {
-      toast.success(data.is_delete ? "Đã tắt phòng khám" : "Đã bật phòng khám");
+      toast.success(data.status === "ACTIVE" ? "Đã bật phòng khám" : "Đã tắt phòng khám");
     },
     onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
     onSettled: () => setTogglingId(null),
@@ -56,8 +56,10 @@ export function useClinicList() {
 
   function toggleRoomStatus(room: HisRoom) {
     setTogglingId(room.id);
-    // is_delete không nằm trong UpdateRoomPayload nên cần cast để gửi kèm.
-    statusMutation.mutate({ id: room.id, data: { is_delete: !room.is_delete } as never });
+    statusMutation.mutate({
+      id: room.id,
+      data: { status: room.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" },
+    });
   }
 
   const examAreaOptions = useMemo(() => {
@@ -69,8 +71,7 @@ export function useClinicList() {
     return allRooms.filter((room) => {
       const areaName = getExamAreaName(room);
       const matchArea = areaFilter === "all" || areaName === areaFilter;
-      const matchStatus =
-        statusFilter === "all" || (statusFilter === "ACTIVE" ? !room.is_delete : room.is_delete);
+      const matchStatus = statusFilter === "all" || room.status === statusFilter;
       const matchHis =
         hisFilter === "all" ||
         (hisFilter === "has" ? hasAssignedServices(room) : !hasAssignedServices(room));
@@ -82,7 +83,7 @@ export function useClinicList() {
 
   const totalRooms = roomsData?.count ?? allRooms.length;
   const stats = useMemo(() => {
-    const activeRooms = allRooms.filter((room) => !room.is_delete).length;
+    const activeRooms = allRooms.filter((room) => room.status === "ACTIVE").length;
     const withServiceCode = allRooms.filter(hasAssignedServices).length;
     const withoutDescription = allRooms.filter((room) => !room.description?.trim()).length;
     const pct = (value: number) => (totalRooms > 0 ? ((value / totalRooms) * 100).toFixed(2) : "0");

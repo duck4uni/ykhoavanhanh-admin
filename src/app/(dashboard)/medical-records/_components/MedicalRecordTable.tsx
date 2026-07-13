@@ -34,7 +34,7 @@ export function MedicalRecordTable({ rows, isLoading, page, totalPages, totalIte
                   <th className="px-5 py-3.5">Chuyên khoa</th>
                   <th className="px-5 py-3.5">Ngày khám</th>
                   <th className="px-5 py-3.5">Chẩn đoán</th>
-                  <th className="px-5 py-3.5">Trạng thái</th>
+                  {/* <th className="px-5 py-3.5">Trạng thái</th> */}
                   <th className="px-5 py-3.5 text-center">Thao tác</th>
                 </tr>
               </thead>
@@ -64,11 +64,11 @@ export function MedicalRecordTable({ rows, isLoading, page, totalPages, totalIte
                       <td className="max-w-xs px-5 py-4 text-muted-foreground">
                         <p className="truncate">{record.diagnosis ?? "—"}</p>
                       </td>
-                      <td className="px-5 py-4">
+                      {/* <td className="px-5 py-4">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${badge.className}`}>
                           {badge.label}
                         </span>
-                      </td>
+                      </td> */}
                       <td className="px-5 py-4 text-center">
                         <Link href={`/medical-records/${record.id}`}>
                           <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-primary-600">

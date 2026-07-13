@@ -1,37 +1,68 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   doctorWorkSchedulesHooks,
-  type CreateDoctorWorkScheduleV2Payload,
-  type WorkScheduleTimeSlotV2,
 } from "@/api/doctorWorkSchedulesApi";
-import { examAreasHooks } from "@/api/examAreasApi";
-import { specialtiesHooks } from "@/api/specialtiesApi";
-import { roomsHooks } from "@/api/roomsApi";
-import { hisServicesHooks } from "@/api/hisServicesApi";
+import { examAreasHooks, examAreasService } from "@/api/examAreasApi";
+import { specialtiesHooks, specialtiesService } from "@/api/specialtiesApi";
+import { roomsHooks, roomsService } from "@/api/roomsApi";
+import { hisServicesHooks, hisServicesService } from "@/api/hisServicesApi";
 import { doctorsHooks, type HisDoctor } from "@/api/doctorsApi";
 import { toast } from "@/components/ui/Toast";
 import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
 import {
   addMinutes,
+  buildSchedulePayload,
   createId,
   createInitialForm,
   emptyScopeDraft,
+  getDatesByWeekday,
+  hydrateScheduleEditor,
+  isValidDateRange,
   sortWeekdays,
-  toApiTime,
+  weekdayOrder,
   type AutoGenConfig,
   type ScheduleForm,
   type ScopeRow,
   type TimeSlotRow,
 } from "../types";
 
-/** Toàn bộ state + logic cho trang "Thêm lịch khám mới". */
-export function useNewScheduleForm() {
+export type ScheduleEditorMode = "create" | "edit";
+
+/** Toàn bộ state + logic dùng chung cho trang thêm và chỉnh sửa lịch khám. */
+export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode; scheduleId?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<ScheduleForm>(createInitialForm);
   const [scopes, setScopes] = useState<ScopeRow[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlotRow[]>([]);
+  const hydratedScheduleId = useRef<string | null>(null);
+  const detailQuery = doctorWorkSchedulesHooks.useDetailV2(scheduleId, { enabled: mode === "edit" });
+
+  const dateRangeValid = isValidDateRange(form.start_date, form.end_date);
+  const datesByWeekday = useMemo(
+    () => getDatesByWeekday(form.start_date, form.end_date),
+    [form.start_date, form.end_date]
+  );
+  const availableWeekdays = useMemo(
+    () => weekdayOrder.filter((weekday) => datesByWeekday[weekday].length > 0),
+    [datesByWeekday]
+  );
+  const dateRangeError =
+    form.start_date && form.end_date && !dateRangeValid
+      ? "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu"
+      : undefined;
+
+  // Chỉ loại ngày không còn hợp lệ khi người dùng đã chọn đủ một khoảng ngày hợp lệ.
+  useEffect(() => {
+    if (!dateRangeValid) return;
+    setTimeSlots((current) =>
+      current.map((slot) => ({
+        ...slot,
+        weekdays: slot.weekdays.filter((weekday) => availableWeekdays.includes(weekday)),
+      }))
+    );
+  }, [availableWeekdays, dateRangeValid]);
 
   // ── Danh mục cho thẻ đếm năng lực (đếm tổng, chỉ cần count) ──
   const { data: specialtyCountData } = specialtiesHooks.useList({ currentPage: 1, pageSize: 1 });
@@ -114,10 +145,46 @@ export function useNewScheduleForm() {
   useEffect(() => {
     const rows = doctorsData?.rows ?? [];
     setDoctorList((current) => {
-      const next = doctorPage === 1 ? rows : [...current, ...rows];
+      const next = doctorPage === 1 ? [...current.filter((doctor) => doctor.id === form.doctor_id), ...rows] : [...current, ...rows];
       return Array.from(new Map(next.map((doctor) => [doctor.id, doctor])).values());
     });
-  }, [doctorsData, doctorPage]);
+  }, [doctorsData, doctorPage, form.doctor_id]);
+
+  useEffect(() => {
+    if (mode !== "edit" || !scheduleId || !detailQuery.data || hydratedScheduleId.current === scheduleId) return;
+    const hydrated = hydrateScheduleEditor(detailQuery.data);
+    setForm(hydrated.form);
+    setScopes(hydrated.scopes);
+    setTimeSlots(hydrated.timeSlots);
+    setLabelCache((current) => ({ ...current, ...hydrated.labels }));
+    if (hydrated.doctor) {
+      setDoctorList((current) => Array.from(new Map([hydrated.doctor!, ...current].map((doctor) => [doctor.id, doctor])).values()));
+    }
+    hydratedScheduleId.current = scheduleId;
+
+    const loadMissingLabels = async () => {
+      const entries = await Promise.all(
+        hydrated.scopes.flatMap((scope) => [
+          scope.specialty_id && !hydrated.labels[scope.specialty_id]
+            ? specialtiesService.getById(scope.specialty_id).then((item) => [scope.specialty_id, item.name] as const).catch(() => null)
+            : null,
+          scope.area_id && !hydrated.labels[scope.area_id]
+            ? examAreasService.getById(scope.area_id).then((item) => [scope.area_id, item.name] as const).catch(() => null)
+            : null,
+          scope.room_id && !hydrated.labels[scope.room_id]
+            ? roomsService.getById(scope.room_id).then((item) => [scope.room_id, item.roomname] as const).catch(() => null)
+            : null,
+          scope.service_id && !hydrated.labels[scope.service_id]
+            ? hisServicesService.getById(scope.service_id).then((item) => [scope.service_id, item.servicename] as const).catch(() => null)
+            : null,
+        ].filter((request): request is Promise<readonly [string, string] | null> => request !== null))
+      );
+      const labels = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null));
+      if (Object.keys(labels).length > 0) setLabelCache((current) => ({ ...current, ...labels }));
+    };
+
+    void loadMissingLabels();
+  }, [detailQuery.data, mode, scheduleId]);
 
   useEffect(() => {
     setDoctorPage(1);
@@ -267,6 +334,7 @@ export function useNewScheduleForm() {
   }
 
   function toggleSlotWeekday(slotId: string, weekday: number) {
+    if (!dateRangeValid || !availableWeekdays.includes(weekday)) return;
     setTimeSlots((prev) =>
       prev.map((slot) => {
         if (slot.id !== slotId) return slot;
@@ -282,7 +350,10 @@ export function useNewScheduleForm() {
   }
 
   function setSlotWeekdays(slotId: string, weekdays: number[]) {
-    setTimeSlots((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, weekdays } : slot)));
+    const validWeekdays = dateRangeValid
+      ? weekdays.filter((weekday) => availableWeekdays.includes(weekday))
+      : [];
+    setTimeSlots((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, weekdays: validWeekdays } : slot)));
   }
 
   // ── Modal state: tự sinh khung giờ ──
@@ -324,27 +395,42 @@ export function useNewScheduleForm() {
     () => timeSlots.reduce((sum, slot) => sum + (slot.slot_limit || 0), 0),
     [timeSlots]
   );
+  const selectedWeekdays = useMemo(
+    () => sortWeekdays(Array.from(new Set(timeSlots.flatMap((slot) => slot.weekdays)))),
+    [timeSlots]
+  );
+  const selectedConcreteDates = useMemo(
+    () => Array.from(new Set(selectedWeekdays.flatMap((weekday) => datesByWeekday[weekday]))).sort(),
+    [datesByWeekday, selectedWeekdays]
+  );
 
   // ── Cảnh báo cấu hình ──
   const warnings = useMemo(() => {
     const list: string[] = [];
     if (!form.doctor_id) list.push("Chưa chọn bác sĩ");
-    if (!form.schedule_date) list.push("Chưa chọn ngày khám");
+    if (!form.start_date) list.push("Chưa chọn ngày bắt đầu");
+    if (!form.end_date) list.push("Chưa chọn ngày kết thúc");
+    if (form.start_date && form.end_date && !dateRangeValid) list.push("Ngày kết thúc phải bằng hoặc sau ngày bắt đầu");
     if (scopes.length === 0) list.push("Chưa có phạm vi khám");
     if (timeSlots.length === 0) list.push("Chưa có khung giờ làm việc");
-    if (timeSlots.some((s) => s.weekdays.length === 0)) list.push("Có khung giờ chưa chọn thứ áp dụng");
+    if (timeSlots.some((s) => s.weekdays.length === 0)) list.push("Có khung giờ chưa chọn ngày áp dụng");
+    if (timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)))
+      list.push("Có khung giờ chứa thứ không thuộc khoảng ngày");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
     if (timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0))
       list.push("Có khung giờ chưa chọn phạm vi áp dụng");
     return list;
-  }, [form.doctor_id, form.schedule_date, scopes, timeSlots]);
+  }, [dateRangeValid, datesByWeekday, form.doctor_id, form.end_date, form.start_date, scopes, timeSlots]);
 
   const canSubmit =
     Boolean(form.doctor_id) &&
-    Boolean(form.schedule_date) &&
+    Boolean(form.start_date) &&
+    Boolean(form.end_date) &&
+    dateRangeValid &&
     scopes.length > 0 &&
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
+    !timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)) &&
     !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0);
 
   const createMutation = doctorWorkSchedulesHooks.useCreateV2({
@@ -354,50 +440,40 @@ export function useNewScheduleForm() {
     },
     onError: (err) => toast.error(err.message || "Tạo lịch khám thất bại"),
   });
-  const isSaving = createMutation.isPending;
-
-  function buildPayload(): CreateDoctorWorkScheduleV2Payload {
-    const selectedWeekdays = sortWeekdays(Array.from(new Set(timeSlots.flatMap((slot) => slot.weekdays))));
-    const time_slots: WorkScheduleTimeSlotV2[] = timeSlots.flatMap((slot) =>
-      slot.weekdays.map((weekday) => ({
-        start_time: toApiTime(slot.start),
-        end_time: toApiTime(slot.end),
-        slot_limit: slot.slot_limit,
-        weekday,
-        scope_ids: slot.scopeMode === "all" ? "all" : slot.scope_ids,
-      }))
-    );
-    return {
-      doctor_id: form.doctor_id,
-      date: form.schedule_date,
-      weekdays: selectedWeekdays,
-      status: form.status,
-      note: form.note || undefined,
-      scopes: scopes.map((s) => ({
-        client_id: s.clientId,
-        specialty_id: s.specialty_id,
-        area_id: s.area_id,
-        room_id: s.room_id,
-        service_id: s.service_id,
-        fee: s.fee,
-        status: s.status,
-        note: s.note || undefined,
-      })),
-      time_slots,
-    };
-  }
+  const updateMutation = doctorWorkSchedulesHooks.useUpdateV2({
+    onSuccess: () => {
+      toast.success("Cập nhật lịch khám thành công");
+      router.push("/appointments");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật lịch khám thất bại"),
+  });
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) {
-      toast.error("Vui lòng hoàn thiện thông tin lịch khám trước khi tạo.");
+    const knownScopeIds = new Set(scopes.map((scope) => scope.clientId));
+    const hasDanglingScope = timeSlots.some((slot) =>
+      slot.scopeMode === "custom" && slot.scope_ids.some((id) => !knownScopeIds.has(id))
+    );
+    if (!canSubmit || hasDanglingScope) {
+      toast.error(`Vui lòng hoàn thiện thông tin lịch khám trước khi ${mode === "edit" ? "lưu" : "tạo"}.`);
       return;
     }
-    await createMutation.mutateAsync(buildPayload());
+    const payload = buildSchedulePayload(form, scopes, timeSlots);
+    if (mode === "edit") {
+      if (!scheduleId) return;
+      await updateMutation.mutateAsync({ id: scheduleId, data: payload });
+    } else {
+      await createMutation.mutateAsync(payload);
+    }
   }
 
   return {
     router,
+    mode,
+    isDetailLoading: mode === "edit" && detailQuery.isLoading,
+    detailError: mode === "edit" ? detailQuery.error : null,
+    retryDetail: detailQuery.refetch,
     // form chính
     form,
     setForm,
@@ -455,6 +531,13 @@ export function useNewScheduleForm() {
     autoGen,
     setAutoGen,
     runAutoGenerate,
+    // khoảng ngày
+    datesByWeekday,
+    availableWeekdays,
+    selectedWeekdays,
+    selectedConcreteDates,
+    dateRangeError,
+    dateRangeValid,
     // tổng hợp & submit
     totalSlotCount,
     warnings,
@@ -464,4 +547,6 @@ export function useNewScheduleForm() {
   };
 }
 
-export type NewScheduleController = ReturnType<typeof useNewScheduleForm>;
+export const useNewScheduleForm = () => useScheduleForm({ mode: "create" });
+
+export type ScheduleEditorController = ReturnType<typeof useScheduleForm>;

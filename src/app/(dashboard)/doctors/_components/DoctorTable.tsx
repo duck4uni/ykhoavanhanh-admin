@@ -22,10 +22,10 @@ export function DoctorTable({ ctrl }: { ctrl: DoctorListController }) {
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-3.5">STT</th>
                   <th className="px-5 py-3.5">Ảnh</th>
-                  <th className="px-5 py-3.5">Mã BS</th>
+                  <th className="px-5 py-3.5">ID Nội Bộ</th>
                   <th className="px-5 py-3.5">Bác sĩ</th>
                   <th className="px-5 py-3.5">Chuyên khoa</th>
-                  <th className="px-5 py-3.5">Phòng khám</th>
+                  {/* <th className="px-5 py-3.5">Phòng khám</th> */}
                   {/* <th className="px-5 py-3.5">Số lịch</th> */}
                   <th className="px-5 py-3.5">Trạng thái</th>
                   <th className="px-5 py-3.5">Cập nhật lúc</th>
@@ -45,7 +45,7 @@ export function DoctorTable({ ctrl }: { ctrl: DoctorListController }) {
                         <td className="px-5 py-4 font-mono font-semibold text-slate-700">{doctor.doctorid}</td>
                         <td className="px-5 py-4 font-semibold text-slate-800">{doctor.doctorname}</td>
                         <td className="px-5 py-4 text-slate-700">{getDoctorSpecialtyName(doctor)}</td>
-                        <td className="px-5 py-4 text-slate-700">{getClinicName(doctor)}</td>
+                        {/* <td className="px-5 py-4 text-slate-700">{getClinicName(doctor)}</td> */}
                         {/* <td className="px-5 py-4 font-semibold text-primary-600">{getScheduleCount(doctor)}</td> */}
                         <td className="px-5 py-4">
                           <StatusSwitch

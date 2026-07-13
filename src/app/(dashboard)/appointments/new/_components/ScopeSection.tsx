@@ -2,10 +2,10 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { StepBadge } from "./StepBadge";
 import { formatFee } from "../types";
-import type { NewScheduleController } from "../hooks/useNewScheduleForm";
+import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Khối 2: Phạm vi khám áp dụng (bảng scopes). */
-export function ScopeSection({ ctrl }: { ctrl: NewScheduleController }) {
+export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
   const { scopes, specialtyName, areaName, roomName, serviceName, openAddScope, openEditScope, removeScope } = ctrl;
 
   return (

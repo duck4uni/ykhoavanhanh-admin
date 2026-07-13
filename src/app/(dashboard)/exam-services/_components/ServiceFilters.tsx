@@ -32,6 +32,7 @@ export function ServiceFilters({ ctrl }: { ctrl: ExamServiceListController }) {
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectClass}>
           <option value="all">Trạng thái: Tất cả</option>
           <option value="active">Hoạt động</option>
+          <option value="inactive">Tạm ngưng</option>
         </select>
         <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={selectClass} />
         <button onClick={() => setCurrentPage(1)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary/90"><Filter className="h-4 w-4" /> Lọc</button>

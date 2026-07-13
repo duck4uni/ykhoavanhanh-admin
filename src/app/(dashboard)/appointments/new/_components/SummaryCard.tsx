@@ -1,12 +1,15 @@
 import { AlertTriangle, Calendar, Info, Save } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
-import { sortWeekdays, weekdayShortLabel } from "../types";
-import type { NewScheduleController } from "../hooks/useNewScheduleForm";
+import { formatShortLocalDate, weekdayShortLabel } from "../types";
+import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Card tóm tắt (cột phải) + nút hành động. */
-export function SummaryCard({ ctrl }: { ctrl: NewScheduleController }) {
-  const { router, form, scopes, timeSlots, totalSlotCount, warnings, canSubmit, isSaving, doctor } = ctrl;
+export function SummaryCard({ ctrl }: { ctrl: ScheduleEditorController }) {
+  const {
+    router, form, scopes, timeSlots, totalSlotCount, selectedWeekdays, selectedConcreteDates,
+    warnings, canSubmit, isSaving, doctor, mode,
+  } = ctrl;
 
   return (
     <aside className="space-y-5">
@@ -22,8 +25,12 @@ export function SummaryCard({ ctrl }: { ctrl: NewScheduleController }) {
             </span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-slate-500">Ngày khám</span>
-            <span className="font-medium text-slate-800">{form.schedule_date || "Chưa chọn"}</span>
+            <span className="text-slate-500">Từ ngày</span>
+            <span className="font-medium text-slate-800">{form.start_date ? formatShortLocalDate(form.start_date, true) : "Chưa chọn"}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">Đến ngày</span>
+            <span className="font-medium text-slate-800">{form.end_date ? formatShortLocalDate(form.end_date, true) : "Chưa chọn"}</span>
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-slate-500">Phạm vi áp dụng</span>
@@ -36,19 +43,21 @@ export function SummaryCard({ ctrl }: { ctrl: NewScheduleController }) {
           <div className="flex justify-between gap-4">
             <span className="text-slate-500">Thứ áp dụng</span>
             <span className="max-w-[60%] text-right font-medium text-slate-800">
-              {sortWeekdays(Array.from(new Set(timeSlots.flatMap((slot) => slot.weekdays))))
-                .map((weekday) => weekdayShortLabel(weekday))
-                .join(", ") || "Chưa chọn"}
+              {selectedWeekdays.map((weekday) => weekdayShortLabel(weekday)).join(", ") || "Chưa chọn"}
             </span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-slate-500">Tổng slot</span>
+            <span className="text-slate-500">Số ngày áp dụng</span>
+            <span className="font-medium text-slate-800">{selectedConcreteDates.length}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">Phiếu khám cấu hình</span>
             <span className="font-medium text-slate-800">{totalSlotCount}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span className="text-slate-500">Dự kiến hiển thị</span>
+            <span className="text-slate-500">Trạng thái</span>
             <Badge variant={form.status === "ACTIVE" ? "success" : "default"}>
-              {form.status === "ACTIVE" ? "Có" : "Không"}
+              {form.status === "ACTIVE" ? "Hoạt động" : "Tạm ngưng"}
             </Badge>
           </div>
         </div>
@@ -67,7 +76,7 @@ export function SummaryCard({ ctrl }: { ctrl: NewScheduleController }) {
         ) : (
           <div className="mt-6 rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800">
             <p className="flex items-center gap-2 font-medium">
-              <Info className="h-4 w-4" /> Vui lòng kiểm tra lại thông tin trước khi tạo lịch.
+              <Info className="h-4 w-4" /> Vui lòng kiểm tra lại thông tin trước khi {mode === "edit" ? "lưu thay đổi" : "tạo lịch"}.
             </p>
             <p className="mt-1 text-primary-700">Các phạm vi khám và khung giờ sẽ hiển thị trong danh sách quản lý.</p>
           </div>
@@ -88,7 +97,7 @@ export function SummaryCard({ ctrl }: { ctrl: NewScheduleController }) {
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
-            Tạo lịch khám
+            {mode === "edit" ? "Lưu thay đổi" : "Tạo lịch khám"}
           </button>
         </div>
       </section>

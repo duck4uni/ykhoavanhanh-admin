@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, ClipboardList, Save, Stethoscope } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardList, MapPin, Save, Stethoscope, X } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { TextEditor } from "@/components/shares/rich-text-editor";
+import { examAreasHooks } from "@/api/examAreasApi";
 import { EMPTY_SPECIALTY_FORM, type SpecialtyFormValues } from "../types";
 
 interface SpecialtyFormProps {
@@ -31,6 +32,18 @@ export function SpecialtyForm({
 }: SpecialtyFormProps) {
   const router = useRouter();
   const [form, setForm] = useState<SpecialtyFormValues>(initialForm);
+  const { data: examAreasData } = examAreasHooks.useList();
+  const examAreas = examAreasData?.rows ?? [];
+  const selectedAreas = examAreas.filter((area) => form.exam_area_ids.includes(area.id));
+
+  function toggleExamArea(id: string) {
+    setForm((p) => ({
+      ...p,
+      exam_area_ids: p.exam_area_ids.includes(id)
+        ? p.exam_area_ids.filter((areaId) => areaId !== id)
+        : [...p.exam_area_ids, id],
+    }));
+  }
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -110,6 +123,47 @@ export function SpecialtyForm({
                 className={TEXTAREA_CLASS}
                 placeholder="Nhập lưu ý khi bệnh nhân đặt khám"
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Khu vực khám</label>
+              <p className="mb-2 text-xs text-slate-400">Chọn các khu vực khám sẽ được gán cho chuyên khoa này.</p>
+              {selectedAreas.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {selectedAreas.map((area) => (
+                    <span key={area.id} className="inline-flex items-center gap-1.5 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
+                      <MapPin className="h-3 w-3" />
+                      {area.name}
+                      <button type="button" onClick={() => toggleExamArea(area.id)} className="text-primary-400 hover:text-primary-700" title="Bỏ chọn">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200">
+                {examAreas.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-xs text-slate-400">Chưa có khu vực khám nào.</p>
+                ) : (
+                  examAreas.map((area) => (
+                    <label key={area.id} className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={form.exam_area_ids.includes(area.id)}
+                        onChange={() => toggleExamArea(area.id)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-slate-700">{area.name}</span>
+                        {area.address && <span className="block truncate text-xs text-slate-400">{area.address}</span>}
+                      </span>
+                      {area.short_name && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{area.short_name}</span>
+                      )}
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
 
             <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">

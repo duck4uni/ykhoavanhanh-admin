@@ -47,10 +47,10 @@ export function ExamAreaTable({
                   <th className="px-5 py-3.5">STT</th>
                   <th className="px-5 py-3.5">ID Nội bộ</th>
                   <th className="px-5 py-3.5">Tên khu vực</th>
-                  <th className="px-5 py-3.5">Tên viết tắt</th>
-                  <th className="px-5 py-3.5">Chi nhánh</th>
+                  {/* <th className="px-5 py-3.5">Tên viết tắt</th> */}
+                  {/* <th className="px-5 py-3.5">Chi nhánh</th> */}
                   <th className="px-5 py-3.5">Địa chỉ</th>
-                  <th className="px-5 py-3.5">Số phòng khám</th>
+                  {/* <th className="px-5 py-3.5">Số phòng khám</th> */}
                   <th className="px-5 py-3.5">Số điện thoại</th>
                   <th className="px-5 py-3.5">Trạng thái</th>
                   <th className="px-5 py-3.5 text-right">Thao tác</th>
@@ -73,7 +73,7 @@ export function ExamAreaTable({
                       </td>
                       <td className="px-5 py-4 font-mono font-semibold text-primary-600">{area.code}</td>
                       <td className="px-5 py-4 font-semibold text-slate-800">{area.name}</td>
-                      <td className="px-5 py-4">
+                      {/* <td className="px-5 py-4">
                         {area.short_name ? (
                           <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-600">
                             {area.short_name}
@@ -81,10 +81,10 @@ export function ExamAreaTable({
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4 text-slate-600">Bệnh viện Vạn Hạnh</td>
+                      </td> */}
+                      {/* <td className="px-5 py-4 text-slate-600">Bệnh viện Vạn Hạnh</td> */}
                       <td className="max-w-xs px-5 py-4 text-slate-600">{area.address ?? "—"}</td>
-                      <td className="px-5 py-4 font-semibold text-slate-700">0 phòng</td>
+                      {/* <td className="px-5 py-4 font-semibold text-slate-700">0 phòng</td> */}
                       <td className="px-5 py-4 text-slate-600">{area.phone ?? "—"}</td>
                       <td className="px-5 py-4"><StatusSwitch checked={area.status === "ACTIVE"} loading={togglingId === area.id} onChange={() => onToggle(area)} inactiveLabel="Tạm tắt" /></td>
                       <td className="px-5 py-4">

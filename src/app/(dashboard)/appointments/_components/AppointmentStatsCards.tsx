@@ -11,7 +11,7 @@ export function AppointmentStatsCards({ stats }: { stats: AppointmentStats }) {
   const cards = [
     { label: "Tổng lịch khám", value: stats.totalCount, sub: "Lịch", icon: Calendar, tone: "bg-primary-100 text-primary-600" },
     { label: "Đang hoạt động", value: stats.activeCount, sub: "Lịch", icon: CheckCircle2, tone: "bg-success-light text-success" },
-    { label: "Tổng slot", value: stats.totalSlots, sub: "Slot", icon: Clock, tone: "bg-purple-100 text-purple-600" },
+    { label: "Tổng phiếu khám", value: stats.totalSlots, sub: "Phiếu", icon: Clock, tone: "bg-purple-100 text-purple-600" },
     { label: "Đã đặt", value: stats.totalBooked, sub: "Lượt", icon: Users, tone: "bg-warning-light text-warning" },
   ];
 

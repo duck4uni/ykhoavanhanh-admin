@@ -25,11 +25,11 @@ export default function NewInternalAccountPage() {
 
   const createMutation = useCreateInternalAccount({
     onSuccess: () => {
-      toast.success("Tao tai khoan thanh cong!");
+      toast.success("Tạo tài khoản thành công!");
       router.push("/internal-accounts");
     },
     onError: (error) => {
-      toast.error(error.message || "Tao tai khoan that bai");
+      toast.error(error.message || "Tạo tài khoản thất bại");
     },
   });
 
@@ -37,7 +37,7 @@ export default function NewInternalAccountPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!form.role_id) {
-        toast.error("Vui long chon vai tro");
+        toast.error("Vui lòng chọn vai trò");
         return;
       }
       createMutation.mutate({
@@ -61,12 +61,12 @@ export default function NewInternalAccountPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => router.back()}>
-          ← Quay lai
+          ← Quay lại
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Them tai khoan noi bo</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Thêm tài khoản nội bộ</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Tao tai khoan nhan Vien moi
+            Tạo tài khoản nhân viên mới
           </p>
         </div>
       </div>
@@ -75,12 +75,12 @@ export default function NewInternalAccountPage() {
         <div className="col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Thong tin tai khoan</CardTitle>
+              <CardTitle>Thông tin tài khoản</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Input
-                  label="Ho va ten *"
+                  label="Họ và tên *"
                   required
                   value={form.fullName}
                   onChange={(e) => setForm({ ...form, fullName: e.target.value })}
@@ -94,33 +94,33 @@ export default function NewInternalAccountPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                label="So dien thoai"
+                label="Số điện thoại"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
               <div className="col-span-2">
                 {rolesLoading ? (
                   <div className="py-2">
-                    <Spinner size="sm" /> Dang tai vai tro...
+                    <Spinner size="sm" /> Đang tải vai trò...
                   </div>
                 ) : (
                   <Select
-                    label="Vai tro *"
+                    label="Vai trò *"
                     value={form.role_id}
                     onChange={(e) => setForm({ ...form, role_id: e.target.value })}
                     options={roleOptions}
-                    placeholder="Chon vai tro"
+                    placeholder="Chọn vai trò"
                   />
                 )}
               </div>
               <div className="col-span-2">
                 <Input
-                  label="Mat khau tam thoi *"
+                  label="Mật khẩu tạm thời *"
                   type="password"
                   required
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  hint="Toi thieu 6 ky tu"
+                  hint="Tối thiểu 6 ký tự"
                 />
               </div>
             </CardContent>
@@ -129,11 +129,11 @@ export default function NewInternalAccountPage() {
         <div>
           <Card className="sticky top-6">
             <CardHeader>
-              <CardTitle>Tao tai khoan</CardTitle>
+              <CardTitle>Tạo tài khoản</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-gray-500">
-                Tai khoan se duoc tao voi quyen admin. Nguoi dung se dang nhap bang email va mat khau.
+                Tài khoản sẽ được tạo với quyền đã chọn. Người dùng sẽ đăng nhập bằng email và mật khẩu.
               </p>
               <Button
                 type="submit"
@@ -141,7 +141,7 @@ export default function NewInternalAccountPage() {
                 className="w-full"
                 disabled={createMutation.isPending}
               >
-                {createMutation.isPending ? "Dang tao..." : "Tao tai khoan"}
+                {createMutation.isPending ? "Đang tạo..." : "Tạo tài khoản"}
               </Button>
               <Button
                 type="button"
@@ -149,7 +149,7 @@ export default function NewInternalAccountPage() {
                 className="w-full"
                 onClick={() => router.back()}
               >
-                Huy
+                Hủy
               </Button>
             </CardContent>
           </Card>

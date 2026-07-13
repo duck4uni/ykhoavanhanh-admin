@@ -44,7 +44,7 @@ export function ServiceTable({ ctrl }: { ctrl: ExamServiceListController }) {
                     <td className="px-5 py-4 text-slate-700">{service.servicetype}</td>
                     <td className="px-5 py-4 font-semibold text-slate-800">{formatCurrency(Number(service.price) || 0)}</td>
                     <td className="px-5 py-4 text-slate-700">{service.insurancetype && service.insurancetype !== "—" ? service.insurancetype : "—"}</td>
-                    <td className="px-5 py-4"><StatusSwitch checked={!service.is_delete} loading={togglingId === service.id} onChange={() => toggleServiceStatus(service)} /></td>
+                    <td className="px-5 py-4"><StatusSwitch checked={service.status === "ACTIVE"} loading={togglingId === service.id} onChange={() => toggleServiceStatus(service)} /></td>
                     <td className="px-5 py-4 text-slate-600">{formatDateTime(service.updatetime || service.updated_at || "")}</td>
                     <td className="px-5 py-4"><div className="flex items-center justify-end gap-2"><button onClick={() => openEdit(service)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="Xem"><Eye className="h-4 w-4" /></button><button onClick={() => openEdit(service)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-primary hover:bg-primary-50" title="Sửa"><Pencil className="h-4 w-4" /></button><button onClick={() => openConfirmDelete(service.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50" title="Xóa"><Trash2 className="h-4 w-4" /></button></div></td>
                   </tr>

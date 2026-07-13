@@ -1,10 +1,10 @@
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
-import type { NewScheduleController } from "../hooks/useNewScheduleForm";
+import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Modal tự sinh khung giờ. */
-export function AutoGenModal({ ctrl }: { ctrl: NewScheduleController }) {
+export function AutoGenModal({ ctrl }: { ctrl: ScheduleEditorController }) {
   const { autoGenOpen, setAutoGenOpen, autoGen, setAutoGen, runAutoGenerate } = ctrl;
 
   return (
@@ -64,16 +64,16 @@ export function AutoGenModal({ ctrl }: { ctrl: NewScheduleController }) {
           ]}
         />
         <Input
-          label="Slot mỗi khung"
+          label="Số phiếu khám"
           type="number"
           min={1}
           value={autoGen.slotLimit}
           onChange={(e) => setAutoGen((p) => ({ ...p, slotLimit: Number(e.target.value) || 0 }))}
         />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Lưu ý: thao tác này sẽ thay thế toàn bộ khung giờ hiện có. Khung giờ sinh ra mặc định áp dụng cho tất cả phạm vi.
-      </p>
+      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-700">
+        <strong>Lưu ý:</strong> thao tác này sẽ thay thế toàn bộ khung giờ hiện có. Khung giờ mới mặc định áp dụng cho tất cả phạm vi; bạn vẫn cần chọn thứ/ngày áp dụng cho từng khung giờ.
+      </div>
     </Modal>
   );
 }

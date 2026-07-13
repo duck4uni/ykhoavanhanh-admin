@@ -12,6 +12,8 @@ export type SpecialtyFormValues = {
   booking_note: string;
   booking_group: string;
   display_priority: string;
+  /** Danh sách UUID khu vực khám cần gán cho chuyên khoa. */
+  exam_area_ids: string[];
 };
 
 export const EMPTY_SPECIALTY_FORM: SpecialtyFormValues = {
@@ -22,6 +24,7 @@ export const EMPTY_SPECIALTY_FORM: SpecialtyFormValues = {
   booking_note: "",
   booking_group: "",
   display_priority: "",
+  exam_area_ids: [],
 };
 
 export function mapSpecialtyToForm(item: AdminSpecialty): SpecialtyFormValues {
@@ -33,6 +36,7 @@ export function mapSpecialtyToForm(item: AdminSpecialty): SpecialtyFormValues {
     booking_note: item.booking_note ?? "",
     booking_group: item.booking_group ?? "",
     display_priority: item.display_priority != null ? String(item.display_priority) : "",
+    exam_area_ids: (item.specialty_exam_areas ?? []).map((relation) => relation.exam_area_id),
   };
 }
 

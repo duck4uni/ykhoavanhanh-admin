@@ -144,7 +144,7 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
         <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Mã bác sĩ *" value={form.doctorid} onChange={(e) => setForm((p) => ({ ...p, doctorid: e.target.value }))} placeholder="VD: BS001" />
+              <Input label="ID Nội Bộ *" value={form.doctorid} onChange={(e) => setForm((p) => ({ ...p, doctorid: e.target.value }))} placeholder="VD: BS001" />
               <Input label="Tên bác sĩ *" value={form.doctorname} onChange={(e) => setForm((p) => ({ ...p, doctorname: e.target.value }))} placeholder="VD: Nguyễn Văn A" />
             </div>
 
@@ -290,7 +290,7 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold text-slate-800">{form.doctorname.trim() || "Tên bác sĩ"}</p>
-                  <p className="mt-0.5 font-mono text-xs text-primary-600">{form.doctorid.trim() || "Mã bác sĩ"}</p>
+                  <p className="mt-0.5 font-mono text-xs text-primary-600">{form.doctorid.trim() || "ID Nội Bộ"}</p>
                 </div>
               </div>
 

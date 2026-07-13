@@ -39,30 +39,30 @@ export default function EditInternalAccountPage() {
 
   const updateUser = useUpdateUser({
     onSuccess: () => {
-      toast.success("Cap nhat thong tin thanh cong!");
+      toast.success("Cập nhật thông tin thành công!");
       router.push(`/internal-accounts/${userId}`);
     },
     onError: (error) => {
-      toast.error(error.message || "Cap nhat that bai");
+      toast.error(error.message || "Cập nhật thất bại");
     },
   });
 
   const addRoleMutation = useCreateUserRole({
     onSuccess: () => {
-      toast.success("Gan vai tro thanh cong!");
+      toast.success("Gán vai trò thành công!");
       setSelectedRoleToAdd("");
     },
     onError: (error) => {
-      toast.error(error.message || "Gan vai tro that bai");
+      toast.error(error.message || "Gán vai trò thất bại");
     },
   });
 
   const removeRoleMutation = useDeleteUserRole({
     onSuccess: () => {
-      toast.success("Go vai tro thanh cong!");
+      toast.success("Gỡ vai trò thành công!");
     },
     onError: (error) => {
-      toast.error(error.message || "Go vai tro that bai");
+      toast.error(error.message || "Gỡ vai trò thất bại");
     },
   });
 
@@ -132,15 +132,15 @@ export default function EditInternalAccountPage() {
   };
 
   if (userLoading || rolesLoading || userRolesLoading) {
-    return <LoadingSection text="Dang tai thong tin..." />;
+    return <LoadingSection text="Đang tải thông tin..." />;
   }
 
   if (!apiUser) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-500 text-lg">Khong tim thay tai khoan.</p>
+        <p className="text-gray-500 text-lg">Không tìm thấy tài khoản.</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>
-          Quay lai
+          Quay lại
         </Button>
       </div>
     );
@@ -150,10 +150,10 @@ export default function EditInternalAccountPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => router.back()}>
-          ← Quay lai
+          ← Quay lại
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Chinh sua tai khoan</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Chỉnh sửa tài khoản</h1>
           <p className="text-sm text-gray-500 mt-0.5">{form.email}</p>
         </div>
       </div>
@@ -162,12 +162,12 @@ export default function EditInternalAccountPage() {
         <div className="col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Thong tin tai khoan</CardTitle>
+              <CardTitle>Thông tin tài khoản</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Input
-                  label="Ho va ten *"
+                  label="Họ và tên *"
                   required
                   value={form.fullName}
                   onChange={(e) => setForm({ ...form, fullName: e.target.value })}
@@ -181,7 +181,7 @@ export default function EditInternalAccountPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                label="So dien thoai"
+                label="Số điện thoại"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
@@ -190,17 +190,17 @@ export default function EditInternalAccountPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Vai tro</CardTitle>
+              <CardTitle>Vai trò</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-500">
-                Quan ly vai tro cua tai khoan.
+                Quản lý vai trò của tài khoản.
               </p>
 
               {/* Current roles with remove option */}
               {currentRoles.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Vai tro hien tai:</p>
+                  <p className="text-sm font-medium">Vai trò hiện tại:</p>
                   <div className="flex flex-wrap gap-2">
                     {currentRoles.map((ur) => (
                       <Badge key={ur.id} variant="info" className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export default function EditInternalAccountPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">Chua co vai tro nao.</p>
+                <p className="text-sm text-gray-500">Chưa có vai trò nào.</p>
               )}
 
               {/* Add new role - chỉ admin mới thấy */}
@@ -231,7 +231,7 @@ export default function EditInternalAccountPage() {
                       value={selectedRoleToAdd}
                       onValueChange={setSelectedRoleToAdd}
                       options={availableRoles}
-                      placeholder={availableRoles.length > 0 ? "Chon vai tro can them" : "Tat ca vai tro da duoc gan"}
+                      placeholder={availableRoles.length > 0 ? "Chọn vai trò cần thêm" : "Tất cả vai trò đã được gán"}
                     />
                   </div>
                   <Button
@@ -240,7 +240,7 @@ export default function EditInternalAccountPage() {
                     onClick={handleAddRole}
                     disabled={!selectedRoleToAdd || addRoleMutation.isPending || availableRoles.length === 0}
                   >
-                    Them vai tro
+                    Thêm vai trò
                   </Button>
                 </div>
               </PermissionGuard>
@@ -251,12 +251,12 @@ export default function EditInternalAccountPage() {
         <div className="space-y-4">
           <Card className="sticky top-6">
             <CardHeader>
-              <CardTitle>Luu thay doi</CardTitle>
+              <CardTitle>Lưu thay đổi</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">
-                  Kich hoat tai khoan
+                  Kích hoạt tài khoản
                 </span>
                 <Toggle
                   checked={form.isActive}
@@ -269,7 +269,7 @@ export default function EditInternalAccountPage() {
                 className="w-full"
                 disabled={updateUser.isPending}
               >
-                {updateUser.isPending ? "Dang luu..." : "Luu thay doi"}
+                {updateUser.isPending ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
               <Button
                 type="button"
@@ -277,7 +277,7 @@ export default function EditInternalAccountPage() {
                 className="w-full"
                 onClick={() => router.push(`/internal-accounts/${userId}`)}
               >
-                Huy
+                Hủy
               </Button>
             </CardContent>
           </Card>

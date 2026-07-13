@@ -30,6 +30,8 @@ export interface HisService {
   exam_area_id?: string | null;
   specialty_id?: string | null;
   is_delete?: boolean;
+  /** Trạng thái hoạt động của dịch vụ. */
+  status?: "ACTIVE" | "INACTIVE";
   booking_note?: string | null;
   display_priority?: number | null;
   display_group?: number | null;

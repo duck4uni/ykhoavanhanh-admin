@@ -31,7 +31,7 @@ export default function NewMedicalRecordPage() {
           <PatientPicker ctrl={ctrl} />
           <ExamInfoSection ctrl={ctrl} />
           <MedicalContentSection ctrl={ctrl} />
-          <CostSection ctrl={ctrl} />
+          {/* <CostSection ctrl={ctrl} /> */}
         </div>
 
         <RecordSummary ctrl={ctrl} />

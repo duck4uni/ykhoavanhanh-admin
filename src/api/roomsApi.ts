@@ -42,6 +42,7 @@ export interface HisRoom {
   created_at?: string;
   updated_at?: string;
   is_delete?: boolean;
+  status: "ACTIVE" | "INACTIVE";
   exam_area_description?: string | null;
   visit_instruction?: string | null;
   clinic_type?: string | null;
@@ -82,6 +83,7 @@ function normalizeRoom(item: RoomApiItem): HisRoom {
     roomname: item.roomname ?? item.room_name ?? rawRoomName ?? "—",
     description: item.description ?? (typeof raw?.description === "string" ? raw.description : null),
     updatetime: item.updatetime ?? rawUpdateTime ?? item.updated_at ?? item.synced_at ?? "",
+    status: item.status ?? (item.is_delete ? "INACTIVE" : "ACTIVE"),
     his_room_services: item.his_room_services ?? [],
     his_room_specialties: item.his_room_specialties ?? [],
     raw_data: raw,
@@ -118,6 +120,7 @@ export interface UpdateRoomPayload {
   visit_instruction?: string | null;
   clinic_type?: string | null;
   exam_area_id?: string | null;
+  status?: "ACTIVE" | "INACTIVE";
 }
 
 export interface CreateRoomPayload {
