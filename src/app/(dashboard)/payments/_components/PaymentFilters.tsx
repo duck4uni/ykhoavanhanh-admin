@@ -1,4 +1,4 @@
-import { CalendarDays, Search, SlidersHorizontal } from "lucide-react";
+import { CalendarDays, Search } from "lucide-react";
 import type { Payment } from "@/types/payment";
 import type { PaymentListController } from "../hooks/usePaymentList";
 
