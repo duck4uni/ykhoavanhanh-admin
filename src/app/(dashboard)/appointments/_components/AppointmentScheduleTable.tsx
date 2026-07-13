@@ -1,9 +1,10 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import { APPOINTMENT_PAGE_SIZE, SHIFT_LABEL, getScheduleTimeText } from "../types";
-import { SlotBar, StatusBadge } from "./ScheduleBadges";
+import { SlotBar } from "./ScheduleBadges";
 
 interface AppointmentScheduleTableProps {
   rows: DoctorWorkSchedule[];
@@ -15,6 +16,8 @@ interface AppointmentScheduleTableProps {
   onPageChange: (page: number) => void;
   onEdit: (item: DoctorWorkSchedule) => void;
   onDelete: (id: string) => void;
+  onToggleStatus: (item: DoctorWorkSchedule) => void;
+  togglingId: string | null;
 }
 
 export function AppointmentScheduleTable({
@@ -27,6 +30,8 @@ export function AppointmentScheduleTable({
   onPageChange,
   onEdit,
   onDelete,
+  onToggleStatus,
+  togglingId,
 }: AppointmentScheduleTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -66,7 +71,15 @@ export function AppointmentScheduleTable({
                       <td className="px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
                       <td className="px-6 py-4 text-slate-600">{SHIFT_LABEL[item.shift_code ?? ""] ?? (item.shift_code || "—")}</td>
                       <td className="px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={item.max_appointments ?? 0} /></td>
-                      <td className="px-6 py-4"><StatusBadge item={item} /></td>
+                      <td className="px-6 py-4">
+                        <StatusSwitch
+                          checked={item.status === "ACTIVE"}
+                          loading={togglingId === item.id}
+                          onChange={() => onToggleStatus(item)}
+                          activeLabel={(item.max_appointments ?? 0) > 0 && item.booked_count >= (item.max_appointments ?? 0) ? "Đã đầy" : "Hoạt động"}
+                          inactiveLabel="Tạm ngưng"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => onEdit(item)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:text-primary">

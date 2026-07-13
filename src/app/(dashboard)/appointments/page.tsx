@@ -154,6 +154,8 @@ export default function AppointmentsPage() {
         onPageChange={schedules.setPage}
         onEdit={openEdit}
         onDelete={schedules.openConfirmDelete}
+        onToggleStatus={schedules.toggleScheduleStatus}
+        togglingId={schedules.togglingId}
       />
 
       <AppointmentScheduleModal

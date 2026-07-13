@@ -64,6 +64,8 @@ export default function ClinicsPage() {
         onPageChange={clinics.setPage}
         onEdit={(id) => router.push(`/clinics/${id}/edit`)}
         onDelete={clinics.openConfirmDelete}
+        onToggleStatus={clinics.toggleRoomStatus}
+        togglingId={clinics.togglingId}
       />
 
       <ConfirmDialog

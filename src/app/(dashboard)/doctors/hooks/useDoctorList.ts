@@ -50,6 +50,21 @@ export function useDoctorList() {
     onError: (err) => toast.error(err.message || "Xóa bác sĩ thất bại"),
   });
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = doctorsHooks.useUpdate({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.data.status === "ACTIVE" ? "Đã đặt bác sĩ hoạt động" : "Đã ẩn bác sĩ");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
+  function toggleDoctorStatus(doctor: HisDoctor) {
+    const nextStatus = getDoctorStatus(doctor).label === "Hoạt động" ? "INACTIVE" : "ACTIVE";
+    setTogglingId(doctor.id);
+    statusMutation.mutate({ id: doctor.id, data: { status: nextStatus } });
+  }
+
   // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
   useEffect(() => {
     setPage(1);
@@ -138,6 +153,9 @@ export function useDoctorList() {
     openConfirmDelete,
     handleConfirmDelete,
     isDeleting: deleteMutation.isPending,
+    // status toggle
+    toggleDoctorStatus,
+    togglingId,
   };
 }
 

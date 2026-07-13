@@ -1,7 +1,7 @@
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
+import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { AdminSpecialty } from "@/types/hospital-admin";
-import { StatusBadge } from "./StatusBadge";
 import { RowMenu } from "./RowMenu";
 
 interface SpecialtyTableProps {
@@ -15,6 +15,8 @@ interface SpecialtyTableProps {
   onPageSizeChange: (size: number) => void;
   onEdit: (item: AdminSpecialty) => void;
   onDelete: (id: string) => void;
+  onToggleStatus: (item: AdminSpecialty) => void;
+  togglingId: string | null;
 }
 
 export function SpecialtyTable({
@@ -28,6 +30,8 @@ export function SpecialtyTable({
   onPageSizeChange,
   onEdit,
   onDelete,
+  onToggleStatus,
+  togglingId,
 }: SpecialtyTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -67,7 +71,7 @@ export function SpecialtyTable({
                       <td className="max-w-xs px-5 py-4 text-slate-600"><p className="line-clamp-2">{item.description || "—"}</p></td>
                       <td className="px-5 py-4 text-slate-700">{item.booking_group || "—"}</td>
                       <td className="px-5 py-4 font-semibold text-slate-700">{item.display_priority ?? "—"}</td>
-                      <td className="px-5 py-4"><StatusBadge isActive={item.is_active} /></td>
+                      <td className="px-5 py-4"><StatusSwitch checked={item.is_active} loading={togglingId === item.id} onChange={() => onToggleStatus(item)} /></td>
                       <td className="px-5 py-4"><RowMenu onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} /></td>
                     </tr>
                   ))

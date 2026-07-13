@@ -24,6 +24,20 @@ export function useExamServiceList() {
     onError: (err) => toast.error(err.message || "Xóa dịch vụ thất bại"),
   });
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = hisServicesHooks.useUpdate({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.data.is_delete ? "Đã tắt dịch vụ" : "Đã bật dịch vụ");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
+  function toggleServiceStatus(service: HisService) {
+    setTogglingId(service.id);
+    statusMutation.mutate({ id: service.id, data: { is_delete: !service.is_delete } });
+  }
+
   const debouncedSearch = useDebounce(search, 400);
   const serverFilters = debouncedSearch.trim() ? `service_name@=${debouncedSearch.trim()}` : undefined;
 
@@ -124,6 +138,9 @@ export function useExamServiceList() {
     openConfirmDelete,
     handleConfirmDelete,
     isDeleting: deleteMutation.isPending,
+    // status toggle
+    toggleServiceStatus,
+    togglingId,
   };
 }
 

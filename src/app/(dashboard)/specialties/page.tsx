@@ -34,6 +34,20 @@ export default function SpecialtiesPage() {
     onError: (err) => toast.error(err.message || "Cập nhật chuyên khoa thất bại"),
   });
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = specialtiesHooks.useUpdate({
+    onSuccess: (_data, variables) => {
+      toast.success((variables.data as Partial<AdminSpecialty>).is_active ? "Đã bật chuyên khoa" : "Đã tắt chuyên khoa");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
+  function toggleStatus(item: AdminSpecialty) {
+    setTogglingId(item.id);
+    statusMutation.mutate({ id: item.id, data: { is_active: !item.is_active } as Partial<AdminSpecialty> });
+  }
+
   function openEdit(item: AdminSpecialty) {
     setEditingId(item.id);
     setForm(mapSpecialtyToForm(item));
@@ -100,6 +114,8 @@ export default function SpecialtiesPage() {
         onPageSizeChange={list.setPageSize}
         onEdit={openEdit}
         onDelete={list.openConfirmDelete}
+        onToggleStatus={toggleStatus}
+        togglingId={togglingId}
       />
 
       <SpecialtyEditModal

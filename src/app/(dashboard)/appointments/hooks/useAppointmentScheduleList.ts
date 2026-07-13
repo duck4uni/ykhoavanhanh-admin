@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { doctorWorkSchedulesHooks } from "@/api/doctorWorkSchedulesApi";
+import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
 import { toast } from "@/components/ui/Toast";
@@ -28,6 +28,23 @@ export function useAppointmentScheduleList() {
     onSuccess: () => toast.success("Xóa lịch khám thành công"),
     onError: (err) => toast.error(err.message || "Xóa lịch khám thất bại"),
   });
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = doctorWorkSchedulesHooks.usePatch({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.data.status === "ACTIVE" ? "Đã bật lịch khám" : "Đã tạm ngưng lịch khám");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
+  function toggleScheduleStatus(schedule: DoctorWorkSchedule) {
+    setTogglingId(schedule.id);
+    statusMutation.mutate({
+      id: schedule.id,
+      data: { status: schedule.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" },
+    });
+  }
 
   const filtered = useMemo(() => {
     return schedules.filter((schedule) => {
@@ -98,5 +115,8 @@ export function useAppointmentScheduleList() {
     openConfirmDelete,
     handleConfirmDelete,
     isDeleting: deleteMutation.isPending,
+    // bật/tắt trạng thái
+    toggleScheduleStatus,
+    togglingId,
   };
 }

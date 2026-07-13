@@ -44,6 +44,15 @@ export default function ExamAreasPage() {
     onError: (err) => toast.error(err.message || "Cập nhật khu vực khám thất bại"),
   });
 
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = examAreasHooks.useUpdate({
+    onSuccess: (_data, variables) => {
+      toast.success(variables.data.status === "ACTIVE" ? "Đã bật khu vực khám" : "Đã tắt khu vực khám");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
   const isMutating = createMutation.isPending || updateMutation.isPending;
 
   function openCreate() {
@@ -82,7 +91,8 @@ export default function ExamAreasPage() {
   }
 
   function toggleStatus(item: ExamArea) {
-    updateMutation.mutate({
+    setTogglingId(item.id);
+    statusMutation.mutate({
       id: item.id,
       data: { status: item.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" },
     });
@@ -140,6 +150,7 @@ export default function ExamAreasPage() {
         onViewRooms={viewRooms}
         onToggle={toggleStatus}
         onDelete={list.openConfirmDelete}
+        togglingId={togglingId}
       />
 
       <ExamAreaFormModal

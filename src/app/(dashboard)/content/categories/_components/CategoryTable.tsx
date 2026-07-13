@@ -1,6 +1,7 @@
 import { Check, Copy, FolderOpen, Info } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
+import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { PostCategory } from "@/api/postCategoriesApi";
 import { formatDate } from "@/lib/utils";
 import { CATEGORY_PAGE_SIZE, getPostCount } from "../types";
@@ -99,18 +100,12 @@ export function CategoryTable({
                     <td className="hidden px-6 py-4 lg:table-cell"><span className="text-sm text-slate-600">{category.sort_order ?? 0}</span></td>
 
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => onToggleActive(category)}
-                        disabled={isPatching}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                          category.is_active
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-600"
-                            : "border-slate-200 bg-slate-50 text-slate-500"
-                        }`}
-                      >
-                        <span className={`h-1.5 w-1.5 rounded-full ${category.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {category.is_active ? "Hoạt động" : "Tắt"}
-                      </button>
+                      <StatusSwitch
+                        checked={category.is_active}
+                        loading={isPatching}
+                        onChange={() => onToggleActive(category)}
+                        inactiveLabel="Tắt"
+                      />
                     </td>
 
                     <td className="hidden px-6 py-4 sm:table-cell"><span className="text-xs text-slate-500">{category.created_at ? formatDate(category.created_at) : "—"}</span></td>

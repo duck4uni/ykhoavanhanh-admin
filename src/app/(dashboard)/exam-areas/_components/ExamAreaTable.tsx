@@ -1,8 +1,8 @@
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
+import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { ExamArea } from "@/api/examAreasApi";
 import { EXAM_AREA_PAGE_SIZE } from "../types";
-import { StatusBadge } from "./StatusBadge";
 import { RowMenu } from "./RowMenu";
 
 interface ExamAreaTableProps {
@@ -17,6 +17,7 @@ interface ExamAreaTableProps {
   onViewRooms: (item: ExamArea) => void;
   onToggle: (item: ExamArea) => void;
   onDelete: (id: string) => void;
+  togglingId?: string | null;
 }
 
 export function ExamAreaTable({
@@ -31,6 +32,7 @@ export function ExamAreaTable({
   onViewRooms,
   onToggle,
   onDelete,
+  togglingId,
 }: ExamAreaTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -84,7 +86,7 @@ export function ExamAreaTable({
                       <td className="max-w-xs px-5 py-4 text-slate-600">{area.address ?? "—"}</td>
                       <td className="px-5 py-4 font-semibold text-slate-700">0 phòng</td>
                       <td className="px-5 py-4 text-slate-600">{area.phone ?? "—"}</td>
-                      <td className="px-5 py-4"><StatusBadge status={area.status} /></td>
+                      <td className="px-5 py-4"><StatusSwitch checked={area.status === "ACTIVE"} loading={togglingId === area.id} onChange={() => onToggle(area)} inactiveLabel="Tạm tắt" /></td>
                       <td className="px-5 py-4">
                         <RowMenu
                           item={area}

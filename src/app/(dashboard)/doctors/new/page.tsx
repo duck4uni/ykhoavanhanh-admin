@@ -41,6 +41,10 @@ export default function NewDoctorPage() {
       toast.error("Vui lòng nhập mã và tên bác sĩ");
       return;
     }
+    if (!form.specialty_id || !form.phone.trim() || !form.gender) {
+      toast.error("Vui lòng nhập chuyên khoa, số điện thoại và giới tính");
+      return;
+    }
     if (!isValidPhoneNumber(form.phone)) {
       toast.error("Số điện thoại không hợp lệ. Vui lòng nhập số bắt đầu bằng 0 hoặc +84");
       return;
@@ -51,11 +55,12 @@ export default function NewDoctorPage() {
   return (
     <DoctorForm
       title="Thêm bác sĩ"
-      subtitle="Tạo mới bác sĩ, gán chuyên khoa và thiết lập thông tin đặt khám."
+      subtitle="Tạo mới bác sĩ và thiết lập thông tin."
       submitLabel="Tạo bác sĩ"
       initialForm={createInitialDoctorForm()}
       isSubmitting={createMutation.isPending}
       onSubmit={handleSubmit}
+      requireContactFields
     />
   );
 }

@@ -1,9 +1,9 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
+import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { HisRoom } from "@/api/roomsApi";
 import { CLINIC_PAGE_SIZE, formatUpdatedAt, getExamAreaLabel } from "../types";
-import { StatusBadge } from "./StatusBadge";
 
 interface ClinicTableProps {
   rooms: HisRoom[];
@@ -14,6 +14,8 @@ interface ClinicTableProps {
   onPageChange: (page: number) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onToggleStatus: (room: HisRoom) => void;
+  togglingId: string | null;
 }
 
 export function ClinicTable({
@@ -25,6 +27,8 @@ export function ClinicTable({
   onPageChange,
   onEdit,
   onDelete,
+  onToggleStatus,
+  togglingId,
 }: ClinicTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -65,7 +69,7 @@ export function ClinicTable({
                       <td className="max-w-xs px-5 py-4 font-semibold text-slate-800">{room.roomname}</td>
                       <td className="px-5 py-4 text-slate-700">{room.clinic_type || "—"}</td>
                       <td className="max-w-xs px-5 py-4 text-slate-700">{getExamAreaLabel(room) || "—"}</td>
-                      <td className="px-5 py-4"><StatusBadge deleted={room.is_delete} /></td>
+                      <td className="px-5 py-4"><StatusSwitch checked={!room.is_delete} loading={togglingId === room.id} onChange={() => onToggleStatus(room)} /></td>
                       <td className="px-5 py-4 text-slate-600">{formatUpdatedAt(room.updated_at || room.synced_at || room.updatetime)}</td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">

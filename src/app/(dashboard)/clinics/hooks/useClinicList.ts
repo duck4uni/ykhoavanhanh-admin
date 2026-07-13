@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { roomsHooks } from "@/api/roomsApi";
+import { roomsHooks, type HisRoom } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
 import { CLINIC_PAGE_SIZE, getExamAreaName, hasAssignedServices } from "../types";
@@ -44,6 +44,21 @@ export function useClinicList() {
     onSuccess: () => toast.success("Xóa phòng khám thành công"),
     onError: (err) => toast.error(err.message || "Xóa phòng khám thất bại"),
   });
+
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const statusMutation = roomsHooks.useUpdate({
+    onSuccess: (data) => {
+      toast.success(data.is_delete ? "Đã tắt phòng khám" : "Đã bật phòng khám");
+    },
+    onError: (err) => toast.error(err.message || "Cập nhật trạng thái thất bại"),
+    onSettled: () => setTogglingId(null),
+  });
+
+  function toggleRoomStatus(room: HisRoom) {
+    setTogglingId(room.id);
+    // is_delete không nằm trong UpdateRoomPayload nên cần cast để gửi kèm.
+    statusMutation.mutate({ id: room.id, data: { is_delete: !room.is_delete } as never });
+  }
 
   const examAreaOptions = useMemo(() => {
     return Array.from(new Set(allRooms.map(getExamAreaName))).filter(Boolean).sort();
@@ -129,5 +144,8 @@ export function useClinicList() {
     openConfirmDelete,
     handleConfirmDelete,
     isDeleting: deleteMutation.isPending,
+    // bật/tắt trạng thái
+    toggleRoomStatus,
+    togglingId,
   };
 }
