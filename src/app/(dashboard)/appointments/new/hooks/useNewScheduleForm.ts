@@ -77,7 +77,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const { data: specialtyPageData, isFetching: isFetchingSpecialties } = specialtiesHooks.useList({
     currentPage: specialtyPicker.page,
     pageSize: 10,
-    filters: specialtyPicker.debouncedSearch.trim() ? `name@=${specialtyPicker.debouncedSearch.trim()}` : undefined,
+    filters: specialtyPicker.debouncedSearch.trim()
+      ? `name@=${specialtyPicker.debouncedSearch.trim()},is_active==true`
+      : "is_active==true",
   });
   const specialties = useAccumulatedRows(
     useMemo(() => specialtyPageData?.rows ?? [], [specialtyPageData]),
@@ -91,7 +93,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const { data: areaPageData, isFetching: isFetchingAreas } = examAreasHooks.useList({
     currentPage: areaPicker.page,
     pageSize: 10,
-    filters: areaPicker.debouncedSearch.trim() ? `name@=${areaPicker.debouncedSearch.trim()}` : undefined,
+    filters: areaPicker.debouncedSearch.trim()
+      ? `name@=${areaPicker.debouncedSearch.trim()},status==ACTIVE`
+      : "status==ACTIVE",
   });
   const examAreas = useAccumulatedRows(
     useMemo(() => areaPageData?.rows ?? [], [areaPageData]),
@@ -105,7 +109,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const { data: roomPageData, isFetching: isFetchingRooms } = roomsHooks.usePaginatedList({
     currentPage: roomPicker.page,
     pageSize: 10,
-    filters: roomPicker.debouncedSearch.trim() ? `room_name@=${roomPicker.debouncedSearch.trim()}` : undefined,
+    filters: roomPicker.debouncedSearch.trim()
+      ? `room_name@=${roomPicker.debouncedSearch.trim()},status==ACTIVE`
+      : "status==ACTIVE",
   });
   const rooms = useAccumulatedRows(
     useMemo(() => roomPageData?.rows ?? [], [roomPageData]),
@@ -119,7 +125,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const { data: servicePageData, isFetching: isFetchingServices } = hisServicesHooks.usePaginatedList({
     currentPage: servicePicker.page,
     pageSize: 10,
-    filters: servicePicker.debouncedSearch.trim() ? `service_name@=${servicePicker.debouncedSearch.trim()}` : undefined,
+    filters: servicePicker.debouncedSearch.trim()
+      ? `service_name@=${servicePicker.debouncedSearch.trim()},status==ACTIVE`
+      : "status==ACTIVE",
   });
   const services = useAccumulatedRows(
     useMemo(() => servicePageData?.rows ?? [], [servicePageData]),

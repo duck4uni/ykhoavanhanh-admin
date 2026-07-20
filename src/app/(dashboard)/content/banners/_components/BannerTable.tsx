@@ -4,21 +4,23 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import type { PageConfig } from "@/api/pageConfigApi";
 import { formatDate } from "@/lib/utils";
-import { BANNER_PAGE_SIZE, getImageSrc } from "../types";
+import { getImageSrc } from "../types";
 
 interface BannerTableProps {
   rows: PageConfig[];
   isFetching: boolean;
   page: number;
+  pageSize: number;
   totalPages: number;
   total: number;
   isDeleting: boolean;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onEdit: (banner: PageConfig) => void;
   onDelete: (id: string) => void;
 }
 
-export function BannerTable({ rows, isFetching, page, totalPages, total, isDeleting, onPageChange, onEdit, onDelete }: BannerTableProps) {
+export function BannerTable({ rows, isFetching, page, pageSize, totalPages, total, isDeleting, onPageChange, onPageSizeChange, onEdit, onDelete }: BannerTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
       {isFetching && <LoadingSection />}
@@ -90,7 +92,7 @@ export function BannerTable({ rows, isFetching, page, totalPages, total, isDelet
 
       {rows.length > 0 && (
         <div className="border-t border-slate-100 px-6 py-4">
-          <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={total} pageSize={BANNER_PAGE_SIZE} />
+          <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={total} pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
         </div>
       )}
     </div>

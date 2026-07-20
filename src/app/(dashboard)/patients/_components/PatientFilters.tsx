@@ -8,7 +8,7 @@ const controlClass =
 
 /** Thanh lọc: tìm kiếm + giới tính + nguồn + trạng thái. */
 export function PatientFilters({ ctrl }: { ctrl: PatientListController }) {
-  const { searchValue, setSearchValue, gender, setGender, source, setSource, syncStatus, setSyncStatus, handleSearch, resetFilters } = ctrl;
+  const { searchValue, setSearchValue, gender, setGender, source, setSource, syncStatus, setSyncStatus, resetFilters } = ctrl;
 
   return (
     <Card className="p-4">
@@ -20,7 +20,6 @@ export function PatientFilters({ ctrl }: { ctrl: PatientListController }) {
               type="text"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Tìm theo mã BN, họ tên, số điện thoại, BHYT..."
               className="h-11 w-full rounded-xl border border-border bg-surface-secondary pl-10 pr-3 text-sm text-foreground outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10"
             />

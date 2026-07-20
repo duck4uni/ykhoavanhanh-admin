@@ -1,22 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appointmentBookingsHooks, type AppointmentBookingListParams } from "@/api/appointmentBookingsApi";
 import { BOOKING_PAGE_SIZE, initialFilters, pruneEmptyFilters, type BookingFilters } from "../types";
 
 /** State + dữ liệu cho trang danh sách lịch đặt khám. */
 export function useBookingList() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(BOOKING_PAGE_SIZE);
   const [draftFilters, setDraftFilters] = useState<BookingFilters>(initialFilters);
   const [filters, setFilters] = useState<BookingFilters>(initialFilters);
 
   const params = useMemo<AppointmentBookingListParams>(
     () => ({
       currentPage: page,
-      pageSize: BOOKING_PAGE_SIZE,
+      pageSize,
       sortField: "appointment_time",
       sortOrder: "DESC",
       ...pruneEmptyFilters(filters),
     }),
-    [filters, page],
+    [filters, page, pageSize],
   );
 
   const { data, isLoading } = appointmentBookingsHooks.useList(params);
@@ -25,6 +26,10 @@ export function useBookingList() {
   const total = data?.count ?? 0;
   const totalPages = data?.totalPages ?? 1;
   const currentPage = data?.currentPage ?? page;
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   function handleFilterChange(key: keyof BookingFilters, value: string) {
     setDraftFilters((prev) => ({ ...prev, [key]: value }));
@@ -48,6 +53,8 @@ export function useBookingList() {
     totalPages,
     currentPage,
     setPage,
+    pageSize,
+    setPageSize,
     draftFilters,
     handleFilterChange,
     applyFilters,

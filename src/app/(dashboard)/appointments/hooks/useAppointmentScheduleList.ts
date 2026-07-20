@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 import {
   APPOINTMENT_PAGE_SIZE,
   getScheduleCapacity,
@@ -13,6 +14,7 @@ import {
 /** State + dữ liệu cho trang danh sách lịch khám (doctor work schedules). */
 export function useAppointmentScheduleList() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(APPOINTMENT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
@@ -20,7 +22,14 @@ export function useAppointmentScheduleList() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = doctorWorkSchedulesHooks.useList();
+  const debouncedSearch = useDebounce(search, 400);
+
+  const { data, isLoading } = doctorWorkSchedulesHooks.useList({
+    currentPage: page,
+    pageSize,
+    schedule_date: dateFilter || undefined,
+    filters: statusFilter ? `status==${statusFilter}` : undefined,
+  });
   const schedules = useMemo(() => data?.rows ?? [], [data]);
   const totalCount = data?.count ?? schedules.length;
 
@@ -51,22 +60,24 @@ export function useAppointmentScheduleList() {
     });
   }
 
-  const filtered = useMemo(() => {
+  const rows = useMemo(() => {
     return schedules.filter((schedule) => {
-      const q = search.trim().toLowerCase();
+      const q = debouncedSearch.trim().toLowerCase();
       const matchQuery =
         !q ||
         (schedule.doctor?.doctor_name ?? "").toLowerCase().includes(q) ||
         (schedule.exam_area?.name ?? "").toLowerCase().includes(q);
       const matchDate = scheduleIncludesDate(schedule, dateFilter);
       const matchShift = !shiftFilter || getScheduleShiftCode(schedule) === shiftFilter;
-      const matchStatus = !statusFilter || schedule.status === statusFilter;
-      return matchQuery && matchDate && matchShift && matchStatus;
+      return matchQuery && matchDate && matchShift;
     });
-  }, [schedules, search, dateFilter, shiftFilter, statusFilter]);
+  }, [schedules, debouncedSearch, dateFilter, shiftFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / APPOINTMENT_PAGE_SIZE));
-  const rows = filtered.slice((page - 1) * APPOINTMENT_PAGE_SIZE, page * APPOINTMENT_PAGE_SIZE);
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, dateFilter, shiftFilter, statusFilter, pageSize]);
 
   const stats = useMemo(() => {
     const activeCount = schedules.filter((schedule) => schedule.status === "ACTIVE").length;
@@ -97,10 +108,12 @@ export function useAppointmentScheduleList() {
 
   return {
     rows,
-    filteredCount: filtered.length,
+    filteredCount: totalCount,
     isLoading,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     search,
     setSearch,

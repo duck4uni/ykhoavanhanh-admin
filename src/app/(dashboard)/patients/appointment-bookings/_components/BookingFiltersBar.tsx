@@ -14,7 +14,7 @@ export function BookingFiltersBar({ ctrl }: { ctrl: BookingListController }) {
   return (
     <Card className="overflow-visible p-4">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div>
+        {/* <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Mã BN HIS</label>
           <input
             value={draftFilters.his_patient_id}
@@ -22,7 +22,7 @@ export function BookingFiltersBar({ ctrl }: { ctrl: BookingListController }) {
             placeholder="his_patient_id"
             className={fieldClass}
           />
-        </div>
+        </div> */}
         <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Trạng thái</label>
           <select

@@ -25,7 +25,9 @@ export function useSpecialtyPicker({ initialSelected, selectedIds }: UseSpecialt
   const [specialties, setSpecialties] = useState<AdminSpecialty[]>(initialSelected ?? []);
   const debouncedSearch = useDebounce(search, 400);
 
-  const filters = debouncedSearch.trim() ? `name@=${debouncedSearch.trim()}` : undefined;
+  const filters = debouncedSearch.trim()
+    ? `name@=${debouncedSearch.trim()},is_active==true`
+    : "is_active==true";
   const { data, isFetching } = specialtiesHooks.useList({
     currentPage: page,
     pageSize: SPECIALTY_PAGE_SIZE,

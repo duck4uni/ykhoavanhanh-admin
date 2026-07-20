@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useBookingList } from "./hooks/useBookingList";
 import { BookingFiltersBar } from "./_components/BookingFiltersBar";
 import { BookingTable } from "./_components/BookingTable";
+import { BookingDetailModal } from "./_components/BookingDetailModal";
+import type { AppointmentBooking } from "@/api/appointmentBookingsApi";
 
 export default function PatientAppointmentBookingsPage() {
   const ctrl = useBookingList();
+  const [selectedBooking, setSelectedBooking] = useState<AppointmentBooking | null>(null);
 
   return (
     <div className="space-y-6 p-6">
@@ -15,7 +19,9 @@ export default function PatientAppointmentBookingsPage() {
       </div>
 
       <BookingFiltersBar ctrl={ctrl} />
-      <BookingTable ctrl={ctrl} />
+      <BookingTable ctrl={ctrl} onViewDetail={setSelectedBooking} />
+
+      <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
     </div>
   );
 }

@@ -1,21 +1,26 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchPatients } from "@/api/patientApi";
-import type { SearchPatientParams } from "@/types/patient";
-import { PATIENT_PAGE_SIZE, buildSearchParams, getGender, getSource, getSyncStatus } from "../helpers";
+import { useDebounce } from "@/hooks/useApiHelpers";
+import { PATIENT_PAGE_SIZE, buildSearchParams, getSource, getSyncStatus } from "../helpers";
 
 /** State + dữ liệu cho trang danh sách bệnh nhân. */
 export function usePatientList() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PATIENT_PAGE_SIZE);
   const [searchValue, setSearchValue] = useState("");
   const [gender, setGender] = useState("all");
   const [source, setSource] = useState("all");
   const [syncStatus, setSyncStatus] = useState("all");
-  const [searchParams, setSearchParams] = useState<SearchPatientParams>({});
+  const debouncedSearch = useDebounce(searchValue, 400);
+
+  const searchParams = useMemo(() => buildSearchParams(debouncedSearch), [debouncedSearch]);
+  const genderFilters = gender === "Nam" ? "sex==MALE" : gender === "Nữ" ? "sex==FEMALE" : undefined;
 
   const { data: patientsData, isLoading } = useSearchPatients({
     ...searchParams,
     currentPage: page,
-    pageSize: PATIENT_PAGE_SIZE,
+    pageSize,
+    filters: genderFilters,
   });
 
   const patients = useMemo(() => patientsData?.rows ?? [], [patientsData]);
@@ -23,32 +28,29 @@ export function usePatientList() {
   const totalPages = patientsData?.totalPages ?? 1;
   const currentPage = patientsData?.currentPage ?? page;
 
-  // Áp bộ lọc phía client (giới tính / nguồn / trạng thái) — API chưa hỗ trợ các lọc này
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize, gender, debouncedSearch]);
+
+  // Nguồn tạo hồ sơ / trạng thái đồng bộ suy ra từ dữ liệu, API chưa có field lọc trực tiếp — lọc phía client.
   const filtered = useMemo(() => {
     return patients.filter((p) => {
-      const matchGender = gender === "all" || getGender(p) === gender;
       const matchSource = source === "all" || getSource(p).label === source;
       const matchSync = syncStatus === "all" || getSyncStatus(p).label === syncStatus;
-      return matchGender && matchSource && matchSync;
+      return matchSource && matchSync;
     });
-  }, [patients, gender, source, syncStatus]);
+  }, [patients, source, syncStatus]);
 
   // ─── Số liệu thẻ thống kê (tính từ dữ liệu thật) ───────────────────────────
   const withInsurance = patients.filter((p) => p.insurance_number).length;
   const pendingSync = patients.filter((p) => getSyncStatus(p).label !== "Đã đồng bộ").length;
   const insurancePct = total > 0 ? Math.round((withInsurance / total) * 100) : 0;
 
-  function handleSearch() {
-    setSearchParams(buildSearchParams(searchValue));
-    setPage(1);
-  }
-
   function resetFilters() {
     setSearchValue("");
     setGender("all");
     setSource("all");
     setSyncStatus("all");
-    setSearchParams({});
     setPage(1);
   }
 
@@ -59,6 +61,8 @@ export function usePatientList() {
     totalPages,
     currentPage,
     setPage,
+    pageSize,
+    setPageSize,
     // filters
     searchValue,
     setSearchValue,
@@ -68,7 +72,6 @@ export function usePatientList() {
     setSource,
     syncStatus,
     setSyncStatus,
-    handleSearch,
     resetFilters,
     // stats
     stats: { total, withInsurance, insurancePct, pendingSync },

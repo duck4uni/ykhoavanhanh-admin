@@ -19,10 +19,22 @@ export function DoctorFilterCombobox({ value, onChange }: DoctorFilterComboboxPr
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data: doctors = [], isLoading } = doctorsHooks.useList(
-    { filters: debouncedSearch ? `doctorname@=${debouncedSearch}` : undefined, pageSize: 20 },
-    { enabled: open },
+  const {
+    data: doctorsPages,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = doctorsHooks.useInfiniteList(
+    {
+      filters: debouncedSearch ? `doctor_name@=${debouncedSearch}` : undefined,
+      sortField: "doctor_name",
+      sortOrder: "ASC",
+    },
+    { enabled: open, pageSize: 10 },
   );
+
+  const doctors = useMemo(() => doctorsPages?.pages.flatMap((p) => p.rows) ?? [], [doctorsPages]);
 
   const selectedDoctor = useMemo(
     () => doctors.find((doctor) => doctor.doctorid === value),
@@ -80,7 +92,15 @@ export function DoctorFilterCombobox({ value, onChange }: DoctorFilterComboboxPr
               className="h-9 w-full rounded-lg border border-border bg-surface-secondary px-3 text-sm text-foreground outline-none focus:border-primary-500 focus:bg-white"
             />
           </div>
-          <div className="max-h-64 overflow-y-auto py-1">
+          <div
+            className="max-h-64 overflow-y-auto py-1"
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              if (hasNextPage && !isFetchingNextPage && el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+                fetchNextPage();
+              }
+            }}
+          >
             {isLoading ? (
               <div className="px-4 py-3 text-center text-sm text-muted-foreground">Đang tải...</div>
             ) : doctors.length === 0 ? (
@@ -101,6 +121,9 @@ export function DoctorFilterCombobox({ value, onChange }: DoctorFilterComboboxPr
                   {doctor.doctorid ? `${doctor.doctorname} (${doctor.doctorid})` : doctor.doctorname}
                 </button>
               ))
+            )}
+            {!isLoading && isFetchingNextPage && (
+              <div className="px-4 py-3 text-center text-sm text-muted-foreground">Đang tải thêm...</div>
             )}
           </div>
         </div>

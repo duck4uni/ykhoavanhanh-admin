@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { formatDateTime } from "@/lib/utils";
-import { PATIENT_PAGE_SIZE, getBirthday, getFullName, getGender, getSource, getSyncStatus } from "../helpers";
+import { getBirthday, getFullName, getGender, getSource, getSyncStatus } from "../helpers";
 import type { PatientListController } from "../hooks/usePatientList";
 
 /** Bảng danh sách bệnh nhân + phân trang. */
 export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
-  const { isLoading, filtered, total, totalPages, currentPage, setPage } = ctrl;
+  const { isLoading, filtered, total, totalPages, currentPage, setPage, pageSize, setPageSize } = ctrl;
 
   return (
     <Card className="overflow-hidden p-0">
@@ -109,7 +109,8 @@ export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
               totalPages={totalPages}
               onPageChange={setPage}
               totalItems={total}
-              pageSize={PATIENT_PAGE_SIZE}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </>

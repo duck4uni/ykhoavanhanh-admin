@@ -142,9 +142,11 @@ export default function ExamAreasPage() {
         rows={list.rows}
         isLoading={list.isLoading}
         page={list.page}
+        pageSize={list.pageSize}
         totalPages={list.totalPages}
         filteredCount={list.filteredCount}
         onPageChange={list.setPage}
+        onPageSizeChange={list.setPageSize}
         onView={setViewingArea}
         onEdit={openEdit}
         onViewRooms={viewRooms}

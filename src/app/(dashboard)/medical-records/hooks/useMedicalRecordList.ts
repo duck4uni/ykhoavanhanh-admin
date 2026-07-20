@@ -7,6 +7,7 @@ import { MEDICAL_RECORD_PAGE_SIZE } from "../types";
 /** State + dữ liệu cho trang danh sách hồ sơ bệnh án. */
 export function useMedicalRecordList() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(MEDICAL_RECORD_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -18,11 +19,11 @@ export function useMedicalRecordList() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, pageSize]);
 
   const { data, isLoading } = medicalRecordsHooks.useList({
     currentPage: page,
-    pageSize: MEDICAL_RECORD_PAGE_SIZE,
+    pageSize,
     sortField: "examined_at",
     sortOrder: "DESC",
     filters: serverFilters,
@@ -61,6 +62,8 @@ export function useMedicalRecordList() {
     isLoading,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalItems,
     totalPages,
     search,

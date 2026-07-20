@@ -16,14 +16,26 @@ import {
 export function useDoctorList() {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DOCTORS_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 400);
 
-  const serverFilters = debouncedSearch.trim() ? `doctor_name@=${debouncedSearch.trim()}` : undefined;
+  const [specialtyFilter, setSpecialtyFilter] = useState("all");
+  const [clinicFilter, setClinicFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [scheduleFilter, setScheduleFilter] = useState("all");
+
+  const serverFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (debouncedSearch.trim()) parts.push(`doctor_name@=${debouncedSearch.trim()}`);
+    if (statusFilter === "Hoạt động") parts.push("status==ACTIVE");
+    else if (statusFilter === "Tạm ngưng") parts.push("status==INACTIVE");
+    return parts.length > 0 ? parts.join(",") : undefined;
+  }, [debouncedSearch, statusFilter]);
 
   const { data: doctorsData, isLoading } = doctorsHooks.usePaginatedList({
     currentPage: page,
-    pageSize: DOCTORS_PAGE_SIZE,
+    pageSize,
     filters: serverFilters,
     sortField: "doctor_name",
     sortOrder: "ASC",
@@ -36,11 +48,6 @@ export function useDoctorList() {
     doctor.specialty?.name ??
     specialties.find((specialty) => specialty.id === doctor.specialty_id)?.name ??
     inferSpecialtyName(doctor);
-
-  const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const [clinicFilter, setClinicFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [scheduleFilter, setScheduleFilter] = useState("all");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -65,10 +72,10 @@ export function useDoctorList() {
     statusMutation.mutate({ id: doctor.id, data: { status: nextStatus } });
   }
 
-  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), trạng thái hoặc số lượng mỗi trang thay đổi.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   const specialtyOptions = useMemo(() => {
     return specialties.map((specialty) => specialty.name).filter(Boolean).sort();
@@ -93,7 +100,7 @@ export function useDoctorList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDoctors, specialtyFilter, clinicFilter, statusFilter, scheduleFilter]);
 
-  const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / DOCTORS_PAGE_SIZE));
+  const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
 
   const activeCount = allDoctors.filter((doctor) => getDoctorStatus(doctor).label === "Hoạt động").length;
   const withSchedule = allDoctors.filter((doctor) => getScheduleCount(doctor) > 0).length;
@@ -127,6 +134,8 @@ export function useDoctorList() {
     isLoading,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     filtered,
     totalCount: doctorsData?.count ?? filtered.length,

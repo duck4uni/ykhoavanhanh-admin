@@ -113,10 +113,12 @@ export default function BannersPage() {
         rows={banners.rows}
         isFetching={banners.isFetching}
         page={banners.page}
+        pageSize={banners.pageSize}
         totalPages={banners.totalPages}
         total={banners.total}
         isDeleting={banners.isDeleting}
         onPageChange={banners.setPage}
+        onPageSizeChange={banners.setPageSize}
         onEdit={openEdit}
         onDelete={banners.openConfirmDelete}
       />

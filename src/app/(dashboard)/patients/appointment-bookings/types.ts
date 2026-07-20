@@ -45,3 +45,20 @@ export function pruneEmptyFilters(filters: BookingFilters) {
     Object.entries(filters).filter(([, value]) => value.trim() !== ""),
   ) as Partial<BookingFilters>;
 }
+
+/** Kết hợp appointment_date (yyyy-MM-dd) + appointment_time (HH:mm:ss) thành text hiển thị. */
+export function getBookingDateTimeText(booking: { appointment_date?: string | null; appointment_time?: string | null }): string {
+  const date = booking.appointment_date?.slice(0, 10);
+  const time = booking.appointment_time?.slice(0, 5);
+  if (date && time) {
+    const [year, month, day] = date.split("-");
+    return `${day}/${month}/${year} ${time}`;
+  }
+  return date ?? time ?? "—";
+}
+
+export function getBookingPrice(price: string | number | null | undefined): number | null {
+  if (price === null || price === undefined) return null;
+  const value = typeof price === "string" ? Number(price) : price;
+  return Number.isFinite(value) ? value : null;
+}

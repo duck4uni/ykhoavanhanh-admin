@@ -4,19 +4,21 @@ import { LoadingSection } from "@/components/ui/Spinner";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { PostCategory } from "@/api/postCategoriesApi";
 import { formatDate } from "@/lib/utils";
-import { CATEGORY_PAGE_SIZE, getPostCount } from "../types";
+import { getPostCount } from "../types";
 import { RowMenu } from "./RowMenu";
 
 interface CategoryTableProps {
   rows: PostCategory[];
   isFetching: boolean;
   page: number;
+  pageSize: number;
   totalPages: number;
   total: number;
   copiedSlug: string | null;
   isPatching: boolean;
   isDeleting: boolean;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onCopySlug: (slug: string) => void;
   onToggleActive: (category: PostCategory) => void;
   onEdit: (category: PostCategory) => void;
@@ -27,12 +29,14 @@ export function CategoryTable({
   rows,
   isFetching,
   page,
+  pageSize,
   totalPages,
   total,
   copiedSlug,
   isPatching,
   isDeleting,
   onPageChange,
+  onPageSizeChange,
   onCopySlug,
   onToggleActive,
   onEdit,
@@ -122,7 +126,7 @@ export function CategoryTable({
 
       {rows.length > 0 && (
         <div className="border-t border-slate-100 px-6 py-4">
-          <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={total} pageSize={CATEGORY_PAGE_SIZE} />
+          <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={total} pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
         </div>
       )}
     </div>

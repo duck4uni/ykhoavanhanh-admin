@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { formatDate } from "@/lib/utils";
-import { INTERNAL_ACCOUNTS_PAGE_SIZE, getInitials, getRoleTone } from "../helpers";
+import { getInitials, getRoleTone } from "../helpers";
 import type { InternalAccountsController } from "../hooks/useInternalAccounts";
 
 /** Bảng tài khoản nội bộ + phân trang + trạng thái rỗng. */
 export function AccountTable({ ctrl }: { ctrl: InternalAccountsController }) {
-  const { filteredUsers, userRolesMap, currentPage, totalItems, totalPages, isFetching, isLoading, handlePageChange, handleDeleteClick, handleCreateAccount } = ctrl;
+  const { filteredUsers, userRolesMap, currentPage, pageSize, totalItems, totalPages, isFetching, isLoading, handlePageChange, handlePageSizeChange, handleDeleteClick, handleCreateAccount } = ctrl;
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -47,7 +47,7 @@ export function AccountTable({ ctrl }: { ctrl: InternalAccountsController }) {
                   const roles = userRolesMap.get(user.id) ?? [];
                   return (
                     <tr key={user.id} className="text-sm transition-colors hover:bg-slate-50/60">
-                      <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(currentPage - 1) * INTERNAL_ACCOUNTS_PAGE_SIZE + index + 1}</span></td>
+                      <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(currentPage - 1) * pageSize + index + 1}</span></td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar src={user.avatar} name={getInitials(user.full_name)} size="sm" />
@@ -77,7 +77,7 @@ export function AccountTable({ ctrl }: { ctrl: InternalAccountsController }) {
             </table>
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
-            <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} totalItems={totalItems} pageSize={INTERNAL_ACCOUNTS_PAGE_SIZE} />
+            <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} totalItems={totalItems} pageSize={pageSize} onPageSizeChange={handlePageSizeChange} />
           </div>
         </>
       )}

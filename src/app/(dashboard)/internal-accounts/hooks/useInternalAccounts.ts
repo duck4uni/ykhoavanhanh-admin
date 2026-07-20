@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUsersList, useDeleteUser } from "@/api/userApi";
 import { useUserRolesList } from "@/api/userRolesApi";
 import type { User } from "@/types/api-response";
@@ -8,17 +8,29 @@ import { INTERNAL_ACCOUNTS_PAGE_SIZE } from "../helpers";
 /** State + dữ liệu cho trang danh sách tài khoản nội bộ. */
 export function useInternalAccounts() {
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(INTERNAL_ACCOUNTS_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
+  const serverFilters = useMemo(() => {
+    if (statusFilter === "active") return "is_active==true";
+    if (statusFilter === "locked") return "is_active==false";
+    return undefined;
+  }, [statusFilter]);
+
   const { data, isLoading, isFetching, error, refetch } = useUsersList({
     currentPage,
-    pageSize: INTERNAL_ACCOUNTS_PAGE_SIZE,
+    pageSize,
+    filters: serverFilters,
   });
   const { data: userRolesData } = useUserRolesList({ pageSize: 1000 });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   const deleteMutation = useDeleteUser({
     onSuccess: () => {
@@ -29,6 +41,10 @@ export function useInternalAccounts() {
   });
 
   const handlePageChange = useCallback((page: number) => setCurrentPage(page), []);
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  }, []);
   const handleDeleteClick = useCallback((id: string, name: string) => setDeleteTarget({ id, name }), []);
   const handleDeleteConfirm = useCallback(() => {
     if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
@@ -85,7 +101,7 @@ export function useInternalAccounts() {
   }, [users, search, roleFilter, statusFilter, dateFilter, userRolesMap]);
 
   const totalItems = data?.count ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalItems / INTERNAL_ACCOUNTS_PAGE_SIZE));
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalItems / pageSize));
 
   const activeCount = users.filter((user) => user.is_active).length;
   const lockedCount = users.filter((user) => !user.is_active).length;
@@ -109,6 +125,8 @@ export function useInternalAccounts() {
     // paging + query state
     currentPage,
     setCurrentPage,
+    pageSize,
+    setPageSize,
     isLoading,
     isFetching,
     error,
@@ -130,6 +148,7 @@ export function useInternalAccounts() {
     totalItems,
     totalPages,
     handlePageChange,
+    handlePageSizeChange,
     // stats
     stats: { totalItems, activeCount, lockedCount, noRoleCount, recentCount },
     // delete

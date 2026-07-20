@@ -5,7 +5,6 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import {
-  APPOINTMENT_PAGE_SIZE,
   SHIFT_LABEL,
   getScheduleCapacity,
   getScheduleDateText,
@@ -18,10 +17,12 @@ interface AppointmentScheduleTableProps {
   rows: DoctorWorkSchedule[];
   isLoading: boolean;
   page: number;
+  pageSize: number;
   totalPages: number;
   filteredCount: number;
   isDeleting: boolean;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (item: DoctorWorkSchedule) => void;
   togglingId: string | null;
@@ -31,10 +32,12 @@ export function AppointmentScheduleTable({
   rows,
   isLoading,
   page,
+  pageSize,
   totalPages,
   filteredCount,
   isDeleting,
   onPageChange,
+  onPageSizeChange,
   onDelete,
   onToggleStatus,
   togglingId,
@@ -73,7 +76,7 @@ export function AppointmentScheduleTable({
                     const shiftCode = getScheduleShiftCode(item);
                     return (
                     <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
-                      <td className="px-6 py-4 text-slate-500">{(page - 1) * APPOINTMENT_PAGE_SIZE + index + 1}</td>
+                      <td className="px-6 py-4 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
                       <td className="px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
                       <td className="px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
@@ -109,7 +112,7 @@ export function AppointmentScheduleTable({
 
           {filteredCount > 0 && (
             <div className="border-t border-slate-100 px-6 py-4">
-              <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={filteredCount} pageSize={APPOINTMENT_PAGE_SIZE} />
+              <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={filteredCount} pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
             </div>
           )}
         </>

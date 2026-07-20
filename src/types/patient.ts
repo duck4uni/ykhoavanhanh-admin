@@ -50,6 +50,8 @@ export interface SearchPatientParams {
   patientphonenumber?: string;
   /** Tên bệnh nhân (tìm gần đúng) */
   patientname?: string;
+  /** Bộ lọc thô dạng field==value, nhiều điều kiện nối dấu phẩy */
+  filters?: string;
 }
 
 export interface CreatePatientPayload {

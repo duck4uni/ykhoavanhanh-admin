@@ -61,7 +61,7 @@ export function ClinicFilters({
           <select value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value)} className={SELECT_CLASS}>
             <option value="all">Tất cả trạng thái</option>
             <option value="ACTIVE">Hoạt động</option>
-            <option value="DELETED">Đã xóa</option>
+            <option value="INACTIVE">Tạm ngưng</option>
           </select>
         </div>
 

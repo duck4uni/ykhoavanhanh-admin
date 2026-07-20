@@ -59,9 +59,11 @@ export default function ClinicsPage() {
         rooms={clinics.rooms}
         isLoading={clinics.isLoading}
         page={clinics.page}
+        pageSize={clinics.pageSize}
         totalPages={clinics.totalPages}
         totalItems={clinics.totalItems}
         onPageChange={clinics.setPage}
+        onPageSizeChange={clinics.setPageSize}
         onEdit={(id) => router.push(`/clinics/${id}/edit`)}
         onDelete={clinics.openConfirmDelete}
         onToggleStatus={clinics.toggleRoomStatus}

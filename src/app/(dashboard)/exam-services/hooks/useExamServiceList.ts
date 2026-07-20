@@ -40,11 +40,17 @@ export function useExamServiceList() {
   }
 
   const debouncedSearch = useDebounce(search, 400);
-  const serverFilters = debouncedSearch.trim() ? `service_name@=${debouncedSearch.trim()}` : undefined;
+  const serverFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (debouncedSearch.trim()) parts.push(`service_name@=${debouncedSearch.trim()}`);
+    if (statusFilter === "active") parts.push("status==ACTIVE");
+    else if (statusFilter === "inactive") parts.push("status==INACTIVE");
+    return parts.length > 0 ? parts.join(",") : undefined;
+  }, [debouncedSearch, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter]);
 
   const { data, isLoading } = hisServicesHooks.usePaginatedList({
     currentPage,

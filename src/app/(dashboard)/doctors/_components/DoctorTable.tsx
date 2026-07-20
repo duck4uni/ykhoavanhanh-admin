@@ -3,12 +3,12 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { DoctorAvatar } from "./DoctorAvatar";
-import { DOCTORS_PAGE_SIZE, formatUpdatedAt, getDoctorStatus } from "../list-helpers";
+import { formatUpdatedAt, getDoctorStatus } from "../list-helpers";
 import type { DoctorListController } from "../hooks/useDoctorList";
 
 /** Bảng bác sĩ + phân trang. */
 export function DoctorTable({ ctrl }: { ctrl: DoctorListController }) {
-  const { isLoading, filtered, page, setPage, totalPages, totalCount, getDoctorSpecialtyName, router, openConfirmDelete, toggleDoctorStatus, togglingId } = ctrl;
+  const { isLoading, filtered, page, setPage, pageSize, setPageSize, totalPages, totalCount, getDoctorSpecialtyName, router, openConfirmDelete, toggleDoctorStatus, togglingId } = ctrl;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -40,7 +40,7 @@ export function DoctorTable({ ctrl }: { ctrl: DoctorListController }) {
                     const status = getDoctorStatus(doctor);
                     return (
                       <tr key={doctor.id} className="text-sm transition-colors hover:bg-slate-50/60">
-                        <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(page - 1) * DOCTORS_PAGE_SIZE + index + 1}</span></td>
+                        <td className="px-5 py-4"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{(page - 1) * pageSize + index + 1}</span></td>
                         <td className="px-5 py-4"><DoctorAvatar doctor={doctor} /></td>
                         <td className="px-5 py-4 font-mono font-semibold text-slate-700">{doctor.doctorid}</td>
                         <td className="px-5 py-4 font-semibold text-slate-800">{doctor.doctorname}</td>
@@ -64,7 +64,7 @@ export function DoctorTable({ ctrl }: { ctrl: DoctorListController }) {
             </table>
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
-            <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalCount} pageSize={DOCTORS_PAGE_SIZE} />
+            <TablePagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalCount} pageSize={pageSize} onPageSizeChange={setPageSize} />
           </div>
         </>
       )}

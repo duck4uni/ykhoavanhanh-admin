@@ -41,10 +41,12 @@ export default function AppointmentsPage() {
         rows={schedules.rows}
         isLoading={schedules.isLoading}
         page={schedules.page}
+        pageSize={schedules.pageSize}
         totalPages={schedules.totalPages}
         filteredCount={schedules.filteredCount}
         isDeleting={schedules.isDeleting}
         onPageChange={schedules.setPage}
+        onPageSizeChange={schedules.setPageSize}
         onDelete={schedules.openConfirmDelete}
         onToggleStatus={schedules.toggleScheduleStatus}
         togglingId={schedules.togglingId}

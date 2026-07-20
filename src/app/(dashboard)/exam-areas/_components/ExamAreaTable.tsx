@@ -2,16 +2,17 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { ExamArea } from "@/api/examAreasApi";
-import { EXAM_AREA_PAGE_SIZE } from "../types";
 import { RowMenu } from "./RowMenu";
 
 interface ExamAreaTableProps {
   rows: ExamArea[];
   isLoading: boolean;
   page: number;
+  pageSize: number;
   totalPages: number;
   filteredCount: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onView: (item: ExamArea) => void;
   onEdit: (item: ExamArea) => void;
   onViewRooms: (item: ExamArea) => void;
@@ -24,9 +25,11 @@ export function ExamAreaTable({
   rows,
   isLoading,
   page,
+  pageSize,
   totalPages,
   filteredCount,
   onPageChange,
+  onPageSizeChange,
   onView,
   onEdit,
   onViewRooms,
@@ -68,7 +71,7 @@ export function ExamAreaTable({
                     <tr key={area.id} className="text-sm transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-4">
                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">
-                          {(page - 1) * EXAM_AREA_PAGE_SIZE + index + 1}
+                          {(page - 1) * pageSize + index + 1}
                         </span>
                       </td>
                       <td className="px-5 py-4 font-mono font-semibold text-primary-600">{area.code}</td>
@@ -110,7 +113,8 @@ export function ExamAreaTable({
               totalPages={totalPages}
               onPageChange={onPageChange}
               totalItems={filteredCount}
-              pageSize={EXAM_AREA_PAGE_SIZE}
+              pageSize={pageSize}
+              onPageSizeChange={onPageSizeChange}
             />
           </div>
         </>

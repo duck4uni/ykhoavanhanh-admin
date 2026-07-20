@@ -117,12 +117,14 @@ export default function CategoriesPage() {
         rows={categories.rows}
         isFetching={categories.isFetching}
         page={categories.page}
+        pageSize={categories.pageSize}
         totalPages={categories.totalPages}
         total={categories.total}
         copiedSlug={categories.copiedSlug}
         isPatching={categories.patchMutation.isPending}
         isDeleting={categories.isDeleting}
         onPageChange={categories.setPage}
+        onPageSizeChange={categories.setPageSize}
         onCopySlug={categories.copySlug}
         onToggleActive={toggleActive}
         onEdit={openEdit}

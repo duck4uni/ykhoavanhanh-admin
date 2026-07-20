@@ -55,9 +55,11 @@ export default function MedicalRecordsPage() {
         rows={records.rows}
         isLoading={records.isLoading}
         page={records.page}
+        pageSize={records.pageSize}
         totalPages={records.totalPages}
         totalItems={records.totalItems}
         onPageChange={records.setPage}
+        onPageSizeChange={records.setPageSize}
       />
     </div>
   );

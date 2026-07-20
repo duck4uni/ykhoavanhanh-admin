@@ -17,11 +17,18 @@ export function useSpecialtyList() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 400);
-  const serverFilters = debouncedSearch.trim() ? `name@=${debouncedSearch.trim()}` : undefined;
+
+  const serverFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (debouncedSearch.trim()) parts.push(`name@=${debouncedSearch.trim()}`);
+    if (statusFilter !== "all") parts.push(`is_active==${statusFilter === "active"}`);
+    if (bookingGroupFilter !== "all") parts.push(`booking_group==${bookingGroupFilter}`);
+    return parts.length > 0 ? parts.join(",") : undefined;
+  }, [debouncedSearch, statusFilter, bookingGroupFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter, bookingGroupFilter]);
 
   const { data, isLoading } = specialtiesHooks.useList({
     currentPage,
@@ -46,16 +53,6 @@ export function useSpecialtyList() {
       ).sort(),
     [rows]
   );
-
-  const filteredRows = useMemo(() => {
-    // Tìm theo tên đã chuyển sang server (filters); tại đây chỉ lọc bổ sung.
-    return rows.filter((item) => {
-      const matchStatus =
-        statusFilter === "all" || (statusFilter === "active" ? item.is_active : !item.is_active);
-      const matchGroup = bookingGroupFilter === "all" || item.booking_group === bookingGroupFilter;
-      return matchStatus && matchGroup;
-    });
-  }, [rows, statusFilter, bookingGroupFilter]);
 
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
 
@@ -88,7 +85,7 @@ export function useSpecialtyList() {
   }
 
   return {
-    rows: filteredRows,
+    rows,
     isLoading,
     currentPage,
     setCurrentPage,

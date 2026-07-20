@@ -1,17 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { examAreasHooks, type ExamArea } from "@/api/examAreasApi";
 import { toast } from "@/components/ui/Toast";
+import { useDebounce } from "@/hooks/useApiHelpers";
 import { EXAM_AREA_PAGE_SIZE } from "../types";
 
-/** State + dữ liệu cho trang danh sách khu vực khám (lọc client-side). */
+/** State + dữ liệu cho trang danh sách khu vực khám. */
 export function useExamAreaList() {
-  const { data, isLoading } = examAreasHooks.useList();
-  const areas = useMemo(() => data?.rows ?? [], [data]);
-  const total = data?.count ?? areas.length;
-
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(EXAM_AREA_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const debouncedSearch = useDebounce(search, 400);
+
+  const serverFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (debouncedSearch.trim()) parts.push(`name@=${debouncedSearch.trim()}`);
+    if (statusFilter !== "all") parts.push(`status==${statusFilter}`);
+    return parts.length > 0 ? parts.join(",") : undefined;
+  }, [debouncedSearch, statusFilter]);
+
+  const { data, isLoading } = examAreasHooks.useList({
+    currentPage: page,
+    pageSize,
+    filters: serverFilters,
+  });
+  const areas = useMemo(() => data?.rows ?? [], [data]);
+  const total = data?.count ?? areas.length;
+  const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
+  const paged = areas;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -21,22 +37,9 @@ export function useExamAreaList() {
     onError: (err) => toast.error(err.message || "Xóa khu vực khám thất bại"),
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return areas.filter((area) => {
-      const matchSearch =
-        !q ||
-        area.code.toLowerCase().includes(q) ||
-        area.name.toLowerCase().includes(q) ||
-        (area.short_name ?? "").toLowerCase().includes(q) ||
-        (area.address ?? "").toLowerCase().includes(q);
-      const matchStatus = statusFilter === "all" || area.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [areas, search, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / EXAM_AREA_PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * EXAM_AREA_PAGE_SIZE, page * EXAM_AREA_PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   const stats = useMemo(() => {
     const activeCount = areas.filter((area) => area.status === "ACTIVE").length;
@@ -70,10 +73,12 @@ export function useExamAreaList() {
 
   return {
     rows: paged,
-    filteredCount: filtered.length,
+    filteredCount: total,
     isLoading,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     search,
     setSearch,

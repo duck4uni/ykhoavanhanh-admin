@@ -12,9 +12,14 @@ export interface AppointmentBooking {
   his_mavaovien: string | null;
   request_booking_id: string | null;
   schedule_id: string | null;
+  appointment_date: string | null;
   appointment_time: string | null;
   room_id: string | null;
   doctor_id: string | null;
+  exam_area_id: string | null;
+  specialty_id: string | null;
+  queue_number: number | null;
+  price: string | number | null;
   exam_object_code: string | null;
   service_id: string | null;
   request_mavaovien: string | null;
@@ -61,12 +66,31 @@ export interface AppointmentBooking {
     service_id: string | null;
     description: string | null;
   } | null;
+  exam_area?: {
+    id: string;
+    code: string | null;
+    name: string | null;
+    short_name: string | null;
+    address: string | null;
+    phone: string | null;
+    description: string | null;
+    status: string | null;
+  } | null;
+  specialty?: {
+    id: string;
+    name: string | null;
+    description: string | null;
+    booking_note: string | null;
+    room_visit_instruction: string | null;
+    booking_group: string | null;
+    display_priority: number | null;
+  } | null;
   service?: {
     id: string;
     facility_id: string | null;
     service_id: string | null;
     service_name: string | null;
-    price: number | null;
+    price: number | string | null;
     specialty_id: string | null;
   } | null;
 }

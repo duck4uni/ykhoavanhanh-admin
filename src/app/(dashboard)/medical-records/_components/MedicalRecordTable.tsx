@@ -6,18 +6,18 @@ import { LoadingSection } from "@/components/ui/Spinner";
 import { formatDate } from "@/lib/utils";
 import type { MedicalRecord } from "@/api/medicalRecordsApi";
 import { FiEye } from "react-icons/fi";
-import { MEDICAL_RECORD_PAGE_SIZE } from "../types";
-
 interface MedicalRecordTableProps {
   rows: MedicalRecord[];
   isLoading: boolean;
   page: number;
+  pageSize: number;
   totalPages: number;
   totalItems: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }
 
-export function MedicalRecordTable({ rows, isLoading, page, totalPages, totalItems, onPageChange }: MedicalRecordTableProps) {
+export function MedicalRecordTable({ rows, isLoading, page, pageSize, totalPages, totalItems, onPageChange, onPageSizeChange }: MedicalRecordTableProps) {
   return (
     <Card className="overflow-hidden p-0">
       {isLoading ? (
@@ -91,7 +91,8 @@ export function MedicalRecordTable({ rows, isLoading, page, totalPages, totalIte
               totalPages={totalPages}
               onPageChange={onPageChange}
               totalItems={totalItems}
-              pageSize={MEDICAL_RECORD_PAGE_SIZE}
+              pageSize={pageSize}
+              onPageSizeChange={onPageSizeChange}
             />
           </div>
         </>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { postCategoriesHooks } from "@/api/postCategoriesApi";
 import { toast } from "@/components/ui/Toast";
 import { CATEGORY_PAGE_SIZE, getPostCount, type SortOrder } from "../types";
@@ -6,6 +6,7 @@ import { CATEGORY_PAGE_SIZE, getPostCount, type SortOrder } from "../types";
 /** State + dữ liệu cho trang danh mục bài viết. */
 export function useCategoryList() {
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(CATEGORY_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
@@ -15,14 +16,18 @@ export function useCategoryList() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const params = useMemo(() => {
-    const value: Record<string, unknown> = { currentPage: page, pageSize: CATEGORY_PAGE_SIZE };
+    const value: Record<string, unknown> = { currentPage: page, pageSize };
     if (filterActive !== null) value.is_active = filterActive;
     return value;
-  }, [page, filterActive]);
+  }, [page, pageSize, filterActive]);
 
   const { data, isFetching } = postCategoriesHooks.useList(params);
   const total = data?.count ?? 0;
-  const totalPages = data?.totalPages ?? (Math.ceil(total / CATEGORY_PAGE_SIZE) || 1);
+  const totalPages = data?.totalPages ?? (Math.ceil(total / pageSize) || 1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   const filteredRows = useMemo(() => {
     let rows = [...(data?.rows ?? [])];
@@ -91,6 +96,8 @@ export function useCategoryList() {
     isFetching,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     total,
     totalPages,
     search,

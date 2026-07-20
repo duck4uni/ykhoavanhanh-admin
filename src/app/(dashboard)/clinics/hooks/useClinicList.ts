@@ -9,6 +9,7 @@ import { CLINIC_PAGE_SIZE, getExamAreaName, hasAssignedServices } from "../types
 export function useClinicList() {
   const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(CLINIC_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 400);
 
@@ -19,20 +20,25 @@ export function useClinicList() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  // Bộ lọc phía server theo tên phòng khám: filters=room_name@=<giá trị>
-  const serverFilters = debouncedSearch.trim() ? `room_name@=${debouncedSearch.trim()}` : undefined;
+  // Bộ lọc phía server: tên phòng + trạng thái — filters=room_name@=<giá trị>,status==<giá trị>
+  const serverFilters = useMemo(() => {
+    const parts: string[] = [];
+    if (debouncedSearch.trim()) parts.push(`room_name@=${debouncedSearch.trim()}`);
+    if (statusFilter !== "all") parts.push(`status==${statusFilter}`);
+    return parts.length > 0 ? parts.join(",") : undefined;
+  }, [debouncedSearch, statusFilter]);
 
   const { data: roomsData, isLoading } = roomsHooks.usePaginatedList({
     currentPage: page,
-    pageSize: CLINIC_PAGE_SIZE,
+    pageSize,
     filters: serverFilters,
   });
   const allRooms = useMemo(() => roomsData?.rows ?? [], [roomsData]);
 
-  // Về trang 1 khi từ khóa tìm kiếm (đã debounce) thay đổi.
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), trạng thái hoặc số lượng mỗi trang thay đổi.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter, pageSize]);
 
   // Điền sẵn ô tìm kiếm khi điều hướng từ trang "Xem phòng khám".
   useEffect(() => {
@@ -79,7 +85,7 @@ export function useClinicList() {
     });
   }, [allRooms, areaFilter, statusFilter, hisFilter]);
 
-  const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / CLINIC_PAGE_SIZE));
+  const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
 
   const totalRooms = roomsData?.count ?? allRooms.length;
   const stats = useMemo(() => {
@@ -124,6 +130,8 @@ export function useClinicList() {
     isLoading,
     page,
     setPage,
+    pageSize,
+    setPageSize,
     totalPages,
     totalItems: roomsData?.count ?? filtered.length,
     // tìm kiếm + lọc
