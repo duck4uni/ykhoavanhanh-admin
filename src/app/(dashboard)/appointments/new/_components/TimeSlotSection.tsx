@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronRight, Clock, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronRight, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { weekdayLabels } from "@/lib/hospital-admin";
 import { StepBadge } from "./StepBadge";
+import { TimeSelect } from "./TimeSelect";
 import { formatShortLocalDate, weekdayOrder, weekdayShortLabel, type TimeSlotRow } from "../types";
 import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
@@ -113,6 +114,9 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                   <TimeInput label="Kết thúc" value={slot.end} onChange={(value) => updateSlot(slot.id, { end: value })} />
                   <label className="space-y-1.5"><span className="block text-xs font-medium text-slate-500">Số phiếu khám</span><input type="number" min={1} value={slot.slot_limit} onChange={(e) => updateSlot(slot.id, { slot_limit: Number(e.target.value) || 0 })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10" /></label>
                 </div>
+                {slot.start && slot.end && slot.start >= slot.end && (
+                  <p className="-mt-2 text-xs text-red-600">Giờ bắt đầu phải nhỏ hơn giờ kết thúc.</p>
+                )}
 
                 <div>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -167,5 +171,5 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
 }
 
 function TimeInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="space-y-1.5"><span className="block text-xs font-medium text-slate-500">{label}</span><div className="relative"><Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="time" value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10" /></div></label>;
+  return <label className="space-y-1.5"><span className="block text-xs font-medium text-slate-500">{label}</span><TimeSelect value={value} onChange={onChange} /></label>;
 }

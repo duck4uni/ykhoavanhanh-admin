@@ -5,7 +5,7 @@
 
 import { createApi, type PaginatedResult } from "@/api/createApi";
 import { useMutation, useQuery, useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPut } from "@/lib/axios";
+import { apiGet, apiPost, apiPut, ApiError } from "@/lib/axios";
 import type { PaginationParams } from "@/types/api-response";
 
 export type DoctorWorkScheduleTimeSlot = {
@@ -184,14 +184,14 @@ export const doctorWorkSchedulesService = {
   createV2: async (payload: CreateDoctorWorkScheduleV2Payload): Promise<DoctorWorkScheduleV2> => {
     const res = await apiPost<DoctorWorkScheduleV2>("/doctor-work-schedules", payload);
     if (res.data.status === "success" && res.data.responseData) return res.data.responseData;
-    throw new Error(res.data.message || "Tạo lịch khám thất bại");
+    throw new ApiError(res.data.message || "Tạo lịch khám thất bại", res.status, res.data.violations);
   },
   updateV2: async (id: string, payload: CreateDoctorWorkScheduleV2Payload): Promise<DoctorWorkScheduleV2> => {
     const res = await apiPut<DetailResponse>(`/doctor-work-schedules/${id}`, payload);
     if (res.data.status === "success" && res.data.responseData) {
       return extractDetail(res.data.responseData, id);
     }
-    throw new Error(res.data.message || "Cập nhật lịch khám thất bại");
+    throw new ApiError(res.data.message || "Cập nhật lịch khám thất bại", res.status, res.data.violations);
   },
 };
 

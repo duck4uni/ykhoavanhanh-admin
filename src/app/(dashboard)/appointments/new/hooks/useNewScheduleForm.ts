@@ -8,6 +8,8 @@ import { specialtiesHooks, specialtiesService } from "@/api/specialtiesApi";
 import { roomsHooks, roomsService } from "@/api/roomsApi";
 import { hisServicesHooks, hisServicesService } from "@/api/hisServicesApi";
 import { doctorsHooks, type HisDoctor } from "@/api/doctorsApi";
+import type { ApiError } from "@/lib/axios";
+import { formatApiViolations } from "@/lib/utils";
 import { toast } from "@/components/ui/Toast";
 import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
@@ -17,6 +19,7 @@ import {
   createId,
   createInitialForm,
   emptyScopeDraft,
+  formatServiceOptionLabel,
   getDatesByWeekday,
   hydrateScheduleEditor,
   isValidDateRange,
@@ -214,6 +217,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const areaName = (id: string) => examAreas.find((a) => a.id === id)?.name ?? labelCache[id] ?? "—";
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.roomname ?? labelCache[id] ?? "";
   const serviceName = (id: string) => services.find((s) => s.id === id)?.servicename ?? labelCache[id] ?? "—";
+  const serviceOptionLabel = (id: string) => {
+    const service = services.find((s) => s.id === id);
+    return service ? formatServiceOptionLabel(service) : serviceName(id);
+  };
   const scopeShortLabel = (scope: ScopeRow) =>
     `${specialtyName(scope.specialty_id)} - ${serviceName(scope.service_id)}`;
 
@@ -427,6 +434,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
     if (timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0))
       list.push("Có khung giờ chưa chọn phạm vi áp dụng");
+    if (timeSlots.some((s) => s.start && s.end && s.start >= s.end))
+      list.push("Có khung giờ có giờ bắt đầu không nhỏ hơn giờ kết thúc");
     return list;
   }, [dateRangeValid, datesByWeekday, form.doctor_id, form.end_date, form.start_date, scopes, timeSlots]);
 
@@ -439,21 +448,26 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
     !timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)) &&
-    !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0);
+    !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0) &&
+    !timeSlots.some((s) => s.start && s.end && s.start >= s.end);
 
   const createMutation = doctorWorkSchedulesHooks.useCreateV2({
     onSuccess: () => {
       toast.success("Tạo lịch khám thành công");
       router.push("/appointments");
     },
-    onError: (err) => toast.error(err.message || "Tạo lịch khám thất bại"),
+    onError: (err) => toast.error(err.message || "Tạo lịch khám thất bại", {
+      description: formatApiViolations((err as ApiError).violations),
+    }),
   });
   const updateMutation = doctorWorkSchedulesHooks.useUpdateV2({
     onSuccess: () => {
       toast.success("Cập nhật lịch khám thành công");
       router.push("/appointments");
     },
-    onError: (err) => toast.error(err.message || "Cập nhật lịch khám thất bại"),
+    onError: (err) => toast.error(err.message || "Cập nhật lịch khám thất bại", {
+      description: formatApiViolations((err as ApiError).violations),
+    }),
   });
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -511,6 +525,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     areaName,
     roomName,
     serviceName,
+    serviceOptionLabel,
     scopeShortLabel,
     rememberLabel,
     // scope modal

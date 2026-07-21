@@ -5,6 +5,7 @@ import type {
   DoctorWorkScheduleV2,
 } from "@/api/doctorWorkSchedulesApi";
 import type { HisDoctor } from "@/api/doctorsApi";
+import type { HisService } from "@/api/hisServicesApi";
 
 export type ScheduleForm = {
   doctor_id: string;
@@ -119,6 +120,13 @@ export function formatShortLocalDate(value: string, includeYear = false): string
 
 export function formatFee(value: number): string {
   return `${value.toLocaleString("vi-VN")}đ`;
+}
+
+/** Nhãn hiển thị dịch vụ khám trong dropdown: loại dịch vụ - loại BH - giá - mã dịch vụ. */
+export function formatServiceOptionLabel(service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid">): string {
+  const price = Number(service.price);
+  const priceLabel = Number.isFinite(price) ? formatFee(price) : service.price;
+  return `${service.servicename  || "—"} - ${priceLabel} - (${service.serviceid})`;
 }
 
 export const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];

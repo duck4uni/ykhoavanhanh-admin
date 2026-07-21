@@ -5,14 +5,14 @@ export interface ApiResponse<T> {
   responseData: T | null;
   message?: string;
   message_en?: string;
-  violations?: Array<{ message: string }>;
+  violations?: Array<{ field?: string; message: string }>;
   timeStamp: string;
 }
 export interface ErrorResponse {
   status: "fail";
   message: string;
   message_en?: string;
-  violations?: Array<{ message: string }>;
+  violations?: Array<{ field?: string; message: string }>;
   responseData: null;
   timeStamp: string;
 }

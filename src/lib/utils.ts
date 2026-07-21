@@ -26,3 +26,15 @@ export function formatDateTime(date: string | Date): string {
     hour: "2-digit", minute: "2-digit",
   });
 }
+
+/** Gộp các lỗi validate (field + message) từ API thành text hiển thị cho người dùng, gộp các message trùng lặp. */
+export function formatApiViolations(violations?: Array<{ field?: string; message: string }>): string | undefined {
+  if (!violations || violations.length === 0) return undefined;
+  const counts = new Map<string, number>();
+  for (const v of violations) {
+    counts.set(v.message, (counts.get(v.message) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([message, count]) => (count > 1 ? `${message} (${count} mục)` : message))
+    .join("\n");
+}

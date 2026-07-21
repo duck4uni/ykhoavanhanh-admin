@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
+import { TimeSelect } from "./TimeSelect";
 import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Modal tự sinh khung giờ. */
@@ -35,21 +36,11 @@ export function AutoGenModal({ ctrl }: { ctrl: ScheduleEditorController }) {
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground">Thời gian bắt đầu</label>
-          <input
-            type="time"
-            value={autoGen.start}
-            onChange={(e) => setAutoGen((p) => ({ ...p, start: e.target.value }))}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
-          />
+          <TimeSelect value={autoGen.start} onChange={(value) => setAutoGen((p) => ({ ...p, start: value }))} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground">Thời gian kết thúc</label>
-          <input
-            type="time"
-            value={autoGen.end}
-            onChange={(e) => setAutoGen((p) => ({ ...p, end: e.target.value }))}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
-          />
+          <TimeSelect value={autoGen.end} onChange={(value) => setAutoGen((p) => ({ ...p, end: value }))} />
         </div>
         <Select
           label="Mỗi khung"
