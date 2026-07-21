@@ -153,7 +153,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
           />
         </ScopeField>
 
-        <ScopeField label="Phí khám (VND)" required>
+        {/* <ScopeField label="Phí khám (VND)" required>
           <div className="flex h-10 items-center overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">
             <input
               type="number"
@@ -165,7 +165,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             />
             <span className="flex h-full items-center border-l border-slate-200 px-3 text-xs font-medium text-slate-400">VND</span>
           </div>
-        </ScopeField>
+        </ScopeField> */}
 
         <ScopeField label="Trạng thái">
           <select
