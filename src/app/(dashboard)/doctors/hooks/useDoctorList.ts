@@ -20,8 +20,8 @@ export function useDoctorList() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 400);
 
-  const [specialtyFilter, setSpecialtyFilter] = useState("all");
-  const [clinicFilter, setClinicFilter] = useState("all");
+  const [specialtyFilter, setSpecialtyFilter] = useState("");
+  const [clinicFilter, setClinicFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [scheduleFilter, setScheduleFilter] = useState("all");
 
@@ -30,8 +30,9 @@ export function useDoctorList() {
     if (debouncedSearch.trim()) parts.push(`doctor_name@=${debouncedSearch.trim()}`);
     if (statusFilter === "Hoạt động") parts.push("status==ACTIVE");
     else if (statusFilter === "Tạm ngưng") parts.push("status==INACTIVE");
+    if (specialtyFilter) parts.push(`specialty_id==${specialtyFilter}`);
     return parts.length > 0 ? parts.join(",") : undefined;
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, specialtyFilter]);
 
   const { data: doctorsData, isLoading } = doctorsHooks.usePaginatedList({
     currentPage: page,
@@ -72,33 +73,22 @@ export function useDoctorList() {
     statusMutation.mutate({ id: doctor.id, data: { status: nextStatus } });
   }
 
-  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), trạng thái hoặc số lượng mỗi trang thay đổi.
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), chuyên khoa, phòng khám, trạng thái hoặc số lượng mỗi trang thay đổi.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, pageSize]);
-
-  const specialtyOptions = useMemo(() => {
-    return specialties.map((specialty) => specialty.name).filter(Boolean).sort();
-  }, [specialties]);
-
-  const clinicOptions = useMemo(() => {
-    return Array.from(new Set(allDoctors.map(getClinicName).filter((v) => v !== "—"))).sort();
-  }, [allDoctors]);
+  }, [debouncedSearch, statusFilter, specialtyFilter, clinicFilter, pageSize]);
 
   const filtered = useMemo(() => {
+    // Tìm kiếm, chuyên khoa và trạng thái đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
+    // Lưu ý: bác sĩ chưa có quan hệ thật với phòng khám (rooms) trong dữ liệu — matchClinic chỉ là gợi ý gần đúng.
     return allDoctors.filter((doctor) => {
-      const specialty = getDoctorSpecialtyName(doctor);
       const clinic = getClinicName(doctor);
-      const status = getDoctorStatus(doctor).label;
       const scheduleCount = getScheduleCount(doctor);
-      const matchSpecialty = specialtyFilter === "all" || specialty === specialtyFilter;
-      const matchClinic = clinicFilter === "all" || clinic === clinicFilter;
-      const matchStatus = statusFilter === "all" || status === statusFilter;
+      const matchClinic = !clinicFilter || clinic === clinicFilter;
       const matchSchedule = scheduleFilter === "all" || (scheduleFilter === "has" ? scheduleCount > 0 : scheduleCount === 0);
-      return matchSpecialty && matchClinic && matchStatus && matchSchedule;
+      return matchClinic && matchSchedule;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDoctors, specialtyFilter, clinicFilter, statusFilter, scheduleFilter]);
+  }, [allDoctors, clinicFilter, scheduleFilter]);
 
   const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
 
@@ -122,8 +112,8 @@ export function useDoctorList() {
 
   function resetFilters() {
     setSearch("");
-    setSpecialtyFilter("all");
-    setClinicFilter("all");
+    setSpecialtyFilter("");
+    setClinicFilter("");
     setStatusFilter("all");
     setScheduleFilter("all");
     setPage(1);
@@ -151,8 +141,6 @@ export function useDoctorList() {
     setStatusFilter,
     scheduleFilter,
     setScheduleFilter,
-    specialtyOptions,
-    clinicOptions,
     resetFilters,
     // stats
     stats: { totalDoctors, activeCount, withSchedule, unassignedSpecialty, activePct },

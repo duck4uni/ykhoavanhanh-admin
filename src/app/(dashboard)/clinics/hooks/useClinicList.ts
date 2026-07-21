@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { roomsHooks, type HisRoom } from "@/api/roomsApi";
+import { examAreasHooks } from "@/api/examAreasApi";
 import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
-import { CLINIC_PAGE_SIZE, getExamAreaName, hasAssignedServices } from "../types";
+import { CLINIC_PAGE_SIZE, hasAssignedServices } from "../types";
 
 /** State + dữ liệu cho trang danh sách phòng khám. */
 export function useClinicList() {
@@ -20,13 +21,14 @@ export function useClinicList() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  // Bộ lọc phía server: tên phòng + trạng thái — filters=room_name@=<giá trị>,status==<giá trị>
+  // Bộ lọc phía server: tên phòng + trạng thái + khu khám — filters=room_name@=<giá trị>,status==<giá trị>,exam_area_id==<id>
   const serverFilters = useMemo(() => {
     const parts: string[] = [];
     if (debouncedSearch.trim()) parts.push(`room_name@=${debouncedSearch.trim()}`);
     if (statusFilter !== "all") parts.push(`status==${statusFilter}`);
+    if (areaFilter !== "all") parts.push(`exam_area_id==${areaFilter}`);
     return parts.length > 0 ? parts.join(",") : undefined;
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, areaFilter]);
 
   const { data: roomsData, isLoading } = roomsHooks.usePaginatedList({
     currentPage: page,
@@ -35,10 +37,21 @@ export function useClinicList() {
   });
   const allRooms = useMemo(() => roomsData?.rows ?? [], [roomsData]);
 
-  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), trạng thái hoặc số lượng mỗi trang thay đổi.
+  // Danh sách đầy đủ khu khám cho dropdown lọc (không phụ thuộc trang phòng khám hiện tại).
+  const { data: examAreasData } = examAreasHooks.useList({
+    pageSize: 100,
+    sortField: "name",
+    sortOrder: "ASC",
+  });
+  const examAreaOptions = useMemo(
+    () => (examAreasData?.rows ?? []).map((area) => ({ value: area.id, label: area.name })),
+    [examAreasData]
+  );
+
+  // Về trang 1 khi từ khóa tìm kiếm (đã debounce), trạng thái, khu khám hoặc số lượng mỗi trang thay đổi.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, pageSize]);
+  }, [debouncedSearch, statusFilter, areaFilter, pageSize]);
 
   // Điền sẵn ô tìm kiếm khi điều hướng từ trang "Xem phòng khám".
   useEffect(() => {
@@ -68,22 +81,15 @@ export function useClinicList() {
     });
   }
 
-  const examAreaOptions = useMemo(() => {
-    return Array.from(new Set(allRooms.map(getExamAreaName))).filter(Boolean).sort();
-  }, [allRooms]);
-
   const filtered = useMemo(() => {
-    // Tìm kiếm theo tên phòng đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
+    // Tìm kiếm, trạng thái và khu khám đã chuyển sang server (params.filters); "dịch vụ đã gán" API chưa hỗ trợ nên lọc bổ sung tại đây.
     return allRooms.filter((room) => {
-      const areaName = getExamAreaName(room);
-      const matchArea = areaFilter === "all" || areaName === areaFilter;
-      const matchStatus = statusFilter === "all" || room.status === statusFilter;
       const matchHis =
         hisFilter === "all" ||
         (hisFilter === "has" ? hasAssignedServices(room) : !hasAssignedServices(room));
-      return matchArea && matchStatus && matchHis;
+      return matchHis;
     });
-  }, [allRooms, areaFilter, statusFilter, hisFilter]);
+  }, [allRooms, hisFilter]);
 
   const totalPages = roomsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
 

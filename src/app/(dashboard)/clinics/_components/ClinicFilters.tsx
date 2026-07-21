@@ -7,9 +7,7 @@ interface ClinicFiltersProps {
   onAreaFilterChange: (value: string) => void;
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
-  hisFilter: string;
-  onHisFilterChange: (value: string) => void;
-  examAreaOptions: string[];
+  examAreaOptions: { value: string; label: string }[];
   onApply: () => void;
   onReset: () => void;
 }
@@ -24,8 +22,6 @@ export function ClinicFilters({
   onAreaFilterChange,
   statusFilter,
   onStatusFilterChange,
-  hisFilter,
-  onHisFilterChange,
   examAreaOptions,
   onApply,
   onReset,
@@ -51,7 +47,7 @@ export function ClinicFilters({
           <select value={areaFilter} onChange={(event) => onAreaFilterChange(event.target.value)} className={SELECT_CLASS}>
             <option value="all">Tất cả khu khám</option>
             {examAreaOptions.map((area) => (
-              <option key={area} value={area}>{area}</option>
+              <option key={area.value} value={area.value}>{area.label}</option>
             ))}
           </select>
         </div>
@@ -65,14 +61,14 @@ export function ClinicFilters({
           </select>
         </div>
 
-        <div>
+        {/* <div>
           <label className="mb-1 block text-xs font-medium text-muted-foreground">Dịch vụ đã gán</label>
           <select value={hisFilter} onChange={(event) => onHisFilterChange(event.target.value)} className={SELECT_CLASS}>
             <option value="all">Tất cả</option>
             <option value="has">Đã gán dịch vụ</option>
             <option value="none">Chưa gán dịch vụ</option>
           </select>
-        </div>
+        </div> */}
 
         <button
           onClick={onApply}

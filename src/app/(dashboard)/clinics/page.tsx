@@ -45,11 +45,6 @@ export default function ClinicsPage() {
         }}
         statusFilter={clinics.statusFilter}
         onStatusFilterChange={clinics.setStatusFilter}
-        hisFilter={clinics.hisFilter}
-        onHisFilterChange={(value) => {
-          clinics.setHisFilter(value);
-          clinics.setPage(1);
-        }}
         examAreaOptions={clinics.examAreaOptions}
         onApply={() => clinics.setPage(1)}
         onReset={clinics.resetFilters}
