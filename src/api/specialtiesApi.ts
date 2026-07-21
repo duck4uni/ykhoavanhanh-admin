@@ -1,4 +1,4 @@
-import { apiPost } from "@/lib/axios";
+import { apiPost, apiDelete } from "@/lib/axios";
 import { createApi } from "./createApi";
 import type { AdminSpecialty } from "@/types/hospital-admin";
 
@@ -30,4 +30,12 @@ export async function assignSpecialtyExamAreas(
     return res.data.responseData;
   }
   throw new Error(res.data.message || "Gán khu vực khám cho chuyên khoa thất bại");
+}
+
+/** Bỏ gán 1 khu khám khỏi chuyên khoa (DELETE /specialties/{id}/exam-areas/{examAreaId}). */
+export async function removeSpecialtyExamArea(specialtyId: string, examAreaId: string): Promise<void> {
+  const res = await apiDelete(`/specialties/${specialtyId}/exam-areas/${examAreaId}`);
+  if (res.data.status === "fail") {
+    throw new Error(res.data.message || "Bỏ gán khu vực khám thất bại");
+  }
 }

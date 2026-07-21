@@ -129,6 +129,8 @@ interface ModalProps {
   children: React.ReactNode
   size?: "sm" | "md" | "lg" | "xl" | "2xl"
   footer?: React.ReactNode
+  /** Chiều cao tối thiểu tuỳ chọn (vd "min-h-[640px]") — dùng khi nội dung có dropdown cần đủ chỗ để không bị cắt bởi overflow-hidden của modal. */
+  minHeightClassName?: string
 }
 
 const sizeClasses: Record<string, string> = {
@@ -139,11 +141,11 @@ const sizeClasses: Record<string, string> = {
   "2xl": "sm:max-w-6xl",
 }
 
-export function Modal({ isOpen, onClose, title, children, size = "md", footer }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = "md", footer, minHeightClassName }: ModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent
-        className={cn("max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden", sizeClasses[size])}
+        className={cn("max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden", sizeClasses[size], minHeightClassName)}
         showCloseButton={false}
       >
         <DialogHeader className="px-6 py-4 border-b border-gray-200 flex-shrink-0">

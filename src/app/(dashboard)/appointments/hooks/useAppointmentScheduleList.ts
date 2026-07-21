@@ -27,6 +27,8 @@ export function useAppointmentScheduleList() {
   const { data, isLoading } = doctorWorkSchedulesHooks.useList({
     currentPage: page,
     pageSize,
+    sortField: "created_at",
+    sortOrder: "DESC",
     schedule_date: dateFilter || undefined,
     filters: statusFilter ? `status==${statusFilter}` : undefined,
   });

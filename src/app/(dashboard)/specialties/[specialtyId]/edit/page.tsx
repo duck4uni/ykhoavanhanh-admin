@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { specialtiesHooks, assignSpecialtyExamAreas } from "@/api/specialtiesApi";
+import { specialtiesHooks, assignSpecialtyExamAreas, removeSpecialtyExamArea } from "@/api/specialtiesApi";
 import type { AdminSpecialty } from "@/types/hospital-admin";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { toast } from "@/components/ui/Toast";
@@ -28,10 +28,17 @@ export default function EditSpecialtyPage() {
     try {
       // B1: cập nhật thông tin chuyên khoa.
       await updateMutation.mutateAsync({ id: specialtyId, data: buildSpecialtyPayload(form) as Partial<AdminSpecialty> });
-      // B2: nếu có chọn thêm khu vực khám thì gán vào chuyên khoa.
-      if (form.exam_area_ids.length > 0) {
+      // B2: đồng bộ khu vực khám đã gán — thêm mục mới chọn, bỏ gán mục đã bỏ tick.
+      const currentIds = (specialty?.specialty_exam_areas ?? []).map((relation) => relation.exam_area_id);
+      const selectedIds = form.exam_area_ids;
+      const toAdd = selectedIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id) => !selectedIds.includes(id));
+      if (toAdd.length > 0 || toRemove.length > 0) {
         setIsAssigning(true);
-        await assignSpecialtyExamAreas(specialtyId, form.exam_area_ids);
+        await Promise.all([
+          toAdd.length > 0 ? assignSpecialtyExamAreas(specialtyId, toAdd) : Promise.resolve(),
+          ...toRemove.map((id) => removeSpecialtyExamArea(specialtyId, id)),
+        ]);
       }
       toast.success("Cập nhật chuyên khoa thành công");
       router.push("/specialties");

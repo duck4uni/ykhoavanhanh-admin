@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import type { PickerOption } from "../types";
 
 type PaginatedComboboxProps = {
@@ -14,6 +14,8 @@ type PaginatedComboboxProps = {
   onChange: (value: string) => void;
   onSearchChange: (value: string) => void;
   onLoadMore: () => void;
+  /** Gọi khi bấm nút xoá lựa chọn (x) — mặc định là onChange(""). */
+  onClear?: () => void;
 };
 
 /** Combobox phân trang có search + scroll load-more (dùng chung). */
@@ -29,6 +31,7 @@ export function PaginatedCombobox({
   onChange,
   onSearchChange,
   onLoadMore,
+  onClear,
 }: PaginatedComboboxProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -52,7 +55,18 @@ export function PaginatedCombobox({
         className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
       >
         <span className={label ? "truncate text-slate-800" : "text-slate-400"}>{label || placeholder}</span>
-        <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0 text-slate-400" />
+        {value ? (
+          <X
+            className="ml-2 h-4 w-4 flex-shrink-0 text-slate-400 hover:text-slate-600"
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen(false);
+              (onClear ?? (() => onChange("")))();
+            }}
+          />
+        ) : (
+          <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0 text-slate-400" />
+        )}
       </button>
 
       {open && (

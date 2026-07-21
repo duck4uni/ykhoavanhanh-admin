@@ -54,6 +54,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
       onClose={() => setScopeModalOpen(false)}
       title={editingScopeId ? "Sửa phạm vi khám" : "Thêm phạm vi khám"}
       size="xl"
+      minHeightClassName="min-h-[640px]"
       footer={
         <div className="flex justify-end gap-3">
           <button
@@ -74,26 +75,6 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
       }
     >
       <div className="space-y-4">
-        <ScopeField label="Chuyên khoa" required>
-          <PaginatedCombobox
-            value={scopeDraft.specialty_id}
-            selectedLabel={scopeDraft.specialty_id ? specialtyName(scopeDraft.specialty_id) : undefined}
-            options={specialtyPicker.rows.map((s) => ({ value: s.id, label: s.name }))}
-            search={specialtyPicker.search}
-            isLoading={specialtyPicker.isFetching}
-            hasMore={specialtyPicker.hasMore}
-            placeholder="Chọn chuyên khoa"
-            searchPlaceholder="Tìm chuyên khoa..."
-            onSearchChange={specialtyPicker.setSearch}
-            onLoadMore={specialtyPicker.loadMore}
-            onChange={(value) => {
-              const item = specialtyPicker.rows.find((s) => s.id === value);
-              rememberLabel(value, item?.name ?? "");
-              setScopeDraft((p) => ({ ...p, specialty_id: value, service_id: "" }));
-            }}
-          />
-        </ScopeField>
-
         <ScopeField label="Khu vực / phòng" required>
           <div className="grid grid-cols-2 gap-2">
             <PaginatedCombobox
@@ -112,6 +93,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
                 rememberLabel(value, item?.name ?? "");
                 setScopeDraft((p) => ({ ...p, area_id: value, room_id: "" }));
               }}
+              onClear={() => setScopeDraft((p) => ({ ...p, area_id: "", room_id: "" }))}
             />
             <PaginatedCombobox
               value={scopeDraft.room_id}
@@ -129,8 +111,30 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
                 rememberLabel(value, item?.roomname ?? "");
                 setScopeDraft((p) => ({ ...p, room_id: value }));
               }}
+              onClear={() => setScopeDraft((p) => ({ ...p, room_id: "" }))}
             />
           </div>
+        </ScopeField>
+
+        <ScopeField label="Chuyên khoa" required>
+          <PaginatedCombobox
+            value={scopeDraft.specialty_id}
+            selectedLabel={scopeDraft.specialty_id ? specialtyName(scopeDraft.specialty_id) : undefined}
+            options={specialtyPicker.rows.map((s) => ({ value: s.id, label: s.name }))}
+            search={specialtyPicker.search}
+            isLoading={specialtyPicker.isFetching}
+            hasMore={specialtyPicker.hasMore}
+            placeholder="Chọn chuyên khoa"
+            searchPlaceholder="Tìm chuyên khoa..."
+            onSearchChange={specialtyPicker.setSearch}
+            onLoadMore={specialtyPicker.loadMore}
+            onChange={(value) => {
+              const item = specialtyPicker.rows.find((s) => s.id === value);
+              rememberLabel(value, item?.name ?? "");
+              setScopeDraft((p) => ({ ...p, specialty_id: value, service_id: "" }));
+            }}
+            onClear={() => setScopeDraft((p) => ({ ...p, specialty_id: "", service_id: "" }))}
+          />
         </ScopeField>
 
         <ScopeField label="Dịch vụ khám" required>
@@ -150,6 +154,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
               rememberLabel(value, item?.servicename ?? "");
               onDraftServiceChange(value);
             }}
+            onClear={() => onDraftServiceChange("")}
           />
         </ScopeField>
 

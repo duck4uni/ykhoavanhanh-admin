@@ -39,6 +39,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const [form, setForm] = useState<ScheduleForm>(createInitialForm);
   const [scopes, setScopes] = useState<ScopeRow[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlotRow[]>([]);
+  const [scopeDraft, setScopeDraft] = useState<Omit<ScopeRow, "clientId">>(emptyScopeDraft);
   const hydratedScheduleId = useRef<string | null>(null);
   const detailQuery = doctorWorkSchedulesHooks.useDetailV2(scheduleId, { enabled: mode === "edit" });
 
@@ -75,7 +76,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const areaTotal = areaCountData?.count ?? 0;
   const serviceTotal = serviceCountData?.count ?? 0;
 
-  // ── Chuyên khoa: search + phân trang ──
+  // ── Chuyên khoa: search + phân trang, lọc theo khu vực đã chọn (nếu có) ──
   const specialtyPicker = usePickerState();
   const { data: specialtyPageData, isFetching: isFetchingSpecialties } = specialtiesHooks.useList({
     currentPage: specialtyPicker.page,
@@ -83,7 +84,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     filters: specialtyPicker.debouncedSearch.trim()
       ? `name@=${specialtyPicker.debouncedSearch.trim()},is_active==true`
       : "is_active==true",
-  });
+    ...(scopeDraft.area_id ? { exam_area_id: scopeDraft.area_id } : {}),
+  } as Record<string, unknown>);
+  // Về trang 1 khi khu vực áp dụng cho bộ lọc chuyên khoa thay đổi.
+  useEffect(() => {
+    specialtyPicker.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeDraft.area_id]);
   const specialties = useAccumulatedRows(
     useMemo(() => specialtyPageData?.rows ?? [], [specialtyPageData]),
     specialtyPicker.page,
@@ -107,31 +114,57 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   );
   const hasMoreAreas = (areaPageData?.currentPage ?? areaPicker.page) < (areaPageData?.totalPages ?? 1);
 
-  // ── Phòng khám: search + phân trang ──
+  // ── Phòng khám: search + phân trang, lọc theo khu vực đã chọn (server) ──
   const roomPicker = usePickerState();
   const { data: roomPageData, isFetching: isFetchingRooms } = roomsHooks.usePaginatedList({
     currentPage: roomPicker.page,
     pageSize: 10,
-    filters: roomPicker.debouncedSearch.trim()
-      ? `room_name@=${roomPicker.debouncedSearch.trim()},status==ACTIVE`
-      : "status==ACTIVE",
+    filters: [
+      roomPicker.debouncedSearch.trim() ? `room_name@=${roomPicker.debouncedSearch.trim()}` : "",
+      "status==ACTIVE",
+      scopeDraft.area_id ? `exam_area_id==${scopeDraft.area_id}` : "",
+    ]
+      .filter(Boolean)
+      .join(","),
   });
-  const rooms = useAccumulatedRows(
+  const roomsFetched = useAccumulatedRows(
     useMemo(() => roomPageData?.rows ?? [], [roomPageData]),
     roomPicker.page,
     (r) => r.id
   );
+  // API rooms không hỗ trợ filter theo chuyên khoa (his_room_specialties là bảng nối, không lọc
+  // được ở server) — lọc bổ sung phía client theo chuyên khoa đã chọn, dựa vào quan hệ đã include sẵn.
+  const rooms = useMemo(() => {
+    if (!scopeDraft.specialty_id) return roomsFetched;
+    return roomsFetched.filter((r) =>
+      (r.his_room_specialties ?? []).some((rel) => rel.specialty_id === scopeDraft.specialty_id)
+    );
+  }, [roomsFetched, scopeDraft.specialty_id]);
   const hasMoreRooms = (roomPageData?.currentPage ?? roomPicker.page) < (roomPageData?.totalPages ?? 1);
+  // Về trang 1 khi khu vực áp dụng cho bộ lọc phòng thay đổi.
+  useEffect(() => {
+    roomPicker.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeDraft.area_id]);
 
   // ── Dịch vụ khám: search + phân trang ──
   const servicePicker = usePickerState();
   const { data: servicePageData, isFetching: isFetchingServices } = hisServicesHooks.usePaginatedList({
     currentPage: servicePicker.page,
     pageSize: 10,
-    filters: servicePicker.debouncedSearch.trim()
-      ? `service_name@=${servicePicker.debouncedSearch.trim()},status==ACTIVE`
-      : "status==ACTIVE",
+    filters: [
+      servicePicker.debouncedSearch.trim() ? `service_name@=${servicePicker.debouncedSearch.trim()}` : "",
+      "status==ACTIVE",
+      scopeDraft.specialty_id ? `specialty_id==${scopeDraft.specialty_id}` : "",
+    ]
+      .filter(Boolean)
+      .join(","),
   });
+  // Về trang 1 khi chuyên khoa áp dụng cho bộ lọc dịch vụ thay đổi.
+  useEffect(() => {
+    servicePicker.setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeDraft.specialty_id]);
   const services = useAccumulatedRows(
     useMemo(() => servicePageData?.rows ?? [], [servicePageData]),
     servicePicker.page,
@@ -227,7 +260,6 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // ── Modal state: scope ──
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
   const [editingScopeId, setEditingScopeId] = useState<string | null>(null);
-  const [scopeDraft, setScopeDraft] = useState<Omit<ScopeRow, "clientId">>(emptyScopeDraft);
 
   function openAddScope() {
     setEditingScopeId(null);
@@ -298,21 +330,12 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     }));
   }
 
-  // Phòng gợi ý lọc theo khu vực đã chọn
-  const draftRoomOptions = useMemo(() => {
-    const list = scopeDraft.area_id
-      ? rooms.filter((r) => !r.exam_area_id || r.exam_area_id === scopeDraft.area_id)
-      : rooms;
-    return list;
-  }, [rooms, scopeDraft.area_id]);
+  // Phòng đã được lọc theo khu vực (server) + chuyên khoa (client, xem roomPicker phía trên).
+  const draftRoomOptions = rooms;
 
   // Dịch vụ gợi ý lọc theo chuyên khoa đã chọn
-  const draftServiceOptions = useMemo(() => {
-    const list = scopeDraft.specialty_id
-      ? services.filter((s) => !s.specialty_id || s.specialty_id === scopeDraft.specialty_id)
-      : services;
-    return list;
-  }, [services, scopeDraft.specialty_id]);
+  // Dịch vụ đã được lọc theo chuyên khoa ngay từ server (xem servicePicker phía trên).
+  const draftServiceOptions = services;
 
   // ── Time slots ──
   function addSlot() {
