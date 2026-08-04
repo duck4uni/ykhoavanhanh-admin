@@ -6,6 +6,9 @@ import { toast } from "@/components/ui/Toast";
 import {
   ServiceForm,
   createInitialServiceForm,
+  getDefaultPrice,
+  getInsuranceTypes,
+  serializePriceLevels,
   type ServiceFormValues,
 } from "../_components/ServiceForm";
 
@@ -21,29 +24,29 @@ export default function NewExamServicePage() {
   });
 
   function handleSubmit(form: ServiceFormValues) {
-    if (!form.exam_area_id) {
-      toast.error("Vui lòng chọn khu vực khám");
-      return;
-    }
-
     // POST /his-services ghi thẳng các cột thật: exam_area_id, service_id,
     // service_name, price, specialty_id, raw_data. Field lạ ở top-level KHÔNG được
     // merge vào raw_data (khác PUT) → mọi field mở rộng (servicetype/insurancetype/
-    // description) phải nằm trong raw_data, dùng đúng key normalizeHisService đọc lại.
+    // description/price_levels) phải nằm trong raw_data, dùng đúng key
+    // normalizeHisService đọc lại.
     const rawData: Record<string, unknown> = {};
     const serviceType = form.service_type.trim();
-    const insuranceType = form.insurance_types.join("/");
+    // Loại bảo hiểm của dịch vụ = các loại đã khai mức giá.
+    const insuranceType = getInsuranceTypes(form.price_levels);
     const description = form.description.trim();
+    const priceLevels = serializePriceLevels(form.price_levels);
     if (serviceType) rawData.servicetype = serviceType;
     if (insuranceType) rawData.insurancetype = insuranceType;
     if (description) rawData.description = description;
+    if (priceLevels.length > 0) rawData.price_levels = priceLevels;
 
     const payload: CreateHisServicePayload = {
-      // Khu vực khám (exam_area_id) — chọn từ danh sách GET /exam-areas.
-      exam_area_id: form.exam_area_id,
       service_id: form.service_id.trim(),
       service_name: form.service_name.trim(),
-      price: form.price.trim() ? Number(form.price) : undefined,
+      // Cột `price` giữ mức giá mặc định; các mức còn lại nằm ở raw_data.price_levels.
+      price: getDefaultPrice(form.price_levels),
+      // Khu vực khám / chuyên khoa không bắt buộc — bỏ trống thì dịch vụ dùng chung.
+      exam_area_id: form.exam_area_id || undefined,
       specialty_id: form.specialty_id || undefined,
       booking_note: form.booking_note.trim() || null,
       display_group: form.display_group.trim() ? Number(form.display_group) : null,
@@ -59,7 +62,7 @@ export default function NewExamServicePage() {
   return (
     <ServiceForm
       title="Thêm dịch vụ khám"
-      subtitle="Tạo mới dịch vụ khám, thiết lập giá, loại bảo hiểm và chuyên khoa."
+      subtitle="Tạo mới dịch vụ khám và khai mức giá theo từng loại bảo hiểm (BHYT, BHXH, BHT, DV) cho cùng một mã dịch vụ."
       submitLabel="Tạo dịch vụ"
       initialForm={createInitialServiceForm()}
       isSubmitting={createMutation.isPending}

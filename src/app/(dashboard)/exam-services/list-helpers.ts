@@ -17,7 +17,15 @@ export function formatDateTime(value: string): string {
 }
 
 export function getSpecialtyName(service: HisService): string {
-  return service.specialty?.name || "—";
+  // Chuyên khoa không bắt buộc — dịch vụ để trống là dùng chung cho mọi chuyên khoa.
+  return service.specialty?.name || "Dùng chung";
+}
+
+/** Các mức giá phụ (ngoài mức mặc định) để hiển thị gọn dưới cột Giá. */
+export function getExtraPriceLevels(service: HisService) {
+  if (service.price_levels.length <= 1) return [];
+  const defaultIndex = Math.max(service.price_levels.findIndex((level) => level.is_default), 0);
+  return service.price_levels.filter((_, index) => index !== defaultIndex);
 }
 
 export function supportsInsurance(service: HisService): boolean {

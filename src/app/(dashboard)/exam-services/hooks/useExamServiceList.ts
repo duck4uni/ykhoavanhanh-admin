@@ -42,7 +42,14 @@ export function useExamServiceList() {
   const debouncedSearch = useDebounce(search, 400);
   const serverFilters = useMemo(() => {
     const parts: string[] = [];
-    if (debouncedSearch.trim()) parts.push(`service_name@=${debouncedSearch.trim()}`);
+    const keyword = debouncedSearch.trim();
+    // Mã dịch vụ (service_id) chỉ gồm chữ số → từ khóa toàn số thì lọc theo mã dịch vụ,
+    // ngược lại lọc theo tên dịch vụ. Không gộp OR 2 field bằng "|" vì filter đó không
+    // trả kết quả trên endpoint này (khác với field==value|field2==value2 dùng cho
+    // notifications/users/page-config).
+    if (keyword) {
+      parts.push(/^\d+$/.test(keyword) ? `service_id@=${keyword}` : `service_name@=${keyword}`);
+    }
     if (statusFilter === "active") parts.push("status==ACTIVE");
     else if (statusFilter === "inactive") parts.push("status==INACTIVE");
     return parts.length > 0 ? parts.join(",") : undefined;

@@ -122,11 +122,30 @@ export function formatFee(value: number): string {
   return `${value.toLocaleString("vi-VN")}đ`;
 }
 
-/** Nhãn hiển thị dịch vụ khám trong dropdown: loại dịch vụ - loại BH - giá - mã dịch vụ. */
-export function formatServiceOptionLabel(service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid">): string {
+/** Danh sách mức giá còn hoạt động của dịch vụ, mức mặc định (is_default) đứng trước. */
+export function activePriceLevels(
+  service: Pick<HisService, "price_levels">
+): HisService["price_levels"] {
+  return [...(service.price_levels ?? [])]
+    .filter((level) => level.status !== "INACTIVE")
+    .sort((a, b) => Number(b.is_default) - Number(a.is_default));
+}
+
+/** Giá mặc định của dịch vụ: mức is_default, mức active đầu tiên, hoặc price gốc. */
+export function defaultServicePrice(
+  service: Pick<HisService, "price" | "price_levels">
+): number {
+  const [firstLevel] = activePriceLevels(service);
+  if (firstLevel) return firstLevel.price;
   const price = Number(service.price);
-  const priceLabel = Number.isFinite(price) ? formatFee(price) : service.price;
-  return `${service.servicename  || "—"} - ${priceLabel} - (${service.serviceid})`;
+  return Number.isFinite(price) ? price : 0;
+}
+
+/** Nhãn hiển thị dịch vụ khám trong dropdown: loại dịch vụ - giá mặc định - mã dịch vụ. */
+export function formatServiceOptionLabel(
+  service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid" | "price_levels">
+): string {
+  return `${service.servicename || "—"} - ${formatFee(defaultServicePrice(service))} - (${service.serviceid})`;
 }
 
 export const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
