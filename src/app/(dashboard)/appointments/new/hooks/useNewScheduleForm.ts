@@ -18,6 +18,7 @@ import {
   buildSchedulePayload,
   createId,
   createInitialForm,
+  defaultServicePrice,
   emptyScopeDraft,
   formatServiceOptionLabel,
   getDatesByWeekday,
@@ -313,14 +314,19 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // vẫn chọn được cho mọi chuyên khoa/khu vực.
   function onDraftServiceChange(serviceId: string) {
     const svc = services.find((s) => s.id === serviceId);
-    const price = svc ? Number(svc.price) || 0 : 0;
+    const price = svc ? defaultServicePrice(svc) : 0;
     setScopeDraft((prev) => ({
       ...prev,
       service_id: serviceId,
-      fee: prev.fee > 0 ? prev.fee : price,
+      fee: price,
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
     }));
+  }
+
+  // Đổi mức giá (theo loại BH) của dịch vụ đang chọn trong modal phạm vi.
+  function onDraftPriceLevelChange(price: number) {
+    setScopeDraft((prev) => ({ ...prev, fee: price }));
   }
 
   // Phòng đã được lọc theo khu vực (server) + chuyên khoa (client, xem roomPicker phía trên).
@@ -554,6 +560,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     saveScope,
     removeScope,
     onDraftServiceChange,
+    onDraftPriceLevelChange,
     draftRoomOptions,
     draftServiceOptions,
     // time slots

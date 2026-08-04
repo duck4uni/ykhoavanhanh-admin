@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PaginatedCombobox } from "./PaginatedCombobox";
-import { formatServiceOptionLabel, scopeControlClass, type ScopeRow } from "../types";
+import { activePriceLevels, formatFee, formatServiceOptionLabel, scopeControlClass, type ScopeRow } from "../types";
 import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Field dạng label-trái / input-phải cho modal phạm vi. */
@@ -46,7 +46,17 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
     serviceOptionLabel,
     rememberLabel,
     onDraftServiceChange,
+    onDraftPriceLevelChange,
   } = ctrl;
+
+  const selectedService = scopeDraft.service_id
+    ? draftServiceOptions.find((s) => s.id === scopeDraft.service_id)
+    : undefined;
+  const priceLevels = selectedService ? activePriceLevels(selectedService) : [];
+  // Nhãn dịch vụ đã chọn phản ánh mức giá hiện tại, không phải giá mặc định của dịch vụ.
+  const selectedServiceLabel = selectedService
+    ? `${selectedService.servicename || "—"} - ${formatFee(scopeDraft.fee)} - (${selectedService.serviceid})`
+    : undefined;
 
   return (
     <Modal
@@ -141,7 +151,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
         <ScopeField label="Dịch vụ khám" required>
           <PaginatedCombobox
             value={scopeDraft.service_id}
-            selectedLabel={scopeDraft.service_id ? serviceOptionLabel(scopeDraft.service_id) : undefined}
+            selectedLabel={scopeDraft.service_id ? selectedServiceLabel ?? serviceOptionLabel(scopeDraft.service_id) : undefined}
             options={draftServiceOptions.map((s) => ({ value: s.id, label: formatServiceOptionLabel(s) }))}
             search={servicePicker.search}
             isLoading={servicePicker.isFetching}
@@ -158,6 +168,22 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             onClear={() => onDraftServiceChange("")}
           />
         </ScopeField>
+
+        {priceLevels.length > 0 && (
+          <ScopeField label="Mức giá" required>
+            <select
+              value={String(scopeDraft.fee)}
+              onChange={(e) => onDraftPriceLevelChange(Number(e.target.value))}
+              className={scopeControlClass}
+            >
+              {priceLevels.map((level) => (
+                <option key={level.code} value={level.price}>
+                  {level.label} - {formatFee(level.price)}
+                </option>
+              ))}
+            </select>
+          </ScopeField>
+        )}
 
         {/* <ScopeField label="Phí khám (VND)" required>
           <div className="flex h-10 items-center overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">
