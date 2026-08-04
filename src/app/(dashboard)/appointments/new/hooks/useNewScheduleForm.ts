@@ -148,6 +148,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   }, [scopeDraft.area_id]);
 
   // ── Dịch vụ khám: search + phân trang ──
+  // Dịch vụ khám không ràng theo chuyên khoa/khu vực — một dịch vụ (kèm giá) dùng chung
+  // cho mọi chuyên khoa, phòng khám và khu khám, nên KHÔNG lọc theo specialty_id.
   const servicePicker = usePickerState();
   const { data: servicePageData, isFetching: isFetchingServices } = hisServicesHooks.usePaginatedList({
     currentPage: servicePicker.page,
@@ -155,16 +157,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     filters: [
       servicePicker.debouncedSearch.trim() ? `service_name@=${servicePicker.debouncedSearch.trim()}` : "",
       "status==ACTIVE",
-      scopeDraft.specialty_id ? `specialty_id==${scopeDraft.specialty_id}` : "",
     ]
       .filter(Boolean)
       .join(","),
   });
-  // Về trang 1 khi chuyên khoa áp dụng cho bộ lọc dịch vụ thay đổi.
-  useEffect(() => {
-    servicePicker.setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeDraft.specialty_id]);
   const services = useAccumulatedRows(
     useMemo(() => servicePageData?.rows ?? [], [servicePageData]),
     servicePicker.page,
@@ -177,22 +173,30 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const rememberLabel = (id: string, label: string) =>
     setLabelCache((prev) => (id && prev[id] !== label ? { ...prev, [id]: label } : prev));
 
-  // ── Doctor combobox ──
-  const [doctorSearch, setDoctorSearch] = useState("");
-  const [doctorPage, setDoctorPage] = useState(1);
+  // ── Doctor combobox: search + phân trang, lọc qua API (không lọc mảng phía client) ──
+  const doctorPicker = usePickerState();
   const [doctorList, setDoctorList] = useState<HisDoctor[]>([]);
+  const doctorKeyword = doctorPicker.debouncedSearch.trim();
+  // Mã bác sĩ (doctor_id) thường toàn chữ số → từ khóa toàn số thì lọc theo mã,
+  // ngược lại lọc theo tên (giống cách lọc dịch vụ khám theo service_id/service_name).
+  const doctorFilters = doctorKeyword
+    ? /^\d+$/.test(doctorKeyword)
+      ? `doctor_id@=${doctorKeyword}`
+      : `doctor_name@=${doctorKeyword}`
+    : undefined;
   const { data: doctorsData, isLoading: isLoadingDoctors, isFetching: isFetchingDoctors } = doctorsHooks.usePaginatedList({
-    currentPage: doctorPage,
+    currentPage: doctorPicker.page,
     pageSize: 10,
+    filters: doctorFilters,
   });
 
   useEffect(() => {
     const rows = doctorsData?.rows ?? [];
     setDoctorList((current) => {
-      const next = doctorPage === 1 ? [...current.filter((doctor) => doctor.id === form.doctor_id), ...rows] : [...current, ...rows];
+      const next = doctorPicker.page === 1 ? [...current.filter((doctor) => doctor.id === form.doctor_id), ...rows] : [...current, ...rows];
       return Array.from(new Map(next.map((doctor) => [doctor.id, doctor])).values());
     });
-  }, [doctorsData, doctorPage, form.doctor_id]);
+  }, [doctorsData, doctorPicker.page, form.doctor_id]);
 
   useEffect(() => {
     if (mode !== "edit" || !scheduleId || !detailQuery.data || hydratedScheduleId.current === scheduleId) return;
@@ -230,19 +234,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     void loadMissingLabels();
   }, [detailQuery.data, mode, scheduleId]);
 
-  useEffect(() => {
-    setDoctorPage(1);
-  }, [doctorSearch]);
-
-  const filteredDoctorList = useMemo(() => {
-    const keyword = doctorSearch.trim().toLowerCase();
-    if (!keyword) return doctorList;
-    return doctorList.filter((doctor) =>
-      [doctor.doctorname, doctor.doctorid].join(" ").toLowerCase().includes(keyword)
-    );
-  }, [doctorList, doctorSearch]);
-
-  const hasMoreDoctors = (doctorsData?.currentPage ?? doctorPage) < (doctorsData?.totalPages ?? 1);
+  const hasMoreDoctors = (doctorsData?.currentPage ?? doctorPicker.page) < (doctorsData?.totalPages ?? 1);
   const selectedDoctor = doctorList.find((d) => d.id === form.doctor_id);
 
   // ── Lookup maps ──
@@ -316,7 +308,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     );
   }
 
-  // Auto set fee mặc định theo dịch vụ khi đổi dịch vụ trong modal
+  // Auto set fee mặc định theo dịch vụ khi đổi dịch vụ trong modal (dùng mức giá mặc định
+  // của dịch vụ). Chuyên khoa/khu vực chỉ gợi ý khi dịch vụ có khai — dịch vụ không khai
+  // vẫn chọn được cho mọi chuyên khoa/khu vực.
   function onDraftServiceChange(serviceId: string) {
     const svc = services.find((s) => s.id === serviceId);
     const price = svc ? Number(svc.price) || 0 : 0;
@@ -324,7 +318,6 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       ...prev,
       service_id: serviceId,
       fee: prev.fee > 0 ? prev.fee : price,
-      // Gợi ý chuyên khoa/khu vực theo dịch vụ nếu chưa chọn
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
     }));
@@ -333,8 +326,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // Phòng đã được lọc theo khu vực (server) + chuyên khoa (client, xem roomPicker phía trên).
   const draftRoomOptions = rooms;
 
-  // Dịch vụ gợi ý lọc theo chuyên khoa đã chọn
-  // Dịch vụ đã được lọc theo chuyên khoa ngay từ server (xem servicePicker phía trên).
+  // Danh sách dịch vụ đầy đủ (không lọc theo chuyên khoa/khu vực — xem servicePicker phía trên).
   const draftServiceOptions = services;
 
   // ── Time slots ──
@@ -535,12 +527,12 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     servicePicker: { ...servicePicker, rows: services, isFetching: isFetchingServices, hasMore: hasMoreServices },
     // doctor combobox
     doctor: {
-      search: doctorSearch,
-      setSearch: setDoctorSearch,
-      list: filteredDoctorList,
+      search: doctorPicker.search,
+      setSearch: doctorPicker.setSearch,
+      list: doctorList,
       isLoading: isLoadingDoctors || isFetchingDoctors,
       hasMore: hasMoreDoctors,
-      loadMore: () => setDoctorPage((current) => current + 1),
+      loadMore: doctorPicker.loadMore,
       selected: selectedDoctor,
     },
     // lookup labels

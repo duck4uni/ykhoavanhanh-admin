@@ -14,6 +14,23 @@ import { apiGet, apiPost, apiPut, apiDelete, api } from "@/lib/axios";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+/**
+ * Một mức giá của dịch vụ khám (VD: Khám thường / Khám BHYT / Khám VIP).
+ * Bảng `his_services` chỉ có 1 cột `price` → danh sách mức giá lưu trong `raw_data.price_levels`,
+ * cột `price` giữ mức giá mặc định để các màn cũ (lịch khám, đặt khám) vẫn đọc được.
+ */
+export interface HisServicePriceLevel {
+  /** Mã mức giá, ổn định để đối chiếu (VD "THUONG", "BHYT", "VIP"). */
+  code: string;
+  /** Tên hiển thị (VD "Khám thường"). */
+  label: string;
+  price: number;
+  /** Mức giá mặc định — đồng bộ với cột `price`. */
+  is_default?: boolean;
+  /** Trạng thái riêng của mức giá; mặc định coi là ACTIVE nếu thiếu (dữ liệu cũ). */
+  status?: "ACTIVE" | "INACTIVE";
+}
+
 export interface HisService {
   /** UUID nội bộ nếu API trả về; fallback về serviceid với response HIS cũ. */
   id: string;
@@ -22,7 +39,10 @@ export interface HisService {
   servicetype: string;
   /** Tên dịch vụ, normalize từ service_name/servicename. */
   servicename: string;
+  /** Mức giá mặc định (cột `price`). Danh sách đầy đủ xem `price_levels`. */
   price: string;
+  /** Các mức giá của dịch vụ; rỗng nếu dịch vụ chỉ có một mức giá duy nhất. */
+  price_levels: HisServicePriceLevel[];
   fromdate: string;
   insurancetype: string;
   description: string | null;
@@ -90,6 +110,31 @@ type HisServicesListResponse =
       currentPage: number;
     };
 
+/** Đọc `raw_data.price_levels` (dữ liệu tự do) về mảng mức giá đã chuẩn hóa. */
+function parsePriceLevels(raw: Record<string, unknown> | null): HisServicePriceLevel[] {
+  const source = raw?.price_levels;
+  if (!Array.isArray(source)) return [];
+  return source.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const level = entry as Record<string, unknown>;
+    const label =
+      typeof level.label === "string" && level.label.trim()
+        ? level.label.trim()
+        : typeof level.name === "string"
+          ? level.name.trim()
+          : "";
+    const price = Number(level.price);
+    if (!label || !Number.isFinite(price)) return [];
+    return [{
+      code: typeof level.code === "string" && level.code.trim() ? level.code.trim() : label,
+      label,
+      price,
+      is_default: level.is_default === true,
+      status: level.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+    }];
+  });
+}
+
 function normalizeHisService(item: HisServiceApiItem): HisService {
   const raw = item.raw_data ?? null;
   const rawServiceId = typeof raw?.serviceid === "string" ? raw.serviceid : undefined;
@@ -107,6 +152,7 @@ function normalizeHisService(item: HisServiceApiItem): HisService {
     servicename: item.servicename ?? item.service_name ?? rawServiceName ?? "—",
     servicetype: item.servicetype ?? rawServiceType ?? "—",
     price: item.price ?? rawPrice ?? "0",
+    price_levels: parsePriceLevels(raw),
     fromdate: item.fromdate ?? rawFromDate ?? "",
     insurancetype: item.insurancetype ?? rawInsuranceType ?? "—",
     description: item.description ?? (typeof raw?.description === "string" ? raw.description : null),
@@ -121,12 +167,16 @@ function normalizeHisServiceList(data: HisServicesListResponse): HisService[] {
 }
 
 export type CreateHisServicePayload = {
-  /** UUID khu vực khám — chọn từ GET /exam-areas. */
-  exam_area_id?: string;
+  /** UUID khu vực khám — chọn từ GET /exam-areas. Không bắt buộc; `null` để gỡ ràng buộc. */
+  exam_area_id?: string | null;
   service_id: string;
   service_name: string;
+  /** Mức giá mặc định — ghi thẳng cột `price`. */
   price?: number;
-  specialty_id?: string;
+  /** Danh sách mức giá; không phải cột thật → nằm trong `raw_data` (POST) hoặc được merge vào `raw_data` (PUT). */
+  price_levels?: HisServicePriceLevel[];
+  /** UUID chuyên khoa. Không bắt buộc; `null` để gỡ ràng buộc. */
+  specialty_id?: string | null;
   booking_note?: string | null;
   display_priority?: number | null;
   display_group?: number | null;

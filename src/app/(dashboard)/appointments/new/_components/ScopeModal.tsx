@@ -131,9 +131,10 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             onChange={(value) => {
               const item = specialtyPicker.rows.find((s) => s.id === value);
               rememberLabel(value, item?.name ?? "");
-              setScopeDraft((p) => ({ ...p, specialty_id: value, service_id: "" }));
+              // Giữ nguyên dịch vụ đã chọn: dịch vụ dùng chung cho mọi chuyên khoa.
+              setScopeDraft((p) => ({ ...p, specialty_id: value }));
             }}
-            onClear={() => setScopeDraft((p) => ({ ...p, specialty_id: "", service_id: "" }))}
+            onClear={() => setScopeDraft((p) => ({ ...p, specialty_id: "" }))}
           />
         </ScopeField>
 

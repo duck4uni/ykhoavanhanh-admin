@@ -3,7 +3,7 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import { formatCurrency } from "@/lib/utils";
-import { formatDateTime, getSpecialtyName } from "../list-helpers";
+import { formatDateTime, getExtraPriceLevels, getSpecialtyName } from "../list-helpers";
 import type { ExamServiceListController } from "../hooks/useExamServiceList";
 
 /** Bảng dịch vụ khám + phân trang. */
@@ -42,7 +42,14 @@ export function ServiceTable({ ctrl }: { ctrl: ExamServiceListController }) {
                     <td className="max-w-sm px-5 py-4 font-semibold text-slate-800">{service.servicename}</td>
                     <td className="px-5 py-4 text-slate-700">{getSpecialtyName(service)}</td>
                     <td className="px-5 py-4 text-slate-700">{service.servicetype}</td>
-                    <td className="px-5 py-4 font-semibold text-slate-800">{formatCurrency(Number(service.price) || 0)}</td>
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-slate-800">{formatCurrency(Number(service.price) || 0)}</div>
+                      {getExtraPriceLevels(service).length > 0 && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          {getExtraPriceLevels(service).map((level) => `${level.label}: ${formatCurrency(level.price)}`).join(" · ")}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-slate-700">{service.insurancetype && service.insurancetype !== "—" ? service.insurancetype : "—"}</td>
                     <td className="px-5 py-4"><StatusSwitch checked={service.status === "ACTIVE"} loading={togglingId === service.id} onChange={() => toggleServiceStatus(service)} /></td>
                     <td className="px-5 py-4 text-slate-600">{formatDateTime(service.updatetime || service.updated_at || "")}</td>
