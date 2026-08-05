@@ -10,7 +10,6 @@ import { toast } from "@/components/ui/Toast";
 import { LoadingSection } from "@/components/ui/Spinner";
 import {
   ServiceForm,
-  getDefaultPrice,
   getInsuranceTypes,
   mapPriceLevelsToForm,
   parseInsuranceTypes,
@@ -65,8 +64,8 @@ export default function EditExamServicePage({
     // exam_area_id/specialty_id để trống → gửi null để gỡ ràng buộc cũ.
     const payload: UpdateHisServicePayload = {
       service_name: form.service_name.trim(),
-      // Cột `price` giữ mức giá mặc định; các mức còn lại nằm ở raw_data.price_levels.
-      price: getDefaultPrice(form.price_levels),
+      // Không gửi `price` khi cập nhật — chỉ cập nhật price_levels, tránh đè
+      // sai cột price ở BE khi sửa dịch vụ.
       price_levels: serializePriceLevels(form.price_levels),
       exam_area_id: form.exam_area_id || null,
       specialty_id: form.specialty_id || null,
@@ -109,6 +108,9 @@ export default function EditExamServicePage({
 
   return (
     <ServiceForm
+      // Remount khi đổi dịch vụ để nạp lại dữ liệu mới, tránh việc ServiceForm
+      // giữ nguyên state cũ khi điều hướng giữa các trang sửa dịch vụ khác nhau.
+      key={serviceId}
       title="Chỉnh sửa dịch vụ khám"
       subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, Khám thường, Khám VIP)."
       submitLabel="Lưu thay đổi"

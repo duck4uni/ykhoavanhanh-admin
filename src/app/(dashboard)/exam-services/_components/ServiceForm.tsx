@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardList, MapPin, Plus, ShieldPlus, Stethoscope, Tag, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
@@ -191,16 +191,18 @@ export function ServiceForm({
   onSubmit,
 }: Props) {
   const router = useRouter();
+  // Chỉ lấy initialForm làm giá trị khởi tạo một lần (lazy init) — KHÔNG đồng bộ lại
+  // mỗi khi component cha re-render, vì initialForm là object mới mỗi lần render
+  // (mapServiceToForm/createInitialServiceForm tạo mới), nếu đồng bộ liên tục sẽ
+  // ghi đè mất dữ liệu người dùng đang sửa (vd giá vừa nhập bị reset về giá cũ).
+  // Khi cần load lại theo bản ghi khác, truyền `key` khác cho <ServiceForm /> để
+  // React remount thay vì dựa vào effect này.
   const [form, setForm] = useState<ServiceFormValues>(initialForm);
 
   const { data: specialtiesData } = specialtiesHooks.useList();
   const specialties = specialtiesData?.rows ?? [];
   const { data: examAreasData } = examAreasHooks.useList();
   const examAreas = examAreasData?.rows ?? [];
-
-  useEffect(() => {
-    setForm(initialForm);
-  }, [initialForm]);
 
   function updatePriceLevel(id: string, patch: Partial<PriceLevelInput>) {
     setForm((p) => ({
