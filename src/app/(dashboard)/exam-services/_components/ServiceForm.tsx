@@ -14,11 +14,10 @@ import type { HisServicePriceLevel } from "@/api/hisServicesApi";
 import { formatCurrency } from "@/lib/utils";
 
 // Các loại bảo hiểm — mỗi loại là một mức giá của dịch vụ. Chuỗi `insurancetype`
-// của dịch vụ (vd "BHXH/BHT/DV") suy ra từ chính các mức giá đã khai.
+// của dịch vụ (vd "BHYT/DV") suy ra từ chính các mức giá đã khai.
 export const INSURANCE_OPTIONS = [
   { value: "BHYT", label: "BHYT" },
-  { value: "BHXH", label: "BHXH" },
-  { value: "BHT", label: "BHT" },
+  { value: "KT", label: "Khám thường" },
   { value: "DV", label: "Dịch vụ (DV)" },
 ] as const;
 
@@ -36,7 +35,7 @@ function isKnownInsuranceCode(code: string): boolean {
 /** Một dòng mức giá trong form; `id` chỉ dùng làm key React. */
 export type PriceLevelInput = {
   id: string;
-  /** Mã loại bảo hiểm: BHYT | BHXH | BHT | DV. */
+  /** Mã loại bảo hiểm: BHYT | KT | DV. */
   code: string;
   price: string;
   status: "ACTIVE" | "INACTIVE";
@@ -120,7 +119,7 @@ export type ServiceFormValues = {
   service_id: string;
   service_name: string;
   service_type: string;
-  /** Mỗi loại bảo hiểm (BHYT/BHXH/BHT/DV) là một mức giá; `insurancetype` suy ra từ đây. */
+  /** Mỗi loại bảo hiểm (BHYT/KT/DV) là một mức giá; `insurancetype` suy ra từ đây. */
   price_levels: PriceLevelInput[];
   exam_area_id: string;
   specialty_id: string;
@@ -149,7 +148,7 @@ export function createInitialServiceForm(): ServiceFormValues {
   };
 }
 
-// Tách chuỗi "BHYT/BHXH/BHT/DV" thành mảng mã loại bảo hiểm.
+// Tách chuỗi "BHYT/KT/DV" thành mảng mã loại bảo hiểm.
 export function parseInsuranceTypes(value: string | null | undefined): string[] {
   if (!value) return [];
   return value
@@ -279,7 +278,7 @@ export function ServiceForm({
               onChange={(e) => setForm((p) => ({ ...p, service_name: e.target.value }))}
               placeholder="VD: Khám bệnh chăm sóc tích cực"
             />
-            {/* Bảng giá: một mã dịch vụ có thể có nhiều mức giá theo loại bảo hiểm (BHYT/BHXH/BHT/DV). */}
+            {/* Bảng giá: một mã dịch vụ có thể có nhiều mức giá theo loại bảo hiểm (BHYT/KT/DV). */}
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <label className="block text-sm font-medium text-foreground">
@@ -289,7 +288,7 @@ export function ServiceForm({
                   type="button"
                   onClick={addPriceLevel}
                   disabled={!canAddPriceLevel}
-                  title={canAddPriceLevel ? undefined : "Đã khai đủ 4 loại bảo hiểm"}
+                  title={canAddPriceLevel ? undefined : "Đã khai đủ các loại bảo hiểm"}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" /> Thêm mức giá

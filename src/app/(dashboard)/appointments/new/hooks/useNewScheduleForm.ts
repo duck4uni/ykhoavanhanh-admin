@@ -329,6 +329,18 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     setScopeDraft((prev) => ({ ...prev, fee: price }));
   }
 
+  // Chọn thẳng một dòng dịch vụ + mức giá cụ thể (mỗi loại bảo hiểm là một dòng riêng trong dropdown).
+  function onDraftServiceOptionChange(serviceId: string, price: number) {
+    const svc = services.find((s) => s.id === serviceId);
+    setScopeDraft((prev) => ({
+      ...prev,
+      service_id: serviceId,
+      fee: price,
+      specialty_id: prev.specialty_id || svc?.specialty_id || "",
+      area_id: prev.area_id || svc?.exam_area_id || "",
+    }));
+  }
+
   // Phòng đã được lọc theo khu vực (server) + chuyên khoa (client, xem roomPicker phía trên).
   const draftRoomOptions = rooms;
 
@@ -561,6 +573,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     removeScope,
     onDraftServiceChange,
     onDraftPriceLevelChange,
+    onDraftServiceOptionChange,
     draftRoomOptions,
     draftServiceOptions,
     // time slots

@@ -110,7 +110,7 @@ export default function EditExamServicePage({
   return (
     <ServiceForm
       title="Chỉnh sửa dịch vụ khám"
-      subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, BHXH, BHT, DV)."
+      subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, Khám thường, DV)."
       submitLabel="Lưu thay đổi"
       initialForm={mapServiceToForm(service)}
       isSubmitting={updateMutation.isPending}

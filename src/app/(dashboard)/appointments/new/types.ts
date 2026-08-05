@@ -141,11 +141,29 @@ export function defaultServicePrice(
   return Number.isFinite(price) ? price : 0;
 }
 
-/** Nhãn hiển thị dịch vụ khám trong dropdown: loại dịch vụ - giá mặc định - mã dịch vụ. */
+/** Danh sách loại bảo hiểm còn hoạt động của dịch vụ, hiển thị dạng "BHYT, Khám thường". */
+export function formatInsuranceTypesLabel(
+  service: Pick<HisService, "insurancetype" | "price_levels">
+): string {
+  const levels = activePriceLevels(service);
+  if (levels.length > 0) return levels.map((level) => level.label).join(", ");
+  return service.insurancetype && service.insurancetype !== "—"
+    ? service.insurancetype.split("/").join(", ")
+    : "";
+}
+
+/** Nhãn hiển thị dịch vụ khám trong dropdown: tên - loại bảo hiểm - giá mặc định - mã dịch vụ. */
 export function formatServiceOptionLabel(
   service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid" | "price_levels">
 ): string {
-  return `${service.servicename || "—"} - ${formatFee(defaultServicePrice(service))} - (${service.serviceid})`;
+  const insuranceLabel = formatInsuranceTypesLabel(service);
+  const parts = [
+    service.servicename || "—",
+    ...(insuranceLabel ? [insuranceLabel] : []),
+    formatFee(defaultServicePrice(service)),
+    service.serviceid,
+  ];
+  return parts.join(" - ");
 }
 
 export const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
