@@ -14,28 +14,37 @@ import type { HisServicePriceLevel } from "@/api/hisServicesApi";
 import { formatCurrency } from "@/lib/utils";
 
 // Các loại bảo hiểm — mỗi loại là một mức giá của dịch vụ. Chuỗi `insurancetype`
-// của dịch vụ (vd "BHYT/DV") suy ra từ chính các mức giá đã khai.
+// của dịch vụ (vd "BHYT/VIP") suy ra từ chính các mức giá đã khai.
 export const INSURANCE_OPTIONS = [
   { value: "BHYT", label: "BHYT" },
   { value: "KT", label: "Khám thường" },
-  { value: "DV", label: "Dịch vụ (DV)" },
+  { value: "VIP", label: "Khám VIP" },
 ] as const;
 
 /** Loại chọn sẵn cho mức giá đầu tiên khi tạo dịch vụ mới. */
-const DEFAULT_PRICE_LEVEL_CODE = "DV";
+const DEFAULT_PRICE_LEVEL_CODE = "VIP";
+
+// Mã cũ đã đổi tên nhưng dữ liệu cũ trong DB vẫn còn lưu mã trước đó — quy về mã hiện hành
+// để dịch vụ cũ vẫn hiển thị/sửa được bình thường.
+const LEGACY_CODE_ALIASES: Record<string, string> = { DV: "VIP" };
+
+function normalizeInsuranceCode(code: string): string {
+  return LEGACY_CODE_ALIASES[code] ?? code;
+}
 
 function insuranceLabel(code: string): string {
-  return INSURANCE_OPTIONS.find((option) => option.value === code)?.label ?? code;
+  const normalized = normalizeInsuranceCode(code);
+  return INSURANCE_OPTIONS.find((option) => option.value === normalized)?.label ?? code;
 }
 
 function isKnownInsuranceCode(code: string): boolean {
-  return INSURANCE_OPTIONS.some((option) => option.value === code);
+  return INSURANCE_OPTIONS.some((option) => option.value === normalizeInsuranceCode(code));
 }
 
 /** Một dòng mức giá trong form; `id` chỉ dùng làm key React. */
 export type PriceLevelInput = {
   id: string;
-  /** Mã loại bảo hiểm: BHYT | KT | DV. */
+  /** Mã loại bảo hiểm: BHYT | KT | VIP. */
   code: string;
   price: string;
   status: "ACTIVE" | "INACTIVE";
@@ -70,10 +79,14 @@ export function mapPriceLevelsToForm(
   if (known.length > 0) {
     const sorted = [...known].sort((a, b) => Number(b.is_default) - Number(a.is_default));
     return sorted.map((level) =>
-      createPriceLevelRow(level.code, String(level.price), level.status === "INACTIVE" ? "INACTIVE" : "ACTIVE")
+      createPriceLevelRow(
+        normalizeInsuranceCode(level.code),
+        String(level.price),
+        level.status === "INACTIVE" ? "INACTIVE" : "ACTIVE"
+      )
     );
   }
-  const legacyCodes = fallbackInsuranceTypes.filter(isKnownInsuranceCode);
+  const legacyCodes = fallbackInsuranceTypes.filter(isKnownInsuranceCode).map(normalizeInsuranceCode);
   if (legacyCodes.length > 0) {
     return legacyCodes.map((code) => createPriceLevelRow(code, fallbackPrice));
   }
@@ -96,7 +109,7 @@ export function serializePriceLevels(rows: PriceLevelInput[]): HisServicePriceLe
   }));
 }
 
-/** Chuỗi `insurancetype` ("BHYT/DV") suy ra từ các mức giá đang Hoạt động. */
+/** Chuỗi `insurancetype` ("BHYT/VIP") suy ra từ các mức giá đang Hoạt động. */
 export function getInsuranceTypes(rows: PriceLevelInput[]): string {
   return Array.from(
     new Set(
@@ -119,7 +132,7 @@ export type ServiceFormValues = {
   service_id: string;
   service_name: string;
   service_type: string;
-  /** Mỗi loại bảo hiểm (BHYT/KT/DV) là một mức giá; `insurancetype` suy ra từ đây. */
+  /** Mỗi loại bảo hiểm (BHYT/KT/VIP) là một mức giá; `insurancetype` suy ra từ đây. */
   price_levels: PriceLevelInput[];
   exam_area_id: string;
   specialty_id: string;
@@ -148,7 +161,7 @@ export function createInitialServiceForm(): ServiceFormValues {
   };
 }
 
-// Tách chuỗi "BHYT/KT/DV" thành mảng mã loại bảo hiểm.
+// Tách chuỗi "BHYT/KT/VIP" thành mảng mã loại bảo hiểm.
 export function parseInsuranceTypes(value: string | null | undefined): string[] {
   if (!value) return [];
   return value
@@ -278,7 +291,7 @@ export function ServiceForm({
               onChange={(e) => setForm((p) => ({ ...p, service_name: e.target.value }))}
               placeholder="VD: Khám bệnh chăm sóc tích cực"
             />
-            {/* Bảng giá: một mã dịch vụ có thể có nhiều mức giá theo loại bảo hiểm (BHYT/KT/DV). */}
+            {/* Bảng giá: một mã dịch vụ có thể có nhiều mức giá theo loại bảo hiểm (BHYT/KT/VIP). */}
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <label className="block text-sm font-medium text-foreground">

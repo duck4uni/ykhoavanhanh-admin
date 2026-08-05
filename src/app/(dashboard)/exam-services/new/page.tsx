@@ -62,7 +62,7 @@ export default function NewExamServicePage() {
   return (
     <ServiceForm
       title="Thêm dịch vụ khám"
-      subtitle="Tạo mới dịch vụ khám và khai mức giá theo từng loại bảo hiểm (BHYT, Khám thường, DV) cho cùng một mã dịch vụ."
+      subtitle="Tạo mới dịch vụ khám và khai mức giá theo từng loại bảo hiểm (BHYT, Khám thường, Khám VIP) cho cùng một mã dịch vụ."
       submitLabel="Tạo dịch vụ"
       initialForm={createInitialServiceForm()}
       isSubmitting={createMutation.isPending}
