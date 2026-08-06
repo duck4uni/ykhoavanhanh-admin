@@ -27,8 +27,9 @@ variables:
     when:
       - runner_system_failure
       - stuck_or_timeout_failure
-  rules:
-    - if: '$CI_COMMIT_REF_NAME == "release/prod"'
+  only:
+    refs:
+      - release/prod
 
 source:
   stage: source
