@@ -10,22 +10,20 @@
 # ==========================================
 
 services:
-   app:
+  app:
     container_name: ${ENVIRONMENT_NAME}-${PROJECT_NAME}
     image: ${APP_IMAGE}
     restart: unless-stopped
-    volumes:
-      - ${MOUNT_DATA_FOLDER}/${PROJECT_NAME}/storage:/usr/src/app/storage
     env_file:
       - ${ENV_FILE}
     environment:
-      - NODE_ENV=staging
+      - NODE_ENV=production
     ports:
       - "${PORT_APP}:3000"
     networks:
-      - meu-solutions-staging
+      - app-network
 
 networks:
-  meu-solutions-staging:
+  app-network:
     external: true
-    name: meu-solutions-staging
+    name: ${DOCKER_NETWORK}
