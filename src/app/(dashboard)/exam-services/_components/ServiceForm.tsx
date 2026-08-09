@@ -17,7 +17,7 @@ import { formatCurrency } from "@/lib/utils";
 // của dịch vụ (vd "BHYT/VIP") suy ra từ chính các mức giá đã khai.
 export const INSURANCE_OPTIONS = [
   { value: "BHYT", label: "BHYT" },
-  { value: "KT", label: "Khám thường" },
+  { value: "DV", label: "Dịch vụ" },
   { value: "VIP", label: "Khám VIP" },
 ] as const;
 
@@ -26,7 +26,7 @@ const DEFAULT_PRICE_LEVEL_CODE = "VIP";
 
 // Mã cũ đã đổi tên nhưng dữ liệu cũ trong DB vẫn còn lưu mã trước đó — quy về mã hiện hành
 // để dịch vụ cũ vẫn hiển thị/sửa được bình thường.
-const LEGACY_CODE_ALIASES: Record<string, string> = { DV: "VIP" };
+const LEGACY_CODE_ALIASES: Record<string, string> = { KT: "DV" };
 
 function normalizeInsuranceCode(code: string): string {
   return LEGACY_CODE_ALIASES[code] ?? code;
@@ -44,7 +44,7 @@ function isKnownInsuranceCode(code: string): boolean {
 /** Một dòng mức giá trong form; `id` chỉ dùng làm key React. */
 export type PriceLevelInput = {
   id: string;
-  /** Mã loại bảo hiểm: BHYT | KT | VIP. */
+  /** Mã loại bảo hiểm: BHYT | DV | VIP. */
   code: string;
   price: string;
   status: "ACTIVE" | "INACTIVE";

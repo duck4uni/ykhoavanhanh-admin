@@ -112,7 +112,7 @@ export default function EditExamServicePage({
       // giữ nguyên state cũ khi điều hướng giữa các trang sửa dịch vụ khác nhau.
       key={serviceId}
       title="Chỉnh sửa dịch vụ khám"
-      subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, Khám thường, Khám VIP)."
+      subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, Dịch vụ, Khám VIP)."
       submitLabel="Lưu thay đổi"
       initialForm={mapServiceToForm(service)}
       isSubmitting={updateMutation.isPending}
