@@ -1,7 +1,14 @@
 import { Info } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PaginatedCombobox } from "./PaginatedCombobox";
-import { formatServiceOptionLabel, scopeControlClass, type ScopeRow } from "../types";
+import {
+  activePriceLevels,
+  defaultServicePrice,
+  formatFee,
+  formatInsuranceTypesLabel,
+  scopeControlClass,
+  type ScopeRow,
+} from "../types";
 import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Field dạng label-trái / input-phải cho modal phạm vi. */
@@ -46,7 +53,31 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
     serviceOptionLabel,
     rememberLabel,
     onDraftServiceChange,
+    onDraftPriceLevelChange,
+    onDraftServiceOptionChange,
   } = ctrl;
+
+  const selectedService = scopeDraft.service_id
+    ? draftServiceOptions.find((s) => s.id === scopeDraft.service_id)
+    : undefined;
+  const priceLevels = selectedService ? activePriceLevels(selectedService) : [];
+  // Mỗi mức giá (loại bảo hiểm) của dịch vụ là một dòng riêng trong dropdown chọn dịch vụ.
+  const serviceOptionRows = draftServiceOptions.flatMap((service) => {
+    const levels = activePriceLevels(service);
+    const rows =
+      levels.length > 0
+        ? levels
+        : [{ code: "", label: formatInsuranceTypesLabel(service), price: defaultServicePrice(service), status: "ACTIVE" as const, is_default: true }];
+    return rows.map((level) => ({
+      value: `${service.id}|||${level.price}`,
+      label: `${level.label || "—"} - ${formatFee(level.price)} - (${service.serviceid})`,
+    }));
+  });
+  const currentLevel = priceLevels.find((level) => level.price === scopeDraft.fee);
+  // Nhãn dịch vụ đã chọn phản ánh mức giá hiện tại, không phải giá mặc định của dịch vụ.
+  const selectedServiceLabel = selectedService
+    ? `${currentLevel?.label || "—"} - ${formatFee(scopeDraft.fee)} - (${selectedService.serviceid})`
+    : undefined;
 
   return (
     <Modal
@@ -131,17 +162,18 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             onChange={(value) => {
               const item = specialtyPicker.rows.find((s) => s.id === value);
               rememberLabel(value, item?.name ?? "");
-              setScopeDraft((p) => ({ ...p, specialty_id: value, service_id: "" }));
+              // Giữ nguyên dịch vụ đã chọn: dịch vụ dùng chung cho mọi chuyên khoa.
+              setScopeDraft((p) => ({ ...p, specialty_id: value }));
             }}
-            onClear={() => setScopeDraft((p) => ({ ...p, specialty_id: "", service_id: "" }))}
+            onClear={() => setScopeDraft((p) => ({ ...p, specialty_id: "" }))}
           />
         </ScopeField>
 
         <ScopeField label="Dịch vụ khám" required>
           <PaginatedCombobox
-            value={scopeDraft.service_id}
-            selectedLabel={scopeDraft.service_id ? serviceOptionLabel(scopeDraft.service_id) : undefined}
-            options={draftServiceOptions.map((s) => ({ value: s.id, label: formatServiceOptionLabel(s) }))}
+            value={scopeDraft.service_id ? `${scopeDraft.service_id}|||${scopeDraft.fee}` : ""}
+            selectedLabel={scopeDraft.service_id ? selectedServiceLabel ?? serviceOptionLabel(scopeDraft.service_id) : undefined}
+            options={serviceOptionRows}
             search={servicePicker.search}
             isLoading={servicePicker.isFetching}
             hasMore={servicePicker.hasMore}
@@ -150,13 +182,30 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             onSearchChange={servicePicker.setSearch}
             onLoadMore={servicePicker.loadMore}
             onChange={(value) => {
-              const item = draftServiceOptions.find((s) => s.id === value);
-              rememberLabel(value, item?.servicename ?? "");
-              onDraftServiceChange(value);
+              const [serviceId, priceStr] = value.split("|||");
+              const item = draftServiceOptions.find((s) => s.id === serviceId);
+              rememberLabel(serviceId, item?.servicename ?? "");
+              onDraftServiceOptionChange(serviceId, Number(priceStr));
             }}
             onClear={() => onDraftServiceChange("")}
           />
         </ScopeField>
+
+        {priceLevels.length > 0 && (
+          <ScopeField label="Mức giá" required>
+            <select
+              value={String(scopeDraft.fee)}
+              onChange={(e) => onDraftPriceLevelChange(Number(e.target.value))}
+              className={scopeControlClass}
+            >
+              {priceLevels.map((level) => (
+                <option key={level.code} value={level.price}>
+                  {level.label} - {formatFee(level.price)}
+                </option>
+              ))}
+            </select>
+          </ScopeField>
+        )}
 
         {/* <ScopeField label="Phí khám (VND)" required>
           <div className="flex h-10 items-center overflow-hidden rounded-lg border border-slate-200 bg-white focus-within:border-primary-500 focus-within:ring-4 focus-within:ring-primary-500/10">

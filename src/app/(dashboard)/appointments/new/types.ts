@@ -122,11 +122,48 @@ export function formatFee(value: number): string {
   return `${value.toLocaleString("vi-VN")}đ`;
 }
 
-/** Nhãn hiển thị dịch vụ khám trong dropdown: loại dịch vụ - loại BH - giá - mã dịch vụ. */
-export function formatServiceOptionLabel(service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid">): string {
+/** Danh sách mức giá còn hoạt động của dịch vụ, mức mặc định (is_default) đứng trước. */
+export function activePriceLevels(
+  service: Pick<HisService, "price_levels">
+): HisService["price_levels"] {
+  return [...(service.price_levels ?? [])]
+    .filter((level) => level.status !== "INACTIVE")
+    .sort((a, b) => Number(b.is_default) - Number(a.is_default));
+}
+
+/** Giá mặc định của dịch vụ: mức is_default, mức active đầu tiên, hoặc price gốc. */
+export function defaultServicePrice(
+  service: Pick<HisService, "price" | "price_levels">
+): number {
+  const [firstLevel] = activePriceLevels(service);
+  if (firstLevel) return firstLevel.price;
   const price = Number(service.price);
-  const priceLabel = Number.isFinite(price) ? formatFee(price) : service.price;
-  return `${service.servicename  || "—"} - ${priceLabel} - (${service.serviceid})`;
+  return Number.isFinite(price) ? price : 0;
+}
+
+/** Danh sách loại bảo hiểm còn hoạt động của dịch vụ, hiển thị dạng "BHYT, Khám thường". */
+export function formatInsuranceTypesLabel(
+  service: Pick<HisService, "insurancetype" | "price_levels">
+): string {
+  const levels = activePriceLevels(service);
+  if (levels.length > 0) return levels.map((level) => level.label).join(", ");
+  return service.insurancetype && service.insurancetype !== "—"
+    ? service.insurancetype.split("/").join(", ")
+    : "";
+}
+
+/** Nhãn hiển thị dịch vụ khám trong dropdown: tên - loại bảo hiểm - giá mặc định - mã dịch vụ. */
+export function formatServiceOptionLabel(
+  service: Pick<HisService, "servicename" | "insurancetype" | "price" | "serviceid" | "price_levels">
+): string {
+  const insuranceLabel = formatInsuranceTypesLabel(service);
+  const parts = [
+    service.servicename || "—",
+    ...(insuranceLabel ? [insuranceLabel] : []),
+    formatFee(defaultServicePrice(service)),
+    service.serviceid,
+  ];
+  return parts.join(" - ");
 }
 
 export const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];

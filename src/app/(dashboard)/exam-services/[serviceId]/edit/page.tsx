@@ -10,7 +10,10 @@ import { toast } from "@/components/ui/Toast";
 import { LoadingSection } from "@/components/ui/Spinner";
 import {
   ServiceForm,
+  getInsuranceTypes,
+  mapPriceLevelsToForm,
   parseInsuranceTypes,
+  serializePriceLevels,
   type ServiceFormValues,
 } from "../../_components/ServiceForm";
 
@@ -19,9 +22,11 @@ function mapServiceToForm(service: HisService): ServiceFormValues {
     service_id: service.serviceid ?? "",
     service_name: service.servicename === "—" ? "" : service.servicename ?? "",
     service_type: service.servicetype === "—" ? "" : service.servicetype ?? "",
-    price: service.price ? String(service.price) : "",
-    insurance_types: parseInsuranceTypes(
-      service.insurancetype === "—" ? "" : service.insurancetype
+    // Dịch vụ cũ (chỉ có 1 giá + chuỗi insurancetype) → mỗi loại bảo hiểm một dòng giá.
+    price_levels: mapPriceLevelsToForm(
+      service.price_levels,
+      service.price ? String(service.price) : "",
+      parseInsuranceTypes(service.insurancetype === "—" ? "" : service.insurancetype)
     ),
     exam_area_id: service.exam_area_id ?? "",
     specialty_id: service.specialty_id ?? "",
@@ -54,20 +59,23 @@ export default function EditExamServicePage({
 
   function handleSubmit(form: ServiceFormValues) {
     // PUT /his-services/{id}: service_id, service_name, price, specialty_id,
-    // exam_area_id là cột thật; field lạ (servicetype/insurancetype/description)
-    // được backend merge vào raw_data (giữ key cũ, đè key trùng).
+    // exam_area_id là cột thật; field lạ (servicetype/insurancetype/description/
+    // price_levels) được backend merge vào raw_data (giữ key cũ, đè key trùng).
+    // exam_area_id/specialty_id để trống → gửi null để gỡ ràng buộc cũ.
     const payload: UpdateHisServicePayload = {
       service_name: form.service_name.trim(),
-      price: form.price.trim() ? Number(form.price) : undefined,
-      exam_area_id: form.exam_area_id || undefined,
-      specialty_id: form.specialty_id || undefined,
+      // Không gửi `price` khi cập nhật — chỉ cập nhật price_levels, tránh đè
+      // sai cột price ở BE khi sửa dịch vụ.
+      price_levels: serializePriceLevels(form.price_levels),
+      exam_area_id: form.exam_area_id || null,
+      specialty_id: form.specialty_id || null,
       booking_note: form.booking_note.trim() || null,
       display_group: form.display_group.trim() ? Number(form.display_group) : null,
       display_priority: form.display_priority.trim() ? Number(form.display_priority) : null,
       room_visit_instruction: form.room_visit_instruction.trim() || null,
       detail: form.detail.trim() || null,
       servicetype: form.service_type.trim() || undefined,
-      insurancetype: form.insurance_types.join("/") || undefined,
+      insurancetype: getInsuranceTypes(form.price_levels) || undefined,
       description: form.description.trim() || undefined,
     };
 
@@ -100,8 +108,11 @@ export default function EditExamServicePage({
 
   return (
     <ServiceForm
+      // Remount khi đổi dịch vụ để nạp lại dữ liệu mới, tránh việc ServiceForm
+      // giữ nguyên state cũ khi điều hướng giữa các trang sửa dịch vụ khác nhau.
+      key={serviceId}
       title="Chỉnh sửa dịch vụ khám"
-      subtitle="Cập nhật thông tin dịch vụ khám, giá, loại bảo hiểm và chuyên khoa."
+      subtitle="Cập nhật thông tin dịch vụ khám và mức giá theo từng loại bảo hiểm (BHYT, Dịch vụ, Khám VIP)."
       submitLabel="Lưu thay đổi"
       initialForm={mapServiceToForm(service)}
       isSubmitting={updateMutation.isPending}
