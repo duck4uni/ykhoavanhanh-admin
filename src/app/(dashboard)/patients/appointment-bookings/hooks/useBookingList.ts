@@ -14,7 +14,7 @@ export function useBookingList() {
       currentPage: page,
       pageSize,
       sortField: "appointment_time",
-      sortOrder: "DESC",
+      sortOrder: "ASC",
       ...pruneEmptyFilters(filters),
     }),
     [filters, page, pageSize],
@@ -22,7 +22,14 @@ export function useBookingList() {
 
   const { data, isLoading } = appointmentBookingsHooks.useList(params);
 
-  const bookings = useMemo(() => data?.rows ?? [], [data]);
+  const bookings = useMemo(() => {
+    const rows = data?.rows ?? [];
+    return [...rows].sort((a, b) => {
+      const aKey = `${a.appointment_date ?? ""}T${a.appointment_time ?? ""}`;
+      const bKey = `${b.appointment_date ?? ""}T${b.appointment_time ?? ""}`;
+      return bKey.localeCompare(aKey);
+    });
+  }, [data]);
   const total = data?.count ?? 0;
   const totalPages = data?.totalPages ?? 1;
   const currentPage = data?.currentPage ?? page;
