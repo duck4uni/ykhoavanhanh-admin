@@ -14,7 +14,6 @@ export function useExamServiceList() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
   const [insuranceFilter, setInsuranceFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -52,12 +51,13 @@ export function useExamServiceList() {
     }
     if (statusFilter === "active") parts.push("status==ACTIVE");
     else if (statusFilter === "inactive") parts.push("status==INACTIVE");
+    if (insuranceFilter !== "all") parts.push(`raw_data.insurancetype@=${insuranceFilter}`);
     return parts.length > 0 ? parts.join(",") : undefined;
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, insuranceFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, insuranceFilter]);
 
   const { data, isLoading } = hisServicesHooks.usePaginatedList({
     currentPage,
@@ -73,13 +73,11 @@ export function useExamServiceList() {
   const filteredServices = useMemo(() => {
     return services.filter((service) => {
       const matchType = serviceTypeFilter === "all" || service.servicetype === serviceTypeFilter;
-      const matchInsurance = insuranceFilter === "all" || (insuranceFilter === "yes" ? supportsInsurance(service) : !supportsInsurance(service));
       const isActive = service.status !== "INACTIVE";
       const matchStatus = statusFilter === "all" || (statusFilter === "active" ? isActive : !isActive);
-      const matchDate = !fromDate || service.updatetime.startsWith(fromDate) || service.fromdate.startsWith(fromDate);
-      return matchType && matchInsurance && matchStatus && matchDate;
+      return matchType && matchStatus;
     });
-  }, [services, serviceTypeFilter, insuranceFilter, statusFilter, fromDate]);
+  }, [services, serviceTypeFilter, statusFilter]);
 
   const serviceTypes = useMemo(() => Array.from(new Set(services.map((s) => s.servicetype).filter(Boolean))).sort(), [services]);
 
@@ -100,7 +98,6 @@ export function useExamServiceList() {
     setServiceTypeFilter("all");
     setInsuranceFilter("all");
     setStatusFilter("all");
-    setFromDate("");
     setCurrentPage(1);
   }
 
@@ -141,8 +138,6 @@ export function useExamServiceList() {
     setInsuranceFilter,
     statusFilter,
     setStatusFilter,
-    fromDate,
-    setFromDate,
     resetFilters,
     // stats
     stats: { total, activeCount, insuranceCount, updatedThisMonth, activePct, insurancePct },
