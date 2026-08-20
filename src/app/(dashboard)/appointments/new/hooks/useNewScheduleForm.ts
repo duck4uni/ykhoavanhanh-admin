@@ -13,6 +13,7 @@ import { formatApiViolations } from "@/lib/utils";
 import { toast } from "@/components/ui/Toast";
 import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
+import { buildServiceSearchFilter } from "./serviceSearchFilter";
 import {
   addMinutes,
   buildSchedulePayload,
@@ -156,7 +157,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     currentPage: servicePicker.page,
     pageSize: 10,
     filters: [
-      servicePicker.debouncedSearch.trim() ? `service_name@=${servicePicker.debouncedSearch.trim()}` : "",
+      buildServiceSearchFilter(servicePicker.debouncedSearch),
       "status==ACTIVE",
     ]
       .filter(Boolean)

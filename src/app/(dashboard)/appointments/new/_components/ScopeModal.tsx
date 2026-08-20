@@ -1,6 +1,7 @@
 import { Info } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { PaginatedCombobox } from "./PaginatedCombobox";
+import { formatServicePriceLevelOptionLabel } from "./servicePriceLevelLabel";
 import {
   activePriceLevels,
   defaultServicePrice,
@@ -70,13 +71,16 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
         : [{ code: "", label: formatInsuranceTypesLabel(service), price: defaultServicePrice(service), status: "ACTIVE" as const, is_default: true }];
     return rows.map((level) => ({
       value: `${service.id}|||${level.price}`,
-      label: `${level.label || "—"} - ${formatFee(level.price)} - (${service.serviceid})`,
+      label: formatServicePriceLevelOptionLabel(service, level),
     }));
   });
   const currentLevel = priceLevels.find((level) => level.price === scopeDraft.fee);
   // Nhãn dịch vụ đã chọn phản ánh mức giá hiện tại, không phải giá mặc định của dịch vụ.
   const selectedServiceLabel = selectedService
-    ? `${currentLevel?.label || "—"} - ${formatFee(scopeDraft.fee)} - (${selectedService.serviceid})`
+    ? formatServicePriceLevelOptionLabel(selectedService, {
+        label: currentLevel?.label,
+        price: scopeDraft.fee,
+      })
     : undefined;
 
   return (
