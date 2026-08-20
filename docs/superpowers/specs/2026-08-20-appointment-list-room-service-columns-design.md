@@ -19,6 +19,8 @@ This room fallback allows the current payload to display its UUID immediately an
 
 Deduplicate labels while preserving scope order. Show the first label in the table; when additional unique values exist, append `+N`. Set the cell title to the complete comma-separated list so users can inspect every value without widening the table.
 
+Use explicit minimum widths to prevent narrow columns from wrapping excessively: doctor `180px`, exam area `160px`, room `240px`, service `220px`, date `260px`, time `150px`, shift `100px`, and capacity `180px`. Preserve horizontal scrolling on smaller viewports and keep long room IDs truncated inside the room column.
+
 ## Tests
 
 Add pure helper tests for service extraction, room-name priority, room-ID fallback, deduplication, summary formatting, and missing data. Run focused tests and the repository type check.
