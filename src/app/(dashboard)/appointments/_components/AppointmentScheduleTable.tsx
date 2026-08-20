@@ -12,6 +12,7 @@ import {
   getScheduleTimeText,
 } from "../types";
 import { SlotBar } from "./ScheduleBadges";
+import { getScheduleScopeLabels, summarizeScopeLabels } from "./scheduleScopeLabels";
 
 interface AppointmentScheduleTableProps {
   rows: DoctorWorkSchedule[];
@@ -55,6 +56,8 @@ export function AppointmentScheduleTable({
                   <th className="px-6 py-3.5">STT</th>
                   <th className="px-6 py-3.5">Bác sĩ</th>
                   <th className="px-6 py-3.5">Khu khám</th>
+                  <th className="px-6 py-3.5">Phòng khám</th>
+                  <th className="px-6 py-3.5">Dịch vụ khám</th>
                   <th className="px-6 py-3.5">Ngày khám</th>
                   <th className="px-6 py-3.5">Giờ khám</th>
                   <th className="px-6 py-3.5">Ca</th>
@@ -66,7 +69,7 @@ export function AppointmentScheduleTable({
               <tbody className="divide-y divide-slate-100">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={11} className="px-6 py-12 text-center text-sm text-muted-foreground">
                       Không tìm thấy lịch khám phù hợp.
                     </td>
                   </tr>
@@ -74,11 +77,20 @@ export function AppointmentScheduleTable({
                   rows.map((item, index) => {
                     const capacity = getScheduleCapacity(item);
                     const shiftCode = getScheduleShiftCode(item);
+                    const { roomLabels, serviceLabels } = getScheduleScopeLabels(item.raw_data, item.room_id);
+                    const roomSummary = summarizeScopeLabels(roomLabels);
+                    const serviceSummary = summarizeScopeLabels(serviceLabels);
                     return (
                     <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
                       <td className="px-6 py-4 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
                       <td className="px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
                       <td className="px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
+                      <td className="max-w-48 px-6 py-4 text-slate-600" title={roomSummary.title}>
+                        <span className="block truncate">{roomSummary.text}</span>
+                      </td>
+                      <td className="max-w-48 px-6 py-4 text-slate-600" title={serviceSummary.title}>
+                        <span className="block truncate">{serviceSummary.text}</span>
+                      </td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
                       <td className="px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
                       <td className="px-6 py-4 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
