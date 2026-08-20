@@ -14,6 +14,8 @@ import { toast } from "@/components/ui/Toast";
 import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
 import { buildServiceSearchFilter } from "./serviceSearchFilter";
+import { reconcileSelectedDates, toggleSpecificDate, toggleWeekdayDates } from "../slotDateSelection";
+import { reconcileDateOverrides, setDateSlotLimit } from "../dateSlotOverrides";
 import {
   addMinutes,
   buildSchedulePayload,
@@ -62,13 +64,21 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // Chỉ loại ngày không còn hợp lệ khi người dùng đã chọn đủ một khoảng ngày hợp lệ.
   useEffect(() => {
     if (!dateRangeValid) return;
+    const validDates = availableWeekdays.flatMap((weekday) => datesByWeekday[weekday]);
     setTimeSlots((current) =>
-      current.map((slot) => ({
-        ...slot,
-        weekdays: slot.weekdays.filter((weekday) => availableWeekdays.includes(weekday)),
-      }))
+      current.map((slot) => {
+        const dates = reconcileSelectedDates(slot.dates, validDates);
+        return {
+          ...slot,
+          dates,
+          date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+          weekdays: slot.weekdays.filter(
+            (weekday) => availableWeekdays.includes(weekday) && datesByWeekday[weekday].some((date) => dates.includes(date))
+          ),
+        };
+      })
     );
-  }, [availableWeekdays, dateRangeValid]);
+  }, [availableWeekdays, dateRangeValid, datesByWeekday]);
 
   // ── Danh mục cho thẻ đếm năng lực (đếm tổng, chỉ cần count) ──
   const { data: specialtyCountData } = specialtiesHooks.useList({ currentPage: 1, pageSize: 1 });
@@ -354,13 +364,20 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       const start = prev[prev.length - 1]?.end ?? "08:00";
       return [
         ...prev,
-        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, weekdays: [], scopeMode: "all", scope_ids: [] },
+        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, weekdays: [], dates: [], date_overrides: [], scopeMode: "all", scope_ids: [] },
       ];
     });
   }
 
   function updateSlot(id: string, patch: Partial<TimeSlotRow>) {
-    setTimeSlots((prev) => prev.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== id) return slot;
+      const next = { ...slot, ...patch };
+      return {
+        ...next,
+        date_overrides: reconcileDateOverrides(next.date_overrides, next.dates, next.slot_limit),
+      };
+    }));
   }
 
   function removeSlot(id: string) {
@@ -388,11 +405,14 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       prev.map((slot) => {
         if (slot.id !== slotId) return slot;
         const exists = slot.weekdays.includes(weekday);
+        const dates = toggleWeekdayDates(slot.dates, datesByWeekday[weekday], !exists);
         return {
           ...slot,
           weekdays: exists
             ? slot.weekdays.filter((day) => day !== weekday)
             : sortWeekdays([...slot.weekdays, weekday]),
+          dates,
+          date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
         };
       })
     );
@@ -402,7 +422,44 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     const validWeekdays = dateRangeValid
       ? weekdays.filter((weekday) => availableWeekdays.includes(weekday))
       : [];
-    setTimeSlots((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, weekdays: validWeekdays } : slot)));
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      let dates = slot.dates;
+      availableWeekdays.forEach((weekday) => {
+        const wasSelected = slot.weekdays.includes(weekday);
+        const shouldSelect = validWeekdays.includes(weekday);
+        if (wasSelected !== shouldSelect) dates = toggleWeekdayDates(dates, datesByWeekday[weekday], shouldSelect);
+      });
+      return {
+        ...slot,
+        weekdays: sortWeekdays(validWeekdays),
+        dates,
+        date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+      };
+    }));
+  }
+
+  function toggleSlotDate(slotId: string, weekday: number, date: string) {
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      const dates = toggleSpecificDate(slot.dates, date);
+      const hasWeekdayDates = datesByWeekday[weekday].some((item) => dates.includes(item));
+      return {
+        ...slot,
+        dates,
+        date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+        weekdays: hasWeekdayDates
+          ? sortWeekdays(Array.from(new Set([...slot.weekdays, weekday])))
+          : slot.weekdays.filter((item) => item !== weekday),
+      };
+    }));
+  }
+
+  function setSlotDateLimit(slotId: string, date: string, limit: number) {
+    if (!Number.isInteger(limit) || limit <= 0) return;
+    setTimeSlots((prev) => prev.map((slot) => slot.id === slotId
+      ? { ...slot, date_overrides: setDateSlotLimit(slot.date_overrides, date, limit, slot.slot_limit) }
+      : slot));
   }
 
   // ── Modal state: tự sinh khung giờ ──
@@ -429,6 +486,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
         end: clamped,
         slot_limit: autoGen.slotLimit,
         weekdays: [],
+        dates: [],
+        date_overrides: [],
         scopeMode: "all",
         scope_ids: [],
       });
@@ -449,8 +508,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     [timeSlots]
   );
   const selectedConcreteDates = useMemo(
-    () => Array.from(new Set(selectedWeekdays.flatMap((weekday) => datesByWeekday[weekday]))).sort(),
-    [datesByWeekday, selectedWeekdays]
+    () => Array.from(new Set(timeSlots.flatMap((slot) => slot.dates))).sort(),
+    [timeSlots]
   );
 
   // ── Cảnh báo cấu hình ──
@@ -463,6 +522,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     if (scopes.length === 0) list.push("Chưa có phạm vi khám");
     if (timeSlots.length === 0) list.push("Chưa có khung giờ làm việc");
     if (timeSlots.some((s) => s.weekdays.length === 0)) list.push("Có khung giờ chưa chọn ngày áp dụng");
+    if (timeSlots.some((s) => s.dates.length === 0)) list.push("Có khung giờ chưa chọn ngày cụ thể");
     if (timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)))
       list.push("Có khung giờ chứa thứ không thuộc khoảng ngày");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
@@ -481,6 +541,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     scopes.length > 0 &&
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
+    !timeSlots.some((s) => s.dates.length === 0) &&
     !timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)) &&
     !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0) &&
     !timeSlots.some((s) => s.start && s.end && s.start >= s.end);
@@ -583,6 +644,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     removeSlot,
     toggleSlotScope,
     toggleSlotWeekday,
+    toggleSlotDate,
+    setSlotDateLimit,
     setSlotWeekdays,
     // auto-gen modal
     autoGenOpen,

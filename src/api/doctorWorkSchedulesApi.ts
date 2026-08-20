@@ -98,6 +98,8 @@ export type WorkScheduleTimeSlotV2 = {
   end_time: string;
   slot_limit: number;
   weekday?: number;
+  dates: string[];
+  date_overrides?: Array<{ date: string; slot_limit: number }>;
   scope_ids: "all" | string[];
 };
 
@@ -135,6 +137,9 @@ export type DoctorWorkScheduleTimeSlotV2 = {
   end_time: string;
   slot_limit: number;
   weekday: number;
+  /** Các ngày cụ thể áp dụng, format YYYY-MM-DD. Thiếu field = toàn bộ ngày khớp weekday (legacy). */
+  dates?: string[];
+  date_overrides?: Array<{ date: string; slot_limit: number }>;
   /** Detail trả persisted scope IDs; một số phiên bản có thể trả "all". */
   scope_ids: "all" | string[];
 };

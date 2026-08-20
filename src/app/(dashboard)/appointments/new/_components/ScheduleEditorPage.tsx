@@ -46,7 +46,7 @@ export function ScheduleEditorPage({ mode, scheduleId }: { mode: ScheduleEditorM
         </div>
       </div>
 
-      <form onSubmit={ctrl.handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+      <form onSubmit={ctrl.handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <ScheduleInfoSection ctrl={ctrl} />
           <ScopeSection ctrl={ctrl} />

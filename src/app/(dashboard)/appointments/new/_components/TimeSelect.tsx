@@ -21,14 +21,14 @@ export function TimeSelect({ value, onChange, className }: TimeSelectProps) {
   const { hour, minute } = parseTime(value);
   const selectClass =
     className ??
-    "h-10 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10";
+    "h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10";
 
   function emit(nextHour: number, nextMinute: number) {
     onChange(`${pad(nextHour)}:${pad(nextMinute)}`);
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-1.5">
       <select
         value={value ? hour : ""}
         onChange={(e) => emit(Number(e.target.value), minute)}

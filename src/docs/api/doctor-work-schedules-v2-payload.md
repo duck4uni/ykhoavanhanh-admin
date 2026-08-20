@@ -300,6 +300,8 @@ const scopeIdMap = new Map<string, string>();
 | `end_time` | string | Có | Giờ kết thúc, format `HH:mm` |
 | `slot_limit` | number | Có | Số slot của khung giờ |
 | `weekday` | number | Có | Thứ áp dụng, `0 = Chủ nhật`, `1 = Thứ 2`, ..., `6 = Thứ 7` |
+| `dates` | string[] | Có | Các ngày cụ thể áp dụng, format `YYYY-MM-DD`; mỗi ngày phải thuộc `weekday` và nằm trong khoảng root `start_date` → `end_date` |
+| `date_overrides` | array | Không | Chỉ gửi ngày có số phiếu khác `slot_limit`, dạng `{ date: YYYY-MM-DD, slot_limit: number }` |
 | `scope_ids` | `"all"` hoặc `string[]` | Có | Áp dụng cho tất cả phạm vi hoặc một số scope theo `client_id` |
 
 ---
@@ -346,6 +348,11 @@ specialty_id + area_id + room_id + service_id
 - `start_time < end_time`.
 - `slot_limit` là số nguyên dương, `slot_limit > 0`.
 - `weekday` bắt buộc và phải thuộc `0,1,2,3,4,5,6`.
+- `dates` bắt buộc, là mảng `YYYY-MM-DD` không rỗng.
+- Mỗi phần tử `dates[]` phải nằm trong khoảng `start_date` → `end_date` và có thứ trùng với `weekday` của time slot.
+- Detail GET cần trả lại nguyên `dates[]`; với dữ liệu legacy chưa có field này, FE sẽ fallback sang toàn bộ ngày khớp `weekday`.
+- `date_overrides` nếu có phải là mảng không trùng `date`; mỗi `date` phải nằm trong `dates[]` và mỗi `slot_limit` phải là số nguyên dương.
+- Detail GET cần trả lại `date_overrides`; thiếu field này được hiểu là mọi ngày dùng `slot_limit` chung.
 - `scope_ids` phải là:
   - chuỗi `"all"`; hoặc
   - mảng string chứa các `scopes[].client_id` hợp lệ.
