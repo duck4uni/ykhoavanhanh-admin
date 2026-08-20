@@ -54,14 +54,14 @@ export function AppointmentScheduleTable({
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                   <th className="px-6 py-3.5">STT</th>
-                  <th className="px-6 py-3.5">Bác sĩ</th>
-                  <th className="px-6 py-3.5">Khu khám</th>
-                  <th className="px-6 py-3.5">Phòng khám</th>
-                  <th className="px-6 py-3.5">Dịch vụ khám</th>
-                  <th className="px-6 py-3.5">Ngày khám</th>
-                  <th className="px-6 py-3.5">Giờ khám</th>
-                  <th className="px-6 py-3.5">Ca</th>
-                  <th className="px-6 py-3.5">Số phiếu khám</th>
+                  <th className="min-w-[180px] px-6 py-3.5">Bác sĩ</th>
+                  <th className="min-w-[160px] px-6 py-3.5">Khu khám</th>
+                  <th className="min-w-[240px] px-6 py-3.5">Phòng khám</th>
+                  <th className="min-w-[220px] px-6 py-3.5">Dịch vụ khám</th>
+                  <th className="min-w-[260px] px-6 py-3.5">Ngày khám</th>
+                  <th className="min-w-[150px] px-6 py-3.5">Giờ khám</th>
+                  <th className="min-w-[100px] px-6 py-3.5">Ca</th>
+                  <th className="min-w-[180px] px-6 py-3.5">Số phiếu khám</th>
                   <th className="px-6 py-3.5">Trạng thái</th>
                   <th className="px-6 py-3.5 text-right">Thao tác</th>
                 </tr>
@@ -83,18 +83,18 @@ export function AppointmentScheduleTable({
                     return (
                     <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
                       <td className="px-6 py-4 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
-                      <td className="px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
-                      <td className="max-w-48 px-6 py-4 text-slate-600" title={roomSummary.title}>
+                      <td className="min-w-[180px] px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
+                      <td className="min-w-[160px] px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
+                      <td className="min-w-[240px] max-w-[240px] px-6 py-4 text-slate-600" title={roomSummary.title}>
                         <span className="block truncate">{roomSummary.text}</span>
                       </td>
-                      <td className="max-w-48 px-6 py-4 text-slate-600" title={serviceSummary.title}>
+                      <td className="min-w-[220px] max-w-[220px] px-6 py-4 text-slate-600" title={serviceSummary.title}>
                         <span className="block truncate">{serviceSummary.text}</span>
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
-                      <td className="px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
-                      <td className="px-6 py-4 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
-                      <td className="px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={capacity} /></td>
+                      <td className="min-w-[260px] whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
+                      <td className="min-w-[150px] whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
+                      <td className="min-w-[100px] px-6 py-4 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
+                      <td className="min-w-[180px] px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={capacity} /></td>
                       <td className="px-6 py-4">
                         <StatusSwitch
                           checked={item.status === "ACTIVE"}
