@@ -70,11 +70,12 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
         ? levels
         : [{ code: "", label: formatInsuranceTypesLabel(service), price: defaultServicePrice(service), status: "ACTIVE" as const, is_default: true }];
     return rows.map((level) => ({
-      value: `${service.id}|||${level.price}`,
+      value: `${service.id}|||${level.code}|||${level.price}`,
       label: formatServicePriceLevelOptionLabel(service, level),
     }));
   });
-  const currentLevel = priceLevels.find((level) => level.price === scopeDraft.fee);
+  const currentLevel = priceLevels.find((level) => level.code === scopeDraft.price_level_code)
+    ?? priceLevels.find((level) => level.price === scopeDraft.fee);
   // Nhãn dịch vụ đã chọn phản ánh mức giá hiện tại, không phải giá mặc định của dịch vụ.
   const selectedServiceLabel = selectedService
     ? formatServicePriceLevelOptionLabel(selectedService, {
@@ -175,7 +176,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
 
         <ScopeField label="Dịch vụ khám" required>
           <PaginatedCombobox
-            value={scopeDraft.service_id ? `${scopeDraft.service_id}|||${scopeDraft.fee}` : ""}
+            value={scopeDraft.service_id ? `${scopeDraft.service_id}|||${scopeDraft.price_level_code}|||${scopeDraft.fee}` : ""}
             selectedLabel={scopeDraft.service_id ? selectedServiceLabel ?? serviceOptionLabel(scopeDraft.service_id) : undefined}
             options={serviceOptionRows}
             search={servicePicker.search}
@@ -186,10 +187,10 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
             onSearchChange={servicePicker.setSearch}
             onLoadMore={servicePicker.loadMore}
             onChange={(value) => {
-              const [serviceId, priceStr] = value.split("|||");
+              const [serviceId, priceLevelCode, priceStr] = value.split("|||");
               const item = draftServiceOptions.find((s) => s.id === serviceId);
               rememberLabel(serviceId, item?.servicename ?? "");
-              onDraftServiceOptionChange(serviceId, Number(priceStr));
+              onDraftServiceOptionChange(serviceId, priceLevelCode, Number(priceStr));
             }}
             onClear={() => onDraftServiceChange("")}
           />
@@ -198,12 +199,12 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
         {priceLevels.length > 0 && (
           <ScopeField label="Mức giá" required>
             <select
-              value={String(scopeDraft.fee)}
-              onChange={(e) => onDraftPriceLevelChange(Number(e.target.value))}
+              value={scopeDraft.price_level_code}
+              onChange={(e) => onDraftPriceLevelChange(e.target.value)}
               className={scopeControlClass}
             >
               {priceLevels.map((level) => (
-                <option key={level.code} value={level.price}>
+                <option key={level.code} value={level.code}>
                   {level.label} - {formatFee(level.price)}
                 </option>
               ))}

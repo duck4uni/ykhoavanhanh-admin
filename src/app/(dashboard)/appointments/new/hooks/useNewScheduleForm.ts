@@ -16,7 +16,9 @@ import { usePickerState } from "./usePickerState";
 import { buildServiceSearchFilter } from "./serviceSearchFilter";
 import { reconcileSelectedDates, toggleSpecificDate, toggleWeekdayDates } from "../slotDateSelection";
 import { reconcileDateOverrides, setDateSlotLimit } from "../dateSlotOverrides";
+import { isDuplicateScope } from "../scopeIdentity";
 import {
+  activePriceLevels,
   addMinutes,
   buildSchedulePayload,
   createId,
@@ -258,8 +260,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     const service = services.find((s) => s.id === id);
     return service ? formatServiceOptionLabel(service) : serviceName(id);
   };
+  const servicePriceLevelLabel = (serviceId: string, priceLevelCode: string) => {
+    const service = services.find((item) => item.id === serviceId);
+    return activePriceLevels(service ?? { price_levels: [] }).find((level) => level.code === priceLevelCode)?.label
+      ?? priceLevelCode;
+  };
   const scopeShortLabel = (scope: ScopeRow) =>
-    `${specialtyName(scope.specialty_id)} - ${serviceName(scope.service_id)}`;
+    `${specialtyName(scope.specialty_id)} - ${serviceName(scope.service_id)}${scope.price_level_code ? ` (${servicePriceLevelLabel(scope.service_id, scope.price_level_code)})` : ""}`;
 
   // ── Modal state: scope ──
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
@@ -284,17 +291,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       toast.error("Vui lòng chọn chuyên khoa, khu vực và dịch vụ khám.");
       return;
     }
-    // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ
-    const isDuplicate = scopes.some(
-      (s) =>
-        s.clientId !== editingScopeId &&
-        s.specialty_id === scopeDraft.specialty_id &&
-        s.area_id === scopeDraft.area_id &&
-        s.room_id === scopeDraft.room_id &&
-        s.service_id === scopeDraft.service_id
-    );
+    // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ + loại/mức giá.
+    const isDuplicate = isDuplicateScope(scopes, { ...scopeDraft, clientId: "" }, editingScopeId);
     if (isDuplicate) {
-      toast.error("Phạm vi khám này đã tồn tại (trùng chuyên khoa, khu vực/phòng và dịch vụ).");
+      toast.error("Phạm vi khám này đã tồn tại (trùng chuyên khoa, khu vực/phòng, dịch vụ và loại giá).");
       return;
     }
     if (scopeDraft.fee <= 0) {
@@ -325,10 +325,12 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // vẫn chọn được cho mọi chuyên khoa/khu vực.
   function onDraftServiceChange(serviceId: string) {
     const svc = services.find((s) => s.id === serviceId);
-    const price = svc ? defaultServicePrice(svc) : 0;
+    const [defaultLevel] = svc ? activePriceLevels(svc) : [];
+    const price = defaultLevel?.price ?? (svc ? defaultServicePrice(svc) : 0);
     setScopeDraft((prev) => ({
       ...prev,
       service_id: serviceId,
+      price_level_code: defaultLevel?.code ?? "",
       fee: price,
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
@@ -336,16 +338,21 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   }
 
   // Đổi mức giá (theo loại BH) của dịch vụ đang chọn trong modal phạm vi.
-  function onDraftPriceLevelChange(price: number) {
-    setScopeDraft((prev) => ({ ...prev, fee: price }));
+  function onDraftPriceLevelChange(priceLevelCode: string) {
+    setScopeDraft((prev) => {
+      const service = services.find((item) => item.id === prev.service_id);
+      const level = service ? activePriceLevels(service).find((item) => item.code === priceLevelCode) : undefined;
+      return { ...prev, price_level_code: priceLevelCode, fee: level?.price ?? prev.fee };
+    });
   }
 
   // Chọn thẳng một dòng dịch vụ + mức giá cụ thể (mỗi loại bảo hiểm là một dòng riêng trong dropdown).
-  function onDraftServiceOptionChange(serviceId: string, price: number) {
+  function onDraftServiceOptionChange(serviceId: string, priceLevelCode: string, price: number) {
     const svc = services.find((s) => s.id === serviceId);
     setScopeDraft((prev) => ({
       ...prev,
       service_id: serviceId,
+      price_level_code: priceLevelCode,
       fee: price,
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
@@ -621,6 +628,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     roomName,
     serviceName,
     serviceOptionLabel,
+    servicePriceLevelLabel,
     scopeShortLabel,
     rememberLabel,
     // scope modal

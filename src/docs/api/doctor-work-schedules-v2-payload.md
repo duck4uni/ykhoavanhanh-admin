@@ -288,6 +288,7 @@ const scopeIdMap = new Map<string, string>();
 | `area_id` | string | Có | ID khu vực khám, tương đương `exam_area_id` |
 | `room_id` | string | Không / Có nếu BE yêu cầu | ID phòng khám |
 | `service_id` | string | Có | ID dịch vụ khám |
+| `price_level_code` | string | Có với dịch vụ có nhiều mức giá | Mã mức giá ổn định, ví dụ `VIP`, `DV`, `BHYT`; dùng trong khóa chống trùng scope |
 | `fee` | number | Có | Phí khám áp dụng cho phạm vi này |
 | `status` | `ACTIVE` / `INACTIVE` | Có | Trạng thái phạm vi |
 | `note` | string | Không | Ghi chú riêng cho phạm vi |
@@ -336,8 +337,10 @@ const scopeIdMap = new Map<string, string>();
 - Không cho trùng hoàn toàn tổ hợp:
 
 ```text
-specialty_id + area_id + room_id + service_id
+specialty_id + area_id + room_id + service_id + price_level_code
 ```
+
+Hai scope cùng dịch vụ nhưng khác `price_level_code` được phép tồn tại. Không dùng `fee` để phân biệt vì hai mức giá có thể cùng số tiền.
 
 - Nếu có kiểm tra quan hệ dữ liệu:
   - `service_id` nên thuộc `specialty_id` nếu service có `specialty_id`.

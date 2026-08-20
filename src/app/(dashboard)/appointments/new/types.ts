@@ -23,6 +23,7 @@ export type ScopeRow = {
   area_id: string;
   room_id: string;
   service_id: string;
+  price_level_code: string;
   fee: number;
   status: "ACTIVE" | "INACTIVE";
   note: string;
@@ -184,6 +185,7 @@ export const emptyScopeDraft = (): Omit<ScopeRow, "clientId"> => ({
   area_id: "",
   room_id: "",
   service_id: "",
+  price_level_code: "",
   fee: 0,
   status: "ACTIVE",
   note: "",
@@ -212,6 +214,7 @@ export function hydrateScheduleEditor(schedule: DoctorWorkScheduleV2): HydratedS
     area_id: cleanOptional(scope.area_id),
     room_id: cleanOptional(scope.room_id),
     service_id: cleanOptional(scope.service_id),
+    price_level_code: cleanOptional(scope.price_level_code),
     fee: Number(scope.fee) || 0,
     status: scope.status ?? "ACTIVE",
     note: scope.note ?? "",
@@ -314,6 +317,7 @@ export function buildSchedulePayload(
       ...(cleanOptional(scope.area_id) ? { area_id: scope.area_id.trim() } : {}),
       ...(cleanOptional(scope.room_id) ? { room_id: scope.room_id.trim() } : {}),
       ...(cleanOptional(scope.service_id) ? { service_id: scope.service_id.trim() } : {}),
+      ...(cleanOptional(scope.price_level_code) ? { price_level_code: scope.price_level_code.trim() } : {}),
       fee: scope.fee,
       status: scope.status,
       ...(scope.note.trim() ? { note: scope.note.trim() } : {}),

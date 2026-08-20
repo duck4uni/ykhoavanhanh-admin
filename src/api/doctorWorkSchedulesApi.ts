@@ -88,6 +88,7 @@ export type WorkScheduleScope = {
   area_id?: string;
   room_id?: string;
   service_id?: string;
+  price_level_code?: string;
   fee: number;
   status: "ACTIVE" | "INACTIVE";
   note?: string;
@@ -121,6 +122,7 @@ export type DoctorWorkScheduleScopeV2 = {
   area_id?: string | null;
   room_id?: string | null;
   service_id?: string | null;
+  price_level_code?: string | null;
   fee: number | string;
   status: "ACTIVE" | "INACTIVE";
   note?: string | null;
