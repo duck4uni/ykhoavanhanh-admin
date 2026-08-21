@@ -13,7 +13,12 @@ import { formatApiViolations } from "@/lib/utils";
 import { toast } from "@/components/ui/Toast";
 import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
+import { buildServiceSearchFilter } from "./serviceSearchFilter";
+import { reconcileSelectedDates, toggleSpecificDate, toggleWeekdayDates } from "../slotDateSelection";
+import { reconcileDateOverrides, setDateScopeIds, setDateSlotLimit } from "../dateSlotOverrides";
+import { isDuplicateScope } from "../scopeIdentity";
 import {
+  activePriceLevels,
   addMinutes,
   buildSchedulePayload,
   createId,
@@ -61,13 +66,21 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // Chỉ loại ngày không còn hợp lệ khi người dùng đã chọn đủ một khoảng ngày hợp lệ.
   useEffect(() => {
     if (!dateRangeValid) return;
+    const validDates = availableWeekdays.flatMap((weekday) => datesByWeekday[weekday]);
     setTimeSlots((current) =>
-      current.map((slot) => ({
-        ...slot,
-        weekdays: slot.weekdays.filter((weekday) => availableWeekdays.includes(weekday)),
-      }))
+      current.map((slot) => {
+        const dates = reconcileSelectedDates(slot.dates, validDates);
+        return {
+          ...slot,
+          dates,
+          date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+          weekdays: slot.weekdays.filter(
+            (weekday) => availableWeekdays.includes(weekday) && datesByWeekday[weekday].some((date) => dates.includes(date))
+          ),
+        };
+      })
     );
-  }, [availableWeekdays, dateRangeValid]);
+  }, [availableWeekdays, dateRangeValid, datesByWeekday]);
 
   // ── Danh mục cho thẻ đếm năng lực (đếm tổng, chỉ cần count) ──
   const { data: specialtyCountData } = specialtiesHooks.useList({ currentPage: 1, pageSize: 1 });
@@ -156,7 +169,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     currentPage: servicePicker.page,
     pageSize: 10,
     filters: [
-      servicePicker.debouncedSearch.trim() ? `service_name@=${servicePicker.debouncedSearch.trim()}` : "",
+      buildServiceSearchFilter(servicePicker.debouncedSearch),
       "status==ACTIVE",
     ]
       .filter(Boolean)
@@ -247,8 +260,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     const service = services.find((s) => s.id === id);
     return service ? formatServiceOptionLabel(service) : serviceName(id);
   };
+  const servicePriceLevelLabel = (serviceId: string, priceLevelCode: string) => {
+    const service = services.find((item) => item.id === serviceId);
+    return activePriceLevels(service ?? { price_levels: [] }).find((level) => level.code === priceLevelCode)?.label
+      ?? priceLevelCode;
+  };
   const scopeShortLabel = (scope: ScopeRow) =>
-    `${specialtyName(scope.specialty_id)} - ${serviceName(scope.service_id)}`;
+    `${specialtyName(scope.specialty_id)} - ${serviceName(scope.service_id)}${scope.price_level_code ? ` (${servicePriceLevelLabel(scope.service_id, scope.price_level_code)})` : ""}`;
 
   // ── Modal state: scope ──
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
@@ -273,17 +291,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       toast.error("Vui lòng chọn chuyên khoa, khu vực và dịch vụ khám.");
       return;
     }
-    // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ
-    const isDuplicate = scopes.some(
-      (s) =>
-        s.clientId !== editingScopeId &&
-        s.specialty_id === scopeDraft.specialty_id &&
-        s.area_id === scopeDraft.area_id &&
-        s.room_id === scopeDraft.room_id &&
-        s.service_id === scopeDraft.service_id
-    );
+    // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ + loại/mức giá.
+    const isDuplicate = isDuplicateScope(scopes, { ...scopeDraft, clientId: "" }, editingScopeId);
     if (isDuplicate) {
-      toast.error("Phạm vi khám này đã tồn tại (trùng chuyên khoa, khu vực/phòng và dịch vụ).");
+      toast.error("Phạm vi khám này đã tồn tại (trùng chuyên khoa, khu vực/phòng, dịch vụ và loại giá).");
       return;
     }
     if (scopeDraft.fee <= 0) {
@@ -300,12 +311,26 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
 
   function removeScope(clientId: string) {
     setScopes((prev) => prev.filter((s) => s.clientId !== clientId));
-    // Gỡ scope khỏi các khung giờ đang tham chiếu
+    // Gỡ scope khỏi các khung giờ và date_overrides đang tham chiếu
     setTimeSlots((prev) =>
-      prev.map((slot) => ({
-        ...slot,
-        scope_ids: slot.scope_ids.filter((id) => id !== clientId),
-      }))
+      prev.map((slot) => {
+        const nextScopeIds = slot.scope_ids.filter((id) => id !== clientId);
+        const nextDateOverrides = slot.date_overrides
+          .map((override) => {
+            if (!Array.isArray(override.scope_ids)) return override;
+            const filtered = override.scope_ids.filter((id) => id !== clientId);
+            return {
+              ...override,
+              scope_ids: filtered.length > 0 ? filtered : undefined,
+            };
+          })
+          .filter((override) => override.slot_limit !== undefined || override.scope_ids !== undefined);
+        return {
+          ...slot,
+          scope_ids: nextScopeIds,
+          date_overrides: nextDateOverrides,
+        };
+      })
     );
   }
 
@@ -314,10 +339,12 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   // vẫn chọn được cho mọi chuyên khoa/khu vực.
   function onDraftServiceChange(serviceId: string) {
     const svc = services.find((s) => s.id === serviceId);
-    const price = svc ? defaultServicePrice(svc) : 0;
+    const [defaultLevel] = svc ? activePriceLevels(svc) : [];
+    const price = defaultLevel?.price ?? (svc ? defaultServicePrice(svc) : 0);
     setScopeDraft((prev) => ({
       ...prev,
       service_id: serviceId,
+      price_level_code: defaultLevel?.code ?? "",
       fee: price,
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
@@ -325,16 +352,21 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   }
 
   // Đổi mức giá (theo loại BH) của dịch vụ đang chọn trong modal phạm vi.
-  function onDraftPriceLevelChange(price: number) {
-    setScopeDraft((prev) => ({ ...prev, fee: price }));
+  function onDraftPriceLevelChange(priceLevelCode: string) {
+    setScopeDraft((prev) => {
+      const service = services.find((item) => item.id === prev.service_id);
+      const level = service ? activePriceLevels(service).find((item) => item.code === priceLevelCode) : undefined;
+      return { ...prev, price_level_code: priceLevelCode, fee: level?.price ?? prev.fee };
+    });
   }
 
   // Chọn thẳng một dòng dịch vụ + mức giá cụ thể (mỗi loại bảo hiểm là một dòng riêng trong dropdown).
-  function onDraftServiceOptionChange(serviceId: string, price: number) {
+  function onDraftServiceOptionChange(serviceId: string, priceLevelCode: string, price: number) {
     const svc = services.find((s) => s.id === serviceId);
     setScopeDraft((prev) => ({
       ...prev,
       service_id: serviceId,
+      price_level_code: priceLevelCode,
       fee: price,
       specialty_id: prev.specialty_id || svc?.specialty_id || "",
       area_id: prev.area_id || svc?.exam_area_id || "",
@@ -353,13 +385,20 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       const start = prev[prev.length - 1]?.end ?? "08:00";
       return [
         ...prev,
-        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, weekdays: [], scopeMode: "all", scope_ids: [] },
+        { id: createId(), start, end: addMinutes(start, 30), slot_limit: 20, weekdays: [], dates: [], date_overrides: [], scopeMode: "all", scope_ids: [] },
       ];
     });
   }
 
   function updateSlot(id: string, patch: Partial<TimeSlotRow>) {
-    setTimeSlots((prev) => prev.map((slot) => (slot.id === id ? { ...slot, ...patch } : slot)));
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== id) return slot;
+      const next = { ...slot, ...patch };
+      return {
+        ...next,
+        date_overrides: reconcileDateOverrides(next.date_overrides, next.dates, next.slot_limit),
+      };
+    }));
   }
 
   function removeSlot(id: string) {
@@ -387,11 +426,14 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       prev.map((slot) => {
         if (slot.id !== slotId) return slot;
         const exists = slot.weekdays.includes(weekday);
+        const dates = toggleWeekdayDates(slot.dates, datesByWeekday[weekday], !exists);
         return {
           ...slot,
           weekdays: exists
             ? slot.weekdays.filter((day) => day !== weekday)
             : sortWeekdays([...slot.weekdays, weekday]),
+          dates,
+          date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
         };
       })
     );
@@ -401,7 +443,75 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     const validWeekdays = dateRangeValid
       ? weekdays.filter((weekday) => availableWeekdays.includes(weekday))
       : [];
-    setTimeSlots((prev) => prev.map((slot) => (slot.id === slotId ? { ...slot, weekdays: validWeekdays } : slot)));
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      let dates = slot.dates;
+      availableWeekdays.forEach((weekday) => {
+        const wasSelected = slot.weekdays.includes(weekday);
+        const shouldSelect = validWeekdays.includes(weekday);
+        if (wasSelected !== shouldSelect) dates = toggleWeekdayDates(dates, datesByWeekday[weekday], shouldSelect);
+      });
+      return {
+        ...slot,
+        weekdays: sortWeekdays(validWeekdays),
+        dates,
+        date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+      };
+    }));
+  }
+
+  function toggleSlotDate(slotId: string, weekday: number, date: string) {
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      const dates = toggleSpecificDate(slot.dates, date);
+      const hasWeekdayDates = datesByWeekday[weekday].some((item) => dates.includes(item));
+      return {
+        ...slot,
+        dates,
+        date_overrides: reconcileDateOverrides(slot.date_overrides, dates, slot.slot_limit),
+        weekdays: hasWeekdayDates
+          ? sortWeekdays(Array.from(new Set([...slot.weekdays, weekday])))
+          : slot.weekdays.filter((item) => item !== weekday),
+      };
+    }));
+  }
+
+  function setSlotDateLimit(slotId: string, date: string, limit: number) {
+    if (!Number.isInteger(limit) || limit <= 0) return;
+    setTimeSlots((prev) => prev.map((slot) => slot.id === slotId
+      ? { ...slot, date_overrides: setDateSlotLimit(slot.date_overrides, date, limit, slot.slot_limit) }
+      : slot));
+  }
+
+  function setSlotDateScopes(slotId: string, date: string, scopeIds: "all" | string[] | undefined) {
+    setTimeSlots((prev) => prev.map((slot) => slot.id === slotId
+      ? { ...slot, date_overrides: setDateScopeIds(slot.date_overrides, date, scopeIds, slot.scopeMode, slot.scope_ids) }
+      : slot));
+  }
+
+  function toggleSlotDateScope(slotId: string, date: string, scopeClientId: string) {
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      const existingOverride = slot.date_overrides.find((item) => item.date === date);
+      let currentScopes: string[];
+      if (existingOverride?.scope_ids === "all") {
+        currentScopes = scopes.map((s) => s.clientId);
+      } else if (Array.isArray(existingOverride?.scope_ids)) {
+        currentScopes = existingOverride.scope_ids;
+      } else {
+        currentScopes = slot.scopeMode === "all" ? scopes.map((s) => s.clientId) : [...slot.scope_ids];
+      }
+
+      const exists = currentScopes.includes(scopeClientId);
+      const nextScopes = exists
+        ? currentScopes.filter((id) => id !== scopeClientId)
+        : [...currentScopes, scopeClientId];
+
+      return {
+        ...slot,
+        date_overrides: setDateScopeIds(slot.date_overrides, date, nextScopes, slot.scopeMode, slot.scope_ids),
+      };
+    }));
   }
 
   // ── Modal state: tự sinh khung giờ ──
@@ -428,6 +538,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
         end: clamped,
         slot_limit: autoGen.slotLimit,
         weekdays: [],
+        dates: [],
+        date_overrides: [],
         scopeMode: "all",
         scope_ids: [],
       });
@@ -448,8 +560,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     [timeSlots]
   );
   const selectedConcreteDates = useMemo(
-    () => Array.from(new Set(selectedWeekdays.flatMap((weekday) => datesByWeekday[weekday]))).sort(),
-    [datesByWeekday, selectedWeekdays]
+    () => Array.from(new Set(timeSlots.flatMap((slot) => slot.dates))).sort(),
+    [timeSlots]
   );
 
   // ── Cảnh báo cấu hình ──
@@ -462,6 +574,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     if (scopes.length === 0) list.push("Chưa có phạm vi khám");
     if (timeSlots.length === 0) list.push("Chưa có khung giờ làm việc");
     if (timeSlots.some((s) => s.weekdays.length === 0)) list.push("Có khung giờ chưa chọn ngày áp dụng");
+    if (timeSlots.some((s) => s.dates.length === 0)) list.push("Có khung giờ chưa chọn ngày cụ thể");
     if (timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)))
       list.push("Có khung giờ chứa thứ không thuộc khoảng ngày");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
@@ -480,6 +593,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     scopes.length > 0 &&
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
+    !timeSlots.some((s) => s.dates.length === 0) &&
     !timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)) &&
     !timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0) &&
     !timeSlots.some((s) => s.start && s.end && s.start >= s.end);
@@ -559,6 +673,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     roomName,
     serviceName,
     serviceOptionLabel,
+    servicePriceLevelLabel,
     scopeShortLabel,
     rememberLabel,
     // scope modal
@@ -582,6 +697,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     removeSlot,
     toggleSlotScope,
     toggleSlotWeekday,
+    toggleSlotDate,
+    setSlotDateLimit,
+    setSlotDateScopes,
+    toggleSlotDateScope,
     setSlotWeekdays,
     // auto-gen modal
     autoGenOpen,

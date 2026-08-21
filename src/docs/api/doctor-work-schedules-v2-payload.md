@@ -1,145 +1,161 @@
-# Doctor Work Schedules API V2 — Payload cho màn Thêm lịch khám mới
+# Đặc tả kỹ thuật Backend: API Lịch khám bác sĩ V2 (Doctor Work Schedules)
 
-## 1. Mục tiêu
-
-Frontend màn **Thêm lịch khám mới** đang tạo lịch khám theo nghiệp vụ mới:
-
-- Một lịch khám có thể có **nhiều phạm vi khám**.
-- Mỗi phạm vi khám là một tổ hợp:
-
-```text
-Chuyên khoa + Khu vực khám + Phòng khám + Dịch vụ khám + Phí khám + Trạng thái
-```
-
-- Một lịch khám có thể có **nhiều khung giờ làm việc**.
-- Mỗi khung giờ có **slot riêng**.
-- Mỗi khung giờ có thể áp dụng cho:
-  - toàn bộ phạm vi khám; hoặc
-  - một số phạm vi khám cụ thể.
-- Mỗi khung giờ có thêm **thứ áp dụng** từ **Thứ 2 đến Chủ nhật**.
-
-Backend cần cập nhật endpoint tạo lịch khám để nhận payload mới từ frontend.
+Tài liệu này mô tả chi tiết yêu cầu nghiệp vụ, cấu trúc dữ liệu (Data Contract), payload API và các quy tắc nghiệp vụ cho đội ngũ Backend (BE) để nâng cấp và đồng bộ với Web Admin Vạn Hạnh Hospital.
 
 ---
 
-## 2. Endpoint cần cập nhật
+## 1. Mục tiêu và Nghiệp vụ mới
 
-```http
-POST /api/v1.0/doctor-work-schedules
-```
+Mô hình quản lý lịch khám mới (V2) thay thế mô hình 1 lịch = 1 phạm vi cố định trước đây:
 
-Endpoint hiện tại đang nhận payload dạng 1 lịch = 1 phạm vi:
+1. **Khoảng ngày & Các thứ áp dụng**:
+   - Một lịch làm việc áp dụng cho một khoảng ngày từ `start_date` đến `end_date`.
+   - Chứa danh sách các thứ áp dụng trong tuần (`weekdays`: `[1, 2, 3, 4, 5, 6, 0]`).
 
-```json
-{
-  "doctor_id": "...",
-  "exam_area_id": "...",
-  "specialty_id": "...",
-  "room_id": "...",
-  "schedule_date": "2026-07-03",
-  "shift_code": "MORNING",
-  "max_appointments": 20,
-  "exam_fee": 150000,
-  "time_slots": []
-}
-```
+2. **Nhiều phạm vi khám (`scopes[]`)**:
+   - Một lịch khám có thể cấu hình **nhiều phạm vi khám** khác nhau cho cùng một bác sĩ.
+   - Mỗi phạm vi (`scope`) là một tổ hợp gồm:
+     - `specialty_id`: Chuyên khoa
+     - `area_id`: Khu vực khám (`exam_area_id`)
+     - `room_id`: Phòng khám (tuỳ chọn)
+     - `service_id`: Dịch vụ khám
+     - `price_level_code`: Mã mức giá/loại bảo hiểm (BHYT, DV, VIP...) từ cấu hình bảng giá dịch vụ
+     - `fee`: Phí khám thực tế
+     - `status`: `"ACTIVE" | "INACTIVE"`
 
-Payload mới cần nhận dạng 1 lịch = nhiều phạm vi + nhiều khung giờ + thứ áp dụng.
+3. **Nhiều khung giờ (`time_slots[]`) & Danh sách ngày cụ thể (`dates[]`)**:
+   - Một lịch có thể có nhiều khung giờ (`start_time` - `end_time`).
+   - Mỗi khung giờ gắn với một thứ trong tuần (`weekday`) và một danh sách ngày cụ thể (`dates[]` định dạng `YYYY-MM-DD`).
+   - Có số lượng phiếu khám mặc định (`slot_limit`).
+   - Có phạm vi khám mặc định của khung giờ (`scope_ids`: `"all"` hoặc mảng `client_id[]`).
 
----
-
-## 3. Quy ước thứ trong tuần
-
-Frontend dùng quy ước số như JavaScript `Date.getDay()`:
-
-| Giá trị | Thứ |
-|---:|---|
-| `0` | Chủ nhật |
-| `1` | Thứ 2 |
-| `2` | Thứ 3 |
-| `3` | Thứ 4 |
-| `4` | Thứ 5 |
-| `5` | Thứ 6 |
-| `6` | Thứ 7 |
-
-Trên UI, người dùng chọn theo thứ tự **Thứ 2 → Chủ nhật**, nhưng payload vẫn dùng giá trị `1,2,3,4,5,6,0`.
+4. **Ghi đè theo từng ngày cụ thể (`date_overrides[]`)**:
+   - Trong cùng một khung giờ, cho phép tuỳ biến riêng theo từng ngày:
+     - `slot_limit`: Điều chỉnh số phiếu khám riêng cho ngày đó.
+     - `scope_ids`: **Gán phạm vi khám riêng cho từng ngày cụ thể** (Ví dụ: Cùng khung 08:00 - 08:30 nhưng ngày `2026-08-21` chỉ khám phạm vi *Khám MeU · Dịch vụ*, ngày `2026-08-22` đổi sang khám *Khám MeU · Khám VIP*).
 
 ---
 
-## 4. Request body mới
+## 2. Danh sách Endpoints cần cập nhật
 
-```ts
-type CreateDoctorWorkScheduleV2Payload = {
+| Method | Endpoint | Mô tả |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1.0/doctor-work-schedules` | Tạo mới lịch khám V2 (nhiều scope, nhiều time slot, date overrides) |
+| `PUT` | `/api/v1.0/doctor-work-schedules/:id` | Cập nhật toàn bộ lịch khám V2 theo ID |
+| `GET` | `/api/v1.0/doctor-work-schedules/:id` | Lấy chi tiết lịch khám V2 đầy đủ quan hệ (`scopes`, `time_slots`, `doctor`, `specialty`, `area`, `room`, `service`) |
+| `GET` | `/api/v1.0/doctor-work-schedules` | Lấy danh sách lịch khám phân trang (danh sách quản trị) |
+
+---
+
+## 3. Quy ước chuẩn hóa
+
+### 3.1. Quy ước Thứ trong tuần (`weekday`)
+Sử dụng giá trị số tương thích chuẩn Javascript `Date.getDay()`:
+- `0`: Chủ nhật (CN)
+- `1`: Thứ 2 (T2)
+- `2`: Thứ 3 (T3)
+- `3`: Thứ 4 (T4)
+- `4`: Thứ 5 (T5)
+- `5`: Thứ 6 (T6)
+- `6`: Thứ 7 (T7)
+
+### 3.2. Mapping Phạm vi khám (`client_id` -> `scope_ids`)
+- Khi tạo mới/cập nhật, Frontend gửi kèm `client_id` (string duy nhất do client sinh, ví dụ `scope_1752200000000_a1b2c3`) trong từng phần tử của `scopes[]`.
+- Trong `time_slots[].scope_ids` hoặc `date_overrides[].scope_ids`:
+  - Giá trị `"all"`: Áp dụng cho tất cả các scopes trong lịch.
+  - Giá trị `string[]`: Chứa danh sách các `client_id` (hoặc `scope_id` khi trả về GET detail).
+
+---
+
+## 4. Đặc tả Cấu trúc Payload (Request Body)
+
+### 4.1. TypeScript Interfaces
+
+```typescript
+export type CreateDoctorWorkScheduleV2Payload = {
   doctor_id: string;
-  date: string; // YYYY-MM-DD, ngày bắt đầu / ngày đại diện để backend neo lịch nếu cần
-  weekdays: number[]; // Tổng hợp các thứ được dùng trong time_slots, ví dụ [1,2,3,4,5,6,0]
+  start_date: string; // YYYY-MM-DD
+  end_date: string;   // YYYY-MM-DD
+  weekdays: number[]; // Mảng các thứ có lịch, ví dụ [1, 2, 3, 4, 5, 6, 0]
   status: "ACTIVE" | "INACTIVE";
   note?: string;
-  scopes: WorkScheduleScope[];
-  time_slots: WorkScheduleTimeSlot[];
+  scopes: WorkScheduleScopePayload[];
+  time_slots: WorkScheduleTimeSlotPayload[];
 };
 
-type WorkScheduleScope = {
-  client_id: string; // ID tạm do frontend tạo, dùng để map time_slots.scope_ids
-  specialty_id: string;
-  area_id: string; // exam_area_id
-  room_id?: string;
-  service_id: string;
-  fee: number;
+export type WorkScheduleScopePayload = {
+  client_id?: string;       // ID định danh tạm từ frontend để liên kết với time_slots
+  specialty_id: string;     // ID Chuyên khoa
+  area_id: string;          // ID Khu vực khám (exam_area_id)
+  room_id?: string;         // ID Phòng khám (nếu có)
+  service_id: string;       // ID Dịch vụ khám
+  price_level_code?: string;// Mã mức giá (BHYT, DV, VIP...) từ his_services.price_levels
+  fee: number;              // Phí khám
   status: "ACTIVE" | "INACTIVE";
   note?: string;
 };
 
-type WorkScheduleTimeSlot = {
-  start_time: string; // HH:mm
-  end_time: string;   // HH:mm
-  slot_limit: number;
-  weekday: number; // 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7
-  scope_ids: "all" | string[]; // string[] tham chiếu WorkScheduleScope.client_id
+export type DateSlotOverridePayload = {
+  date: string;             // YYYY-MM-DD (ngày ghi đè)
+  slot_limit?: number;      // Số phiếu ghi đè riêng cho ngày này (nếu khác mặc định của slot)
+  scope_ids?: "all" | string[]; // Danh sách client_id scope áp dụng riêng cho ngày này
+};
+
+export type WorkScheduleTimeSlotPayload = {
+  start_time: string;       // HH:mm (ví dụ "08:00")
+  end_time: string;         // HH:mm (ví dụ "08:30")
+  slot_limit: number;       // Số phiếu mặc định của khung giờ
+  weekday: number;          // Thứ trong tuần (0..6)
+  dates: string[];          // Danh sách các ngày cụ thể áp dụng khung giờ này (YYYY-MM-DD)
+  date_overrides?: DateSlotOverridePayload[]; // Cấu hình riêng theo từng ngày
+  scope_ids: "all" | string[]; // "all" hoặc mảng client_id các scopes mặc định
 };
 ```
 
-### Ghi chú quan trọng
-
-- `scopes[].client_id` là ID tạm frontend tạo trước khi backend lưu DB.
-- Nếu `time_slots[].scope_ids` là mảng string, các phần tử trong mảng chính là `client_id` của scope tương ứng.
-- Nếu `time_slots[].scope_ids = "all"`, khung giờ đó áp dụng cho toàn bộ `scopes`.
-- Frontend hiện gửi `weekdays` ở root để backend dễ biết lịch có những thứ nào.
-- Frontend cũng gửi `weekday` trong từng `time_slots[]` để backend biết khung giờ cụ thể thuộc thứ nào.
-
 ---
 
-## 5. Ví dụ request hoàn chỉnh
+## 5. Ví dụ Request JSON Hoàn Chỉnh
 
-Ví dụ dưới đây tạo lịch cho bác sĩ, áp dụng từ **Thứ 2 đến Chủ nhật**. Khung 08:00-08:30 áp dụng cho tất cả phạm vi trong Thứ 2 và Thứ 3; khung 09:00-09:30 chỉ áp dụng cho 1 phạm vi trong Thứ 2.
+### Kịch bản thực tế:
+- Bác sĩ **Nguyễn Văn A** (`doctor_001`).
+- Lịch từ ngày `2026-08-21` đến `2026-08-22`.
+- Có 2 phạm vi khám:
+  1. `scope_service_01`: Khám MeU Chuyên khoa Nhi · Dịch vụ thường (Phí: 150.000đ).
+  2. `scope_vip_02`: Khám MeU Chuyên khoa Nhi · Khám VIP (Phí: 300.000đ).
+- Khung giờ `08:00 - 08:30`:
+  - Ngày `2026-08-21`: Ghi đè áp dụng riêng cho `scope_service_01` (Dịch vụ) và số phiếu là 15.
+  - Ngày `2026-08-22`: Ghi đè áp dụng riêng cho `scope_vip_02` (VIP) và số phiếu là 10.
 
 ```json
 {
   "doctor_id": "doctor_001",
-  "date": "2026-07-13",
-  "weekdays": [1, 2, 3, 4, 5, 6, 0],
+  "start_date": "2026-08-21",
+  "end_date": "2026-08-22",
+  "weekdays": [5, 6],
   "status": "ACTIVE",
-  "note": "Lịch khám từ Thứ 2 đến Chủ nhật",
+  "note": "Lịch phân ca khám Dịch vụ ngày 21 và VIP ngày 22",
   "scopes": [
     {
-      "client_id": "scope_1752200000000_a1b2c3",
+      "client_id": "scope_service_01",
       "specialty_id": "specialty_pediatrics",
-      "area_id": "area_specialized",
+      "area_id": "area_meu",
       "room_id": "room_201",
-      "service_id": "service_general_checkup",
+      "service_id": "srv_kham_meu",
+      "price_level_code": "DV",
       "fee": 150000,
       "status": "ACTIVE",
-      "note": ""
+      "note": "Khám MeU Dịch vụ thường"
     },
     {
-      "client_id": "scope_1752200000000_d4e5f6",
-      "specialty_id": "specialty_ent",
-      "area_id": "area_specialized",
-      "room_id": "room_303",
-      "service_id": "service_ent_endoscopy",
-      "fee": 200000,
+      "client_id": "scope_vip_02",
+      "specialty_id": "specialty_pediatrics",
+      "area_id": "area_meu_vip",
+      "room_id": "room_301",
+      "service_id": "srv_kham_meu",
+      "price_level_code": "VIP",
+      "fee": 300000,
       "status": "ACTIVE",
-      "note": ""
+      "note": "Khám MeU VIP"
     }
   ],
   "time_slots": [
@@ -147,29 +163,31 @@ Ví dụ dưới đây tạo lịch cho bác sĩ, áp dụng từ **Thứ 2 đ�
       "start_time": "08:00",
       "end_time": "08:30",
       "slot_limit": 20,
-      "weekday": 1,
-      "scope_ids": "all"
+      "weekday": 5,
+      "dates": ["2026-08-21"],
+      "scope_ids": "all",
+      "date_overrides": [
+        {
+          "date": "2026-08-21",
+          "slot_limit": 15,
+          "scope_ids": ["scope_service_01"]
+        }
+      ]
     },
     {
       "start_time": "08:00",
       "end_time": "08:30",
       "slot_limit": 20,
-      "weekday": 2,
-      "scope_ids": "all"
-    },
-    {
-      "start_time": "09:00",
-      "end_time": "09:30",
-      "slot_limit": 10,
-      "weekday": 1,
-      "scope_ids": ["scope_1752200000000_a1b2c3"]
-    },
-    {
-      "start_time": "09:30",
-      "end_time": "10:00",
-      "slot_limit": 15,
-      "weekday": 0,
-      "scope_ids": ["scope_1752200000000_a1b2c3", "scope_1752200000000_d4e5f6"]
+      "weekday": 6,
+      "dates": ["2026-08-22"],
+      "scope_ids": "all",
+      "date_overrides": [
+        {
+          "date": "2026-08-22",
+          "slot_limit": 10,
+          "scope_ids": ["scope_vip_02"]
+        }
+      ]
     }
   ]
 }
@@ -177,474 +195,117 @@ Ví dụ dưới đây tạo lịch cho bác sĩ, áp dụng từ **Thứ 2 đ�
 
 ---
 
-## 6. Cách frontend sinh `time_slots` theo thứ
+## 6. Cấu trúc Response Chi tiết (GET Detail V2)
 
-Trên UI, một dòng khung giờ có thể chọn nhiều thứ. Ví dụ:
+Endpoint: `GET /api/v1.0/doctor-work-schedules/:id`
 
-```text
-08:00 - 08:30, slot 20, chọn Thứ 2 + Thứ 3 + Chủ nhật
-```
-
-Frontend sẽ tách thành nhiều phần tử trong `time_slots`:
-
-```json
-[
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 1,
-    "scope_ids": "all"
-  },
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 2,
-    "scope_ids": "all"
-  },
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 0,
-    "scope_ids": "all"
-  }
-]
-```
-
-Backend không cần tự nhân bản theo `weekdays`; chỉ cần lưu/validate từng phần tử `time_slots[]` đã có `weekday`.
-
----
-
-## 7. Mapping `scope_ids`
-
-Frontend gửi `scopes[].client_id` để backend map rõ ràng, không cần đoán theo thứ tự mảng.
-
-Ví dụ:
-
-```json
-{
-  "scopes": [
-    {
-      "client_id": "scope_1752200000000_a1b2c3",
-      "specialty_id": "specialty_pediatrics",
-      "area_id": "area_specialized",
-      "room_id": "room_201",
-      "service_id": "service_general_checkup",
-      "fee": 150000,
-      "status": "ACTIVE"
-    }
-  ],
-  "time_slots": [
-    {
-      "start_time": "09:00",
-      "end_time": "09:30",
-      "slot_limit": 10,
-      "weekday": 1,
-      "scope_ids": ["scope_1752200000000_a1b2c3"]
-    }
-  ]
-}
-```
-
-Backend nên xử lý như sau:
-
-1. Lưu từng phần tử trong `scopes[]` vào DB.
-2. Tạo map tạm:
-
-```ts
-const scopeIdMap = new Map<string, string>();
-// key = scopes[].client_id
-// value = id thật sau khi lưu DB
-```
-
-3. Khi lưu `time_slots[]`:
-   - Nếu `scope_ids = "all"`: áp dụng cho toàn bộ scope đã lưu.
-   - Nếu `scope_ids` là mảng: map từng `client_id` sang ID thật bằng `scopeIdMap`.
-
----
-
-## 8. Ý nghĩa các field
-
-### 8.1. Root payload
-
-| Field | Type | Required | Ghi chú |
-|---|---|---:|---|
-| `doctor_id` | string | Có | ID bác sĩ |
-| `date` | string | Có | Ngày bắt đầu / ngày đại diện, format `YYYY-MM-DD` |
-| `weekdays` | number[] | Có | Danh sách thứ có lịch, dùng quy ước `0..6` |
-| `status` | `ACTIVE` / `INACTIVE` | Có | Trạng thái lịch |
-| `note` | string | Không | Ghi chú chung của lịch |
-| `scopes` | array | Có | Danh sách phạm vi khám |
-| `time_slots` | array | Có | Danh sách khung giờ đã tách theo từng thứ |
-
-### 8.2. `scopes[]`
-
-| Field | Type | Required | Ghi chú |
-|---|---|---:|---|
-| `client_id` | string | Có | ID tạm do frontend tạo để `time_slots.scope_ids` tham chiếu |
-| `specialty_id` | string | Có | ID chuyên khoa |
-| `area_id` | string | Có | ID khu vực khám, tương đương `exam_area_id` |
-| `room_id` | string | Không / Có nếu BE yêu cầu | ID phòng khám |
-| `service_id` | string | Có | ID dịch vụ khám |
-| `fee` | number | Có | Phí khám áp dụng cho phạm vi này |
-| `status` | `ACTIVE` / `INACTIVE` | Có | Trạng thái phạm vi |
-| `note` | string | Không | Ghi chú riêng cho phạm vi |
-
-### 8.3. `time_slots[]`
-
-| Field | Type | Required | Ghi chú |
-|---|---|---:|---|
-| `start_time` | string | Có | Giờ bắt đầu, format `HH:mm` |
-| `end_time` | string | Có | Giờ kết thúc, format `HH:mm` |
-| `slot_limit` | number | Có | Số slot của khung giờ |
-| `weekday` | number | Có | Thứ áp dụng, `0 = Chủ nhật`, `1 = Thứ 2`, ..., `6 = Thứ 7` |
-| `scope_ids` | `"all"` hoặc `string[]` | Có | Áp dụng cho tất cả phạm vi hoặc một số scope theo `client_id` |
-
----
-
-## 9. Validation backend đề xuất
-
-### 9.1. Root
-
-- `doctor_id` bắt buộc.
-- `date` bắt buộc, đúng format `YYYY-MM-DD`.
-- `weekdays` bắt buộc, là mảng number.
-- Mỗi phần tử trong `weekdays` phải thuộc `0,1,2,3,4,5,6`.
-- `weekdays` không được rỗng.
-- `status` chỉ nhận `ACTIVE` hoặc `INACTIVE`.
-- `scopes` phải có ít nhất 1 phần tử.
-- `time_slots` phải có ít nhất 1 phần tử.
-- Nên kiểm tra `weekdays` khớp với các `time_slots[].weekday`:
-  - mọi `time_slots[].weekday` phải nằm trong `weekdays`.
-  - mọi phần tử trong `weekdays` nên có ít nhất một `time_slots[]` tương ứng.
-
-### 9.2. Scopes
-
-- Mỗi scope bắt buộc có:
-  - `client_id`
-  - `specialty_id`
-  - `area_id`
-  - `service_id`
-  - `fee`
-  - `status`
-- `client_id` không được trùng trong cùng payload.
-- `fee >= 0`.
-- Không cho trùng hoàn toàn tổ hợp:
-
-```text
-specialty_id + area_id + room_id + service_id
-```
-
-- Nếu có kiểm tra quan hệ dữ liệu:
-  - `service_id` nên thuộc `specialty_id` nếu service có `specialty_id`.
-  - `room_id` nên thuộc `area_id` nếu room có `exam_area_id`.
-
-### 9.3. Time slots
-
-- `start_time < end_time`.
-- `slot_limit` là số nguyên dương, `slot_limit > 0`.
-- `weekday` bắt buộc và phải thuộc `0,1,2,3,4,5,6`.
-- `scope_ids` phải là:
-  - chuỗi `"all"`; hoặc
-  - mảng string chứa các `scopes[].client_id` hợp lệ.
-- Nếu `scope_ids = "all"`: khung giờ áp dụng cho toàn bộ phần tử trong `scopes`.
-- Nếu `scope_ids` là mảng: tất cả phần tử trong mảng phải map được tới `scopes[].client_id` trong payload.
-- Không cho khung giờ trùng/chồng lấn trong cùng **doctor + weekday + phạm vi áp dụng**.
-
-Ví dụ chồng lấn cần chặn:
-
-```json
-[
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 1,
-    "scope_ids": "all"
-  },
-  {
-    "start_time": "08:15",
-    "end_time": "08:45",
-    "slot_limit": 20,
-    "weekday": 1,
-    "scope_ids": "all"
-  }
-]
-```
-
-Ví dụ KHÔNG chồng lấn vì khác thứ:
-
-```json
-[
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 1,
-    "scope_ids": "all"
-  },
-  {
-    "start_time": "08:00",
-    "end_time": "08:30",
-    "slot_limit": 20,
-    "weekday": 2,
-    "scope_ids": "all"
-  }
-]
-```
-
----
-
-## 10. Response đề xuất
-
-### 10.1. Success
+Backend trả về chi tiết lịch cùng thông tin các quan hệ (`specialty`, `area`, `room`, `service`, `doctor`):
 
 ```json
 {
   "status": "success",
-  "message": "Tạo lịch khám thành công",
   "responseData": {
-    "id": "schedule_001",
+    "id": "sch_uuid_12345",
     "doctor_id": "doctor_001",
-    "date": "2026-07-13",
-    "weekdays": [1, 2, 3, 4, 5, 6, 0],
+    "start_date": "2026-08-21",
+    "end_date": "2026-08-22",
+    "weekdays": [5, 6],
     "status": "ACTIVE",
-    "note": "Lịch khám từ Thứ 2 đến Chủ nhật",
+    "note": "Lịch phân ca khám Dịch vụ ngày 21 và VIP ngày 22",
+    "created_at": "2026-08-21T08:00:00Z",
+    "updated_at": "2026-08-21T08:00:00Z",
+    "doctor": {
+      "id": "doc_pk_01",
+      "doctor_id": "doctor_001",
+      "doctor_name": "BS. Nguyễn Văn A"
+    },
     "scopes": [
       {
-        "id": "scope_db_001",
-        "client_id": "scope_1752200000000_a1b2c3",
+        "id": "scope_db_id_01",
+        "client_id": "scope_service_01",
         "specialty_id": "specialty_pediatrics",
-        "area_id": "area_specialized",
+        "area_id": "area_meu",
         "room_id": "room_201",
-        "service_id": "service_general_checkup",
+        "service_id": "srv_kham_meu",
+        "price_level_code": "DV",
         "fee": 150000,
         "status": "ACTIVE",
-        "note": ""
+        "note": "Khám MeU Dịch vụ thường",
+        "specialty": { "id": "specialty_pediatrics", "name": "Nhi khoa" },
+        "area": { "id": "area_meu", "name": "Khu MeU" },
+        "room": { "id": "room_201", "roomname": "Phòng 201" },
+        "service": { "id": "srv_kham_meu", "servicename": "Khám tổng quát MeU" }
+      },
+      {
+        "id": "scope_db_id_02",
+        "client_id": "scope_vip_02",
+        "specialty_id": "specialty_pediatrics",
+        "area_id": "area_meu_vip",
+        "room_id": "room_301",
+        "service_id": "srv_kham_meu",
+        "price_level_code": "VIP",
+        "fee": 300000,
+        "status": "ACTIVE",
+        "note": "Khám MeU VIP",
+        "specialty": { "id": "specialty_pediatrics", "name": "Nhi khoa" },
+        "area": { "id": "area_meu_vip", "name": "Khu VIP MeU" },
+        "room": { "id": "room_301", "roomname": "Phòng 301 - VIP" },
+        "service": { "id": "srv_kham_meu", "servicename": "Khám tổng quát MeU" }
       }
     ],
     "time_slots": [
       {
-        "id": "slot_db_001",
+        "id": "slot_db_id_01",
         "start_time": "08:00",
         "end_time": "08:30",
         "slot_limit": 20,
-        "weekday": 1,
-        "scope_ids": "all"
+        "weekday": 5,
+        "dates": ["2026-08-21"],
+        "scope_ids": ["scope_db_id_01", "scope_db_id_02"],
+        "date_overrides": [
+          {
+            "date": "2026-08-21",
+            "slot_limit": 15,
+            "scope_ids": ["scope_db_id_01"]
+          }
+        ]
+      },
+      {
+        "id": "slot_db_id_02",
+        "start_time": "08:00",
+        "end_time": "08:30",
+        "slot_limit": 20,
+        "weekday": 6,
+        "dates": ["2026-08-22"],
+        "scope_ids": ["scope_db_id_01", "scope_db_id_02"],
+        "date_overrides": [
+          {
+            "date": "2026-08-22",
+            "slot_limit": 10,
+            "scope_ids": ["scope_db_id_02"]
+          }
+        ]
       }
-    ],
-    "created_at": "2026-07-13T01:00:00.000Z",
-    "updated_at": "2026-07-13T01:00:00.000Z"
+    ]
   }
 }
 ```
 
-Nếu backend vẫn dùng envelope cũ `{ success, data }`, frontend có thể điều chỉnh sau, nhưng khuyến nghị đồng bộ theo envelope chuẩn của hệ thống:
-
-```json
-{
-  "status": "success",
-  "responseData": {}
-}
-```
-
-### 10.2. Validation error
-
-```json
-{
-  "status": "fail",
-  "message": "Dữ liệu lịch khám không hợp lệ",
-  "violations": [
-    {
-      "field": "weekdays[0]",
-      "message": "Thứ áp dụng không hợp lệ"
-    },
-    {
-      "field": "scopes[0].client_id",
-      "message": "client_id là bắt buộc"
-    },
-    {
-      "field": "time_slots[0].weekday",
-      "message": "Thứ áp dụng là bắt buộc"
-    },
-    {
-      "field": "time_slots[0].scope_ids[0]",
-      "message": "Không tìm thấy phạm vi khám tương ứng"
-    }
-  ],
-  "responseData": null
-}
-```
-
 ---
 
-## 11. Gợi ý lưu DB
+## 7. Các quy tắc Validate và Xử lý Backend cần lưu ý
 
-Backend có thể triển khai theo 1 trong 2 hướng.
-
-### Hướng A — Tách bảng scope và time slot
-
-Bổ sung các bảng mới:
-
-```text
-doctor_work_schedule_scopes
-- id
-- schedule_id
-- client_id              // optional, lưu để audit/debug nếu cần
-- specialty_id
-- area_id
-- room_id
-- service_id
-- fee
-- status
-- note
-- created_at
-- updated_at
-
-doctor_work_schedule_time_slots
-- id
-- schedule_id
-- weekday                // 0 = Chủ nhật, 1 = Thứ 2, ... 6 = Thứ 7
-- start_time
-- end_time
-- slot_limit
-- scope_mode             // all | custom
-- scope_ids              // jsonb array id thật hoặc mapping table
-- created_at
-- updated_at
-```
-
-Ưu điểm:
-
-- Query rõ ràng.
-- Dễ thống kê theo phạm vi/dịch vụ/phòng/thứ.
-- Dễ validate trùng/chồng lấn theo `weekday`.
-
-### Hướng B — Giữ bảng chính, lưu `scopes` và `time_slots` dạng JSONB
-
-Bổ sung JSONB column:
-
-```text
-weekdays jsonb
-scopes jsonb
-time_slots jsonb
-```
-
-Ưu điểm:
-
-- Ít thay đổi DB.
-- Phù hợp nếu lịch khám chỉ dùng để hiển thị/đặt lịch theo JSON.
-
-Nhược điểm:
-
-- Khó query/thống kê hơn.
-- Cần validate JSON kỹ ở application layer.
-
----
-
-## 12. Backward compatibility
-
-Trong giai đoạn chuyển tiếp, backend có thể hỗ trợ đồng thời:
-
-### Payload cũ
-
-```json
-{
-  "doctor_id": "...",
-  "exam_area_id": "...",
-  "schedule_date": "...",
-  "time_slots": []
-}
-```
-
-### Payload mới
-
-```json
-{
-  "doctor_id": "...",
-  "date": "...",
-  "weekdays": [1, 2, 3, 4, 5, 6, 0],
-  "scopes": [],
-  "time_slots": []
-}
-```
-
-Cách nhận diện payload mới:
-
-```ts
-const isV2 = Array.isArray(body.scopes) && Array.isArray(body.time_slots);
-```
-
-Nếu `isV2 = true`, backend xử lý theo logic nhiều phạm vi + thứ áp dụng.
-Nếu `isV2 = false`, backend xử lý theo logic cũ để không ảnh hưởng màn hình/luồng khác.
-
----
-
-## 13. Mapping từ frontend hiện tại
-
-Frontend hiện đang gửi từ file:
-
-```text
-src/app/(dashboard)/appointments/new/page.tsx
-```
-
-Hook gọi API:
-
-```text
-doctorWorkSchedulesHooks.useCreateV2
-```
-
-Type payload nằm ở:
-
-```text
-src/api/doctorWorkSchedulesApi.ts
-```
-
-Tên type frontend:
-
-```ts
-CreateDoctorWorkScheduleV2Payload
-WorkScheduleScope
-WorkScheduleTimeSlotV2
-```
-
-Frontend hiện gửi:
-
-- `scopes[].client_id`: ID tạm để backend map scope.
-- `time_slots[].weekday`: thứ áp dụng cho từng khung giờ.
-- `time_slots[].scope_ids`: `"all"` hoặc mảng `client_id` của scope.
-- `weekdays`: danh sách thứ tổng hợp từ toàn bộ time slot.
-
----
-
-## 14. Checklist cho backend
-
-- [ ] Endpoint `POST /doctor-work-schedules` nhận được `scopes[]`.
-- [ ] Endpoint nhận được `scopes[].client_id`.
-- [ ] Endpoint nhận được `weekdays[]` ở root payload.
-- [ ] Endpoint nhận được `time_slots[]` với `weekday` và `slot_limit` riêng từng khung.
-- [ ] Hỗ trợ `scope_ids = "all"`.
-- [ ] Hỗ trợ `scope_ids = string[]` trỏ tới `scopes[].client_id`.
-- [ ] Map `scopes[].client_id` sang ID thật sau khi lưu DB.
-- [ ] Validate không trùng `client_id` trong scopes.
-- [ ] Validate không trùng scope theo tổ hợp `specialty_id + area_id + room_id + service_id`.
-- [ ] Validate `weekday` chỉ nhận `0..6`.
-- [ ] Validate `weekdays[]` khớp với `time_slots[].weekday`.
-- [ ] Validate không chồng lấn khung giờ trong cùng doctor + weekday + phạm vi.
-- [ ] Validate `slot_limit > 0`.
-- [ ] Trả response success theo envelope chuẩn.
-- [ ] Trả validation errors có field rõ ràng để frontend hiển thị nếu cần.
-
----
-
-## 15. Ghi chú quan trọng cho frontend/backend
-
-Payload mới hiện đã ưu tiên hướng rõ ràng nhất:
-
-```text
-scopes[].client_id  <── time_slots[].scope_ids[]
-```
-
-Backend không cần map scope theo thứ tự mảng nữa. Chỉ cần dùng `client_id` để tạo bảng map tạm khi lưu lịch khám.
+1. **Khóa chống trùng lịch của Bác sĩ (Doctor Overlap Validation)**:
+   - Một bác sĩ không thể có 2 khung giờ trùng/giao nhau trong cùng một ngày cụ thể (`start_time` - `end_time` giao nhau trên cùng `date`).
+2. **Khóa chống trùng phòng khám (Room Overlap Validation)**:
+   - Một phòng khám (`room_id`) trong cùng một ngày và khung giờ không thể được phân cho 2 bác sĩ khác nhau.
+3. **Ưu tiên cấu hình khi Bệnh nhân đặt lịch (Booking Resolution Logic)**:
+   - Khi bệnh nhân tìm kiếm lịch khám theo ngày $D$, khung giờ $T$:
+     1. Tìm `time_slots` có $D \in \text{dates}$ và thời gian $T$.
+     2. **Kiểm tra `date_overrides` cho ngày $D$**:
+        - Nếu có `date_overrides` cho ngày $D$:
+          - Lấy `slot_limit = override.slot_limit ?? slot.slot_limit`.
+          - Lấy `scope_ids = override.scope_ids ?? slot.scope_ids`.
+        - Nếu không có: Dùng `slot.slot_limit` và `slot.scope_ids`.
+     3. Lọc danh sách dịch vụ / khu vực / mức giá mà bác sĩ nhận khám trong ngày $D$ dựa trên tập `scope_ids` đã xác định ở Bước 2.
+     4. Kiểm tra số lượng phiếu đã được đặt thực tế so với `slot_limit` tính được.

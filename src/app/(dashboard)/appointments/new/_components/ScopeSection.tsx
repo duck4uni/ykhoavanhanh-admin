@@ -6,7 +6,7 @@ import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Khối 2: Phạm vi khám áp dụng (bảng scopes). */
 export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
-  const { scopes, specialtyName, areaName, roomName, serviceName, openAddScope, openEditScope, removeScope } = ctrl;
+  const { scopes, specialtyName, areaName, roomName, serviceName, servicePriceLevelLabel, openAddScope, openEditScope, removeScope } = ctrl;
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -41,7 +41,10 @@ export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                   {areaName(scope.area_id)}
                   {roomName(scope.room_id) ? ` · ${roomName(scope.room_id)}` : ""}
                 </span>
-                <span className="truncate text-slate-700">{serviceName(scope.service_id)}</span>
+                <span className="truncate text-slate-700">
+                  {serviceName(scope.service_id)}
+                  {scope.price_level_code ? ` · ${servicePriceLevelLabel(scope.service_id, scope.price_level_code)}` : ""}
+                </span>
                 <span className="text-right font-medium text-slate-800">{formatFee(scope.fee)}</span>
                 <span>
                   <Badge variant={scope.status === "ACTIVE" ? "success" : "default"}>
