@@ -52,6 +52,9 @@ export interface DoctorWorkSchedule {
   exam_area?: { id: string; code: string; name: string; short_name: string | null };
   room?: { id: string; roomid?: string; room_id?: string; roomname?: string; room_name?: string } | null;
   room_name?: string | null;
+  service_id?: string | null;
+  service_name?: string | null;
+  service?: { id: string; service_id?: string; serviceid?: string; service_name?: string; servicename?: string; name?: string } | null;
   scopes?: DoctorWorkScheduleScopeV2[];
 }
 

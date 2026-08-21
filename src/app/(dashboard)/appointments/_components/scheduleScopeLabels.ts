@@ -16,7 +16,10 @@ export function getScheduleScopeLabels(
   rawDataOrItem: unknown,
   legacyRoomId?: string | null,
   roomLookup?: Map<string, string> | Record<string, string>,
-  legacyRoomName?: string | null
+  legacyRoomName?: string | null,
+  legacyServiceId?: string | null,
+  serviceLookup?: Map<string, string> | Record<string, string>,
+  legacyServiceName?: string | null
 ): {
   roomLabels: string[];
   serviceLabels: string[];
@@ -28,6 +31,17 @@ export function getScheduleScopeLabels(
     }
     if (roomLookup && typeof roomLookup === "object") {
       return roomLookup[roomId];
+    }
+    return undefined;
+  };
+
+  const getResolvedServiceName = (serviceId?: string): string | undefined => {
+    if (!serviceId) return undefined;
+    if (serviceLookup instanceof Map) {
+      return serviceLookup.get(serviceId);
+    }
+    if (serviceLookup && typeof serviceLookup === "object") {
+      return serviceLookup[serviceId];
     }
     return undefined;
   };
@@ -45,7 +59,21 @@ export function getScheduleScopeLabels(
 
   const serviceLabels = unique(scopes.map((scope) => {
     const service = isRecord(scope.service) ? scope.service : undefined;
-    return text(scope.service_name) ?? text(service?.service_name) ?? text(service?.servicename);
+    const serviceRaw = isRecord(service?.raw_data) ? service.raw_data : undefined;
+    const directServiceName =
+      text(scope.service_name)
+      ?? text(service?.service_name)
+      ?? text(service?.servicename)
+      ?? text(service?.name)
+      ?? text(serviceRaw?.servicename)
+      ?? text(serviceRaw?.service_name);
+
+    if (directServiceName) return directServiceName;
+
+    const serviceId = text(scope.service_id) ?? text(service?.id) ?? text(service?.serviceid);
+    const lookedUpName = getResolvedServiceName(serviceId);
+
+    return lookedUpName ?? serviceId;
   }));
 
   const roomLabels = unique(scopes.map((scope) => {
@@ -80,6 +108,23 @@ export function getScheduleScopeLabels(
       roomLabels.push(fallbackRoomName);
     } else if (fallbackRoomId) {
       roomLabels.push(fallbackRoomId);
+    }
+  }
+
+  // Fallback từ root item nếu scopes chưa có serviceLabels
+  const directItemServiceName =
+    text(legacyServiceName)
+    ?? text(itemRecord?.service_name)
+    ?? (isRecord(itemRecord?.service) ? text(itemRecord.service.service_name) ?? text(itemRecord.service.servicename) ?? text(itemRecord.service.name) : undefined);
+
+  const fallbackServiceId = text(legacyServiceId) ?? (itemRecord ? text(itemRecord.service_id) : undefined);
+  const fallbackServiceName = directItemServiceName ?? getResolvedServiceName(fallbackServiceId);
+
+  if (serviceLabels.length === 0) {
+    if (fallbackServiceName) {
+      serviceLabels.push(fallbackServiceName);
+    } else if (fallbackServiceId) {
+      serviceLabels.push(fallbackServiceId);
     }
   }
 
