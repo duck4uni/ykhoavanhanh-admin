@@ -27,6 +27,10 @@ interface AppointmentScheduleTableProps {
   onDelete: (id: string) => void;
   onToggleStatus: (item: DoctorWorkSchedule) => void;
   togglingId: string | null;
+  selectedIds?: string[];
+  onToggleSelectRow?: (id: string) => void;
+  onToggleSelectAll?: (pageRows: DoctorWorkSchedule[]) => void;
+  roomLookup?: Map<string, string>;
 }
 
 export function AppointmentScheduleTable({
@@ -42,7 +46,16 @@ export function AppointmentScheduleTable({
   onDelete,
   onToggleStatus,
   togglingId,
+  selectedIds = [],
+  onToggleSelectRow,
+  onToggleSelectAll,
+  roomLookup,
 }: AppointmentScheduleTableProps) {
+  const allCurrentPageSelected =
+    rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
+  const someCurrentPageSelected =
+    rows.some((item) => selectedIds.includes(item.id)) && !allCurrentPageSelected;
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
       {isLoading ? (
@@ -53,6 +66,20 @@ export function AppointmentScheduleTable({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {onToggleSelectRow && (
+                    <th className="w-12 px-4 py-3.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={allCurrentPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someCurrentPageSelected;
+                        }}
+                        onChange={() => onToggleSelectAll?.(rows)}
+                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary-500"
+                        title="Chọn tất cả trên trang này"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-3.5">STT</th>
                   <th className="min-w-[180px] px-6 py-3.5">Bác sĩ</th>
                   <th className="min-w-[160px] px-6 py-3.5">Khu khám</th>
@@ -69,7 +96,7 @@ export function AppointmentScheduleTable({
               <tbody className="divide-y divide-slate-100">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={onToggleSelectRow ? 12 : 11} className="px-6 py-12 text-center text-sm text-muted-foreground">
                       Không tìm thấy lịch khám phù hợp.
                     </td>
                   </tr>
@@ -77,11 +104,34 @@ export function AppointmentScheduleTable({
                   rows.map((item, index) => {
                     const capacity = getScheduleCapacity(item);
                     const shiftCode = getScheduleShiftCode(item);
-                    const { roomLabels, serviceLabels } = getScheduleScopeLabels(item.raw_data, item.room_id);
+                    const legacyRoomName = item.room?.room_name ?? item.room?.roomname ?? item.room_name ?? null;
+                    const { roomLabels, serviceLabels } = getScheduleScopeLabels(
+                      item,
+                      item.room_id,
+                      roomLookup,
+                      legacyRoomName
+                    );
                     const roomSummary = summarizeScopeLabels(roomLabels);
                     const serviceSummary = summarizeScopeLabels(serviceLabels);
+                    const isSelected = selectedIds.includes(item.id);
+
                     return (
-                    <tr key={item.id} className="text-sm transition-colors hover:bg-slate-50/60">
+                    <tr
+                      key={item.id}
+                      className={`text-sm transition-colors ${
+                        isSelected ? "bg-primary-50/40 hover:bg-primary-50/60" : "hover:bg-slate-50/60"
+                      }`}
+                    >
+                      {onToggleSelectRow && (
+                        <td className="w-12 px-4 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onToggleSelectRow(item.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary-500"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
                       <td className="min-w-[180px] px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
                       <td className="min-w-[160px] px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>

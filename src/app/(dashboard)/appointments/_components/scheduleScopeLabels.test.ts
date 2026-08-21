@@ -27,6 +27,49 @@ test("prefers room names and falls back to room ids", () => {
   assert.deepEqual(result.roomLabels, ["Phòng 101", "Phòng 102", "Phòng 103", "room-104"]);
 });
 
+test("resolves room id to room name via roomLookup", () => {
+  const lookup = new Map([
+    ["room-104", "Phòng 104 - Ngoại"],
+    ["legacy-room", "Phòng 101 - Khám Tổng Quát"],
+  ]);
+  const result = getScheduleScopeLabels(
+    {
+      scopes: [{ room_id: "room-104" }],
+    },
+    undefined,
+    lookup
+  );
+  assert.deepEqual(result.roomLabels, ["Phòng 104 - Ngoại"]);
+
+  const fallback = getScheduleScopeLabels(null, "legacy-room", lookup);
+  assert.deepEqual(fallback.roomLabels, ["Phòng 101 - Khám Tổng Quát"]);
+});
+
+test("extracts room names directly from schedule item payload as returned by API", () => {
+  const apiItem = {
+    id: "b4a81a21-ac4f-4391-9c6d-aa4620487eda",
+    room_name: "PK - P204 NỘI",
+    room: {
+      id: "db5de58b-23b8-473d-b4ba-81db3282516b",
+      room_id: "098",
+      room_name: "PK - P204 NỘI"
+    },
+    scopes: [
+      {
+        room_name: "PK - P204 NỘI",
+        service_name: "Kham MeU",
+        room: {
+          room_name: "PK - P204 NỘI"
+        }
+      }
+    ]
+  };
+
+  const result = getScheduleScopeLabels(apiItem);
+  assert.deepEqual(result.roomLabels, ["PK - P204 NỘI"]);
+  assert.deepEqual(result.serviceLabels, ["Kham MeU"]);
+});
+
 test("uses the legacy room id and handles missing scope data", () => {
   assert.deepEqual(getScheduleScopeLabels(null, "legacy-room"), {
     roomLabels: ["legacy-room"],

@@ -12,13 +12,36 @@ function unique(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
-export function getScheduleScopeLabels(rawData: unknown, legacyRoomId?: string | null): {
+export function getScheduleScopeLabels(
+  rawDataOrItem: unknown,
+  legacyRoomId?: string | null,
+  roomLookup?: Map<string, string> | Record<string, string>,
+  legacyRoomName?: string | null
+): {
   roomLabels: string[];
   serviceLabels: string[];
 } {
-  const scopes = isRecord(rawData) && Array.isArray(rawData.scopes)
-    ? rawData.scopes.filter(isRecord)
-    : [];
+  const getResolvedRoomName = (roomId?: string): string | undefined => {
+    if (!roomId) return undefined;
+    if (roomLookup instanceof Map) {
+      return roomLookup.get(roomId);
+    }
+    if (roomLookup && typeof roomLookup === "object") {
+      return roomLookup[roomId];
+    }
+    return undefined;
+  };
+
+  const itemRecord = isRecord(rawDataOrItem) ? rawDataOrItem : undefined;
+  const rawDataRecord = isRecord(itemRecord?.raw_data) ? itemRecord.raw_data : undefined;
+
+  // Lấy scopes từ item.scopes hoặc item.raw_data.scopes hoặc rawDataOrItem.scopes
+  const rawScopes =
+    (Array.isArray(itemRecord?.scopes) ? itemRecord.scopes : undefined) ??
+    (Array.isArray(rawDataRecord?.scopes) ? rawDataRecord.scopes : undefined) ??
+    (Array.isArray(rawDataOrItem) ? rawDataOrItem : []);
+
+  const scopes = rawScopes.filter(isRecord);
 
   const serviceLabels = unique(scopes.map((scope) => {
     const service = isRecord(scope.service) ? scope.service : undefined;
@@ -27,14 +50,38 @@ export function getScheduleScopeLabels(rawData: unknown, legacyRoomId?: string |
 
   const roomLabels = unique(scopes.map((scope) => {
     const room = isRecord(scope.room) ? scope.room : undefined;
-    return text(scope.room_name)
+    const roomRaw = isRecord(room?.raw_data) ? room.raw_data : undefined;
+    const directRoomName =
+      text(scope.room_name)
       ?? text(room?.room_name)
       ?? text(room?.roomname)
-      ?? text(scope.room_id);
+      ?? text(roomRaw?.roomname)
+      ?? text(roomRaw?.room_name);
+
+    if (directRoomName) return directRoomName;
+
+    const roomId = text(scope.room_id) ?? text(room?.id) ?? text(room?.roomid);
+    const lookedUpName = getResolvedRoomName(roomId);
+
+    return lookedUpName ?? roomId;
   }));
 
-  const fallbackRoomId = text(legacyRoomId);
-  if (roomLabels.length === 0 && fallbackRoomId) roomLabels.push(fallbackRoomId);
+  // Fallback từ root item nếu scopes chưa có roomLabels
+  const directItemRoomName =
+    text(legacyRoomName)
+    ?? text(itemRecord?.room_name)
+    ?? (isRecord(itemRecord?.room) ? text(itemRecord.room.room_name) ?? text(itemRecord.room.roomname) : undefined);
+
+  const fallbackRoomId = text(legacyRoomId) ?? (itemRecord ? text(itemRecord.room_id) : undefined);
+  const fallbackRoomName = directItemRoomName ?? getResolvedRoomName(fallbackRoomId);
+
+  if (roomLabels.length === 0) {
+    if (fallbackRoomName) {
+      roomLabels.push(fallbackRoomName);
+    } else if (fallbackRoomId) {
+      roomLabels.push(fallbackRoomId);
+    }
+  }
 
   return { roomLabels, serviceLabels };
 }
