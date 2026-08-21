@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, MapPin, Plus, RefreshCw, Ticket, Trash2 } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronDown, ChevronRight, Clock3, MapPin, Plus, RefreshCw, RotateCcw, Ticket, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { weekdayLabels } from "@/lib/hospital-admin";
 import { StepBadge } from "./StepBadge";
 import { TimeSelect } from "./TimeSelect";
-import { getDateSlotLimit } from "../dateSlotOverrides";
+import { getDateScopeIds, getDateSlotLimit } from "../dateSlotOverrides";
 import { formatShortLocalDate, weekdayOrder, weekdayShortLabel, type TimeSlotRow } from "../types";
 import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
@@ -13,7 +13,7 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
   const {
     timeSlots, scopes, totalSlotCount, datesByWeekday, availableWeekdays, dateRangeValid, form,
     setAutoGenOpen, addSlot, updateSlot, removeSlot, toggleSlotScope, toggleSlotWeekday,
-    toggleSlotDate, setSlotDateLimit, setSlotWeekdays, scopeShortLabel,
+    toggleSlotDate, setSlotDateLimit, setSlotDateScopes, toggleSlotDateScope, setSlotWeekdays, scopeShortLabel,
   } = ctrl;
   const crossesYear = Boolean(form.start_date && form.end_date && form.start_date.slice(0, 4) !== form.end_date.slice(0, 4));
   const [collapsedSlotIds, setCollapsedSlotIds] = useState<Set<string>>(() => new Set());
@@ -48,7 +48,7 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
       <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><StepBadge n={3} /> Khung giờ làm việc</h2>
-          <p className="mt-1 text-xs text-slate-400">Thiết lập giờ khám, số phiếu và các ngày áp dụng trong khoảng đã chọn.</p>
+          <p className="mt-1 text-xs text-slate-400">Thiết lập giờ khám, số phiếu, ngày áp dụng và phạm vi khám linh hoạt theo từng ngày.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setAutoGenOpen(true)} className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"><RefreshCw className="h-3.5 w-3.5" /> Tự sinh khung giờ</button>
@@ -97,7 +97,7 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                   <span className="font-semibold text-slate-800">Khung giờ {index + 1}</span>
                   <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 text-slate-400" /> <b className="font-medium text-slate-700">{slot.start || "--:--"} – {slot.end || "--:--"}</b></span>
                   <span className="inline-flex items-center gap-1.5"><Ticket className="h-3.5 w-3.5 text-slate-400" /> {slot.slot_limit} phiếu</span>
-                  <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {slot.weekdays.length} ngày / tuần</span>
+                  <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-slate-400" /> {slot.weekdays.length} ngày / tuần ({slot.dates.length} ngày cụ thể)</span>
                   <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" /> {weekdayOrder.filter((weekday) => slot.weekdays.includes(weekday)).map(weekdayShortLabel).join(", ") || "Chưa chọn"}</span>
                 </span>
               </button>
@@ -117,13 +117,13 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                     </div>
                   </div>
                   <label className="min-w-0 space-y-1.5">
-                    <span className="block text-xs font-semibold text-slate-700">Số phiếu khám</span>
+                    <span className="block text-xs font-semibold text-slate-700">Số phiếu khám mặc định</span>
                     <input type="number" min={1} value={slot.slot_limit} onChange={(e) => updateSlot(slot.id, { slot_limit: Number(e.target.value) || 0 })} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10" />
                   </label>
                   <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-slate-700">Áp dụng cho phạm vi</label>
-                    <select value={slot.scopeMode} onChange={(e) => { const scopeMode = e.target.value as TimeSlotRow["scopeMode"]; if (scopeMode === "custom" && scopes.length === 0) { toast.error("Vui lòng thêm ít nhất một phạm vi khám trước."); return; } updateSlot(slot.id, { scopeMode }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"><option value="all">Tất cả phạm vi</option><option value="custom">Chọn phạm vi</option></select>
-                    {slot.scopeMode === "all" ? <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">Khung giờ này áp dụng cho toàn bộ phạm vi khám đã cấu hình.</p> : (
+                    <label className="block text-xs font-semibold text-slate-700">Phạm vi khám mặc định của khung giờ</label>
+                    <select value={slot.scopeMode} onChange={(e) => { const scopeMode = e.target.value as TimeSlotRow["scopeMode"]; if (scopeMode === "custom" && scopes.length === 0) { toast.error("Vui lòng thêm ít nhất một phạm vi khám trước."); return; } updateSlot(slot.id, { scopeMode }); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"><option value="all">Tất cả phạm vi</option><option value="custom">Chọn phạm vi chung</option></select>
+                    {slot.scopeMode === "all" ? <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">Mặc định áp dụng cho tất cả phạm vi khám (có thể gán riêng theo từng ngày bên dưới).</p> : (
                       <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
                         {scopes.map((scope) => { const checked = slot.scope_ids.includes(scope.clientId); return <button key={scope.clientId} type="button" aria-pressed={checked} onClick={() => toggleSlotScope(slot.id, scope.clientId)} className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${checked ? "bg-primary-100 text-primary-700 ring-1 ring-primary-300" : "bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-100"}`}>{scopeShortLabel(scope)}</button>; })}
                         {slot.scope_ids.length === 0 && <span className="text-[11px] text-amber-600">Chưa chọn phạm vi nào</span>}
@@ -191,11 +191,14 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                         })}
                       </div>
                     </div>
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
                       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <p className="text-xs font-semibold text-primary-700">Cấu hình số phiếu theo từng ngày đã chọn</p>
-                          <p className="mt-1 text-[11px] text-slate-500">Mặc định theo số phiếu chung; chỉ giá trị thay đổi mới được lưu riêng.</p>
+                          <p className="text-xs font-semibold text-primary-700">Cấu hình phạm vi khám & số phiếu theo từng ngày</p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Bạn có thể gán phạm vi riêng (ví dụ: ngày 21/08 khám Dịch vụ, ngày 22/08 khám VIP) và số phiếu cho từng ngày cụ thể.
+                          </p>
                         </div>
                         {slot.dates.length > 6 && (
                           <button type="button" onClick={() => setExpandedCapacitySlots((current) => { const next = new Set(current); if (next.has(slot.id)) next.delete(slot.id); else next.add(slot.id); return next; })} className="rounded-md bg-primary-50 px-2.5 py-1 text-[11px] font-medium text-primary-700 hover:bg-primary-100">
@@ -203,17 +206,86 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                           </button>
                         )}
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+                      <div className="grid gap-3 lg:grid-cols-2">
                         {(expandedCapacitySlots.has(slot.id) ? slot.dates : slot.dates.slice(0, 6)).map((date) => {
                           const weekday = new Date(`${date}T00:00:00`).getDay();
+                          const dateScopeSetting = getDateScopeIds(slot.date_overrides, date, slot.scopeMode, slot.scope_ids);
+                          const dateOverride = slot.date_overrides.find((item) => item.date === date);
+                          const hasScopeOverride = dateOverride?.scope_ids !== undefined;
+
                           return (
-                            <div key={date} className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 p-2">
-                              <span className="inline-flex flex-none items-center gap-1.5 rounded-md bg-primary-50 px-2 py-1 text-xs font-semibold text-primary-700"><CalendarDays className="h-3.5 w-3.5" /> {formatShortLocalDate(date, crossesYear)}</span>
-                              <label className="ml-auto flex min-w-0 items-center gap-1.5 text-[11px] text-slate-500">
-                                <span className="whitespace-nowrap">Số phiếu</span>
-                                <input type="number" min={1} value={getDateSlotLimit(slot.date_overrides, date, slot.slot_limit)} onChange={(event) => setSlotDateLimit(slot.id, date, Number(event.target.value))} className="h-8 w-16 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10" />
-                              </label>
-                              <button type="button" onClick={() => toggleSlotDate(slot.id, weekday, date)} aria-label={`Bỏ ngày ${formatShortLocalDate(date, true)}`} className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-red-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                            <div key={date} className="flex flex-col gap-2.5 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+                              <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                                <span className="inline-flex items-center gap-1.5 rounded-md bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">
+                                  <CalendarDays className="h-3.5 w-3.5" /> {formatShortLocalDate(date, crossesYear)} ({weekdayShortLabel(weekday)})
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                                    <span>Số phiếu:</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      value={getDateSlotLimit(slot.date_overrides, date, slot.slot_limit)}
+                                      onChange={(event) => setSlotDateLimit(slot.id, date, Number(event.target.value))}
+                                      className="h-7 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSlotDate(slot.id, weekday, date)}
+                                    aria-label={`Bỏ ngày ${formatShortLocalDate(date, true)}`}
+                                    title="Bỏ ngày này"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-semibold text-slate-700">Phạm vi khám ngày {formatShortLocalDate(date, crossesYear)}:</span>
+                                  {hasScopeOverride && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setSlotDateScopes(slot.id, date, undefined)}
+                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-primary-600 hover:text-primary-800 hover:underline"
+                                      title="Đặt lại theo phạm vi mặc định của khung giờ"
+                                    >
+                                      <RotateCcw className="h-2.5 w-2.5" /> Đặt lại mặc định
+                                    </button>
+                                  )}
+                                </div>
+
+                                {scopes.length === 0 ? (
+                                  <p className="text-[11px] text-amber-600">Chưa có phạm vi nào được thêm ở Bước 2.</p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {scopes.map((scope) => {
+                                      const isChecked = dateScopeSetting === "all" || (Array.isArray(dateScopeSetting) && dateScopeSetting.includes(scope.clientId));
+                                      return (
+                                        <button
+                                          key={scope.clientId}
+                                          type="button"
+                                          aria-pressed={isChecked}
+                                          onClick={() => toggleSlotDateScope(slot.id, date, scope.clientId)}
+                                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+                                            isChecked
+                                              ? "bg-primary text-white shadow-xs ring-1 ring-primary"
+                                              : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+                                          }`}
+                                        >
+                                          {isChecked && <Check className="h-3 w-3" />}
+                                          <span>{scopeShortLabel(scope)}</span>
+                                        </button>
+                                      );
+                                    })}
+                                    {Array.isArray(dateScopeSetting) && dateScopeSetting.length === 0 && (
+                                      <span className="text-[11px] font-medium text-red-500">Chưa chọn phạm vi nào cho ngày này</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}

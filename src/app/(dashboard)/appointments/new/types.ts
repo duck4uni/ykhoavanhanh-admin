@@ -236,7 +236,23 @@ export function hydrateScheduleEditor(schedule: DoctorWorkScheduleV2): HydratedS
     const scopeMode: TimeSlotRow["scopeMode"] = slot.scope_ids === "all" || coversAll ? "all" : "custom";
     const scopeIds = scopeMode === "all" ? [] : mappedScopeIds;
     const slotDates = Array.isArray(slot.dates) ? slot.dates : scheduleDatesByWeekday[slot.weekday];
-    const slotOverrides = Array.isArray(slot.date_overrides) ? slot.date_overrides : [];
+    const slotOverrides: DateSlotOverride[] = Array.isArray(slot.date_overrides)
+      ? slot.date_overrides.map((override) => {
+          let mappedOverrideScopeIds: "all" | string[] | undefined = undefined;
+          if (override.scope_ids === "all") {
+            mappedOverrideScopeIds = "all";
+          } else if (Array.isArray(override.scope_ids)) {
+            mappedOverrideScopeIds = Array.from(new Set(
+              override.scope_ids.map((id) => scopeReferenceMap.get(id)).filter((id): id is string => Boolean(id))
+            ));
+          }
+          return {
+            date: override.date,
+            ...(override.slot_limit !== undefined ? { slot_limit: override.slot_limit } : {}),
+            ...(mappedOverrideScopeIds !== undefined ? { scope_ids: mappedOverrideScopeIds } : {}),
+          };
+        })
+      : [];
     const key = [normalizeTime(slot.start_time), normalizeTime(slot.end_time), slot.slot_limit, scopeMode, ...[...scopeIds].sort()].join("|");
     const existing = grouped.get(key);
     if (existing) {
@@ -325,9 +341,23 @@ export function buildSchedulePayload(
     time_slots: timeSlots.flatMap((slot) => {
       const customIds = slot.scope_ids.filter((id) => scopeClientIds.has(id));
       return slot.weekdays.map((weekday) => {
-        const dateOverrides = slot.date_overrides.filter(
-          (override) => slot.dates.includes(override.date) && parseLocalISODate(override.date)?.getDay() === weekday
-        );
+        const dateOverrides = slot.date_overrides
+          .filter((override) => slot.dates.includes(override.date) && parseLocalISODate(override.date)?.getDay() === weekday)
+          .map((override) => {
+            let sanitizedScopeIds: "all" | string[] | undefined = undefined;
+            if (override.scope_ids === "all") {
+              sanitizedScopeIds = "all";
+            } else if (Array.isArray(override.scope_ids)) {
+              sanitizedScopeIds = override.scope_ids.filter((id) => scopeClientIds.has(id));
+            }
+            return {
+              date: override.date,
+              ...(override.slot_limit !== undefined ? { slot_limit: override.slot_limit } : {}),
+              ...(sanitizedScopeIds !== undefined ? { scope_ids: sanitizedScopeIds } : {}),
+            };
+          })
+          .filter((override) => override.slot_limit !== undefined || override.scope_ids !== undefined);
+
         return {
           start_time: toApiTime(slot.start),
           end_time: toApiTime(slot.end),
@@ -335,7 +365,7 @@ export function buildSchedulePayload(
           weekday,
           dates: slot.dates.filter((date) => parseLocalISODate(date)?.getDay() === weekday),
           ...(dateOverrides.length > 0 ? { date_overrides: dateOverrides } : {}),
-          scope_ids: slot.scopeMode === "all" ? "all" as const : customIds,
+          scope_ids: slot.scopeMode === "all" ? ("all" as const) : customIds,
         };
       });
     }),

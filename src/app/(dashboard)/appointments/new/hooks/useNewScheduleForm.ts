@@ -15,7 +15,7 @@ import { useAccumulatedRows } from "./useAccumulatedRows";
 import { usePickerState } from "./usePickerState";
 import { buildServiceSearchFilter } from "./serviceSearchFilter";
 import { reconcileSelectedDates, toggleSpecificDate, toggleWeekdayDates } from "../slotDateSelection";
-import { reconcileDateOverrides, setDateSlotLimit } from "../dateSlotOverrides";
+import { reconcileDateOverrides, setDateScopeIds, setDateSlotLimit } from "../dateSlotOverrides";
 import { isDuplicateScope } from "../scopeIdentity";
 import {
   activePriceLevels,
@@ -311,12 +311,26 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
 
   function removeScope(clientId: string) {
     setScopes((prev) => prev.filter((s) => s.clientId !== clientId));
-    // Gỡ scope khỏi các khung giờ đang tham chiếu
+    // Gỡ scope khỏi các khung giờ và date_overrides đang tham chiếu
     setTimeSlots((prev) =>
-      prev.map((slot) => ({
-        ...slot,
-        scope_ids: slot.scope_ids.filter((id) => id !== clientId),
-      }))
+      prev.map((slot) => {
+        const nextScopeIds = slot.scope_ids.filter((id) => id !== clientId);
+        const nextDateOverrides = slot.date_overrides
+          .map((override) => {
+            if (!Array.isArray(override.scope_ids)) return override;
+            const filtered = override.scope_ids.filter((id) => id !== clientId);
+            return {
+              ...override,
+              scope_ids: filtered.length > 0 ? filtered : undefined,
+            };
+          })
+          .filter((override) => override.slot_limit !== undefined || override.scope_ids !== undefined);
+        return {
+          ...slot,
+          scope_ids: nextScopeIds,
+          date_overrides: nextDateOverrides,
+        };
+      })
     );
   }
 
@@ -467,6 +481,37 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     setTimeSlots((prev) => prev.map((slot) => slot.id === slotId
       ? { ...slot, date_overrides: setDateSlotLimit(slot.date_overrides, date, limit, slot.slot_limit) }
       : slot));
+  }
+
+  function setSlotDateScopes(slotId: string, date: string, scopeIds: "all" | string[] | undefined) {
+    setTimeSlots((prev) => prev.map((slot) => slot.id === slotId
+      ? { ...slot, date_overrides: setDateScopeIds(slot.date_overrides, date, scopeIds, slot.scopeMode, slot.scope_ids) }
+      : slot));
+  }
+
+  function toggleSlotDateScope(slotId: string, date: string, scopeClientId: string) {
+    setTimeSlots((prev) => prev.map((slot) => {
+      if (slot.id !== slotId) return slot;
+      const existingOverride = slot.date_overrides.find((item) => item.date === date);
+      let currentScopes: string[];
+      if (existingOverride?.scope_ids === "all") {
+        currentScopes = scopes.map((s) => s.clientId);
+      } else if (Array.isArray(existingOverride?.scope_ids)) {
+        currentScopes = existingOverride.scope_ids;
+      } else {
+        currentScopes = slot.scopeMode === "all" ? scopes.map((s) => s.clientId) : [...slot.scope_ids];
+      }
+
+      const exists = currentScopes.includes(scopeClientId);
+      const nextScopes = exists
+        ? currentScopes.filter((id) => id !== scopeClientId)
+        : [...currentScopes, scopeClientId];
+
+      return {
+        ...slot,
+        date_overrides: setDateScopeIds(slot.date_overrides, date, nextScopes, slot.scopeMode, slot.scope_ids),
+      };
+    }));
   }
 
   // ── Modal state: tự sinh khung giờ ──
@@ -654,6 +699,8 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     toggleSlotWeekday,
     toggleSlotDate,
     setSlotDateLimit,
+    setSlotDateScopes,
+    toggleSlotDateScope,
     setSlotWeekdays,
     // auto-gen modal
     autoGenOpen,
