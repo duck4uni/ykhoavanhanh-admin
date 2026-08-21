@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
+import { roomsHooks } from "@/api/roomsApi";
 import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
 import {
@@ -40,10 +41,112 @@ export function useAppointmentScheduleList() {
   const { data: doctors, isLoading: isLoadingDoctors } = doctorsHooks.useList();
   const doctorList = doctors ?? [];
 
+  const { data: roomsData } = roomsHooks.usePaginatedList({
+    pageSize: 100,
+    filters: "status==ACTIVE",
+  });
+  const roomLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (roomsData?.rows ?? []).forEach((r) => {
+      const name = r.roomname || (r as unknown as { room_name?: string }).room_name;
+      if (name) {
+        if (r.id) map.set(r.id, name);
+        if (r.roomid) map.set(r.roomid, name);
+      }
+    });
+    return map;
+  }, [roomsData]);
+
   const deleteMutation = doctorWorkSchedulesHooks.useDelete({
     onSuccess: () => toast.success("Xóa lịch khám thành công"),
     onError: (err) => toast.error(err.message || "Xóa lịch khám thất bại"),
   });
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkActionConfirm, setBulkActionConfirm] = useState<{
+    open: boolean;
+    action: "activate" | "deactivate" | "activate_all" | "deactivate_all";
+  }>({ open: false, action: "activate" });
+
+  const activateManyMutation = doctorWorkSchedulesHooks.useActivateMany({
+    onSuccess: (res) => {
+      const count = res?.affected ?? selectedIds.length;
+      toast.success(`Đã kích hoạt thành công ${count} lịch khám`);
+      setSelectedIds([]);
+      setBulkActionConfirm({ open: false, action: "activate" });
+    },
+    onError: (err) => toast.error(err.message || "Kích hoạt lịch khám thất bại"),
+  });
+
+  const deactivateManyMutation = doctorWorkSchedulesHooks.useDeactivateMany({
+    onSuccess: (res) => {
+      const count = res?.affected ?? selectedIds.length;
+      toast.success(`Đã tạm ngưng thành công ${count} lịch khám`);
+      setSelectedIds([]);
+      setBulkActionConfirm({ open: false, action: "deactivate" });
+    },
+    onError: (err) => toast.error(err.message || "Tạm ngưng lịch khám thất bại"),
+  });
+
+  const activateAllMutation = doctorWorkSchedulesHooks.useActivateAll({
+    onSuccess: (res) => {
+      const count = res?.affected;
+      toast.success(count !== undefined ? `Đã kích hoạt tất cả (${count}) lịch khám` : "Đã kích hoạt tất cả lịch khám đang tạm ngưng");
+      setSelectedIds([]);
+      setBulkActionConfirm({ open: false, action: "activate_all" });
+    },
+    onError: (err) => toast.error(err.message || "Kích hoạt tất cả lịch khám thất bại"),
+  });
+
+  const deactivateAllMutation = doctorWorkSchedulesHooks.useDeactivateAll({
+    onSuccess: (res) => {
+      const count = res?.affected;
+      toast.success(count !== undefined ? `Đã tạm ngưng tất cả (${count}) lịch khám` : "Đã tạm ngưng tất cả lịch khám đang hoạt động");
+      setSelectedIds([]);
+      setBulkActionConfirm({ open: false, action: "deactivate_all" });
+    },
+    onError: (err) => toast.error(err.message || "Tạm ngưng tất cả lịch khám thất bại"),
+  });
+
+  const isBulkOperating =
+    activateManyMutation.isPending ||
+    deactivateManyMutation.isPending ||
+    activateAllMutation.isPending ||
+    deactivateAllMutation.isPending;
+
+  function toggleSelectRow(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  function toggleSelectAllCurrentPage(pageRows: DoctorWorkSchedule[]) {
+    const pageIds = pageRows.map((r) => r.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
+  function handleConfirmBulkAction() {
+    if (bulkActionConfirm.action === "activate") {
+      if (selectedIds.length === 0) return;
+      activateManyMutation.mutate(selectedIds);
+    } else if (bulkActionConfirm.action === "deactivate") {
+      if (selectedIds.length === 0) return;
+      deactivateManyMutation.mutate(selectedIds);
+    } else if (bulkActionConfirm.action === "activate_all") {
+      activateAllMutation.mutate();
+    } else if (bulkActionConfirm.action === "deactivate_all") {
+      deactivateAllMutation.mutate();
+    }
+  }
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const statusMutation = doctorWorkSchedulesHooks.useUpdate({
@@ -130,6 +233,7 @@ export function useAppointmentScheduleList() {
     examAreas,
     doctorList,
     isLoadingDoctors,
+    roomLookup,
     confirmOpen,
     setConfirmOpen,
     openConfirmDelete,
@@ -138,5 +242,14 @@ export function useAppointmentScheduleList() {
     // bật/tắt trạng thái
     toggleScheduleStatus,
     togglingId,
+    // multi-select & bulk actions
+    selectedIds,
+    toggleSelectRow,
+    toggleSelectAllCurrentPage,
+    clearSelection,
+    bulkActionConfirm,
+    setBulkActionConfirm,
+    handleConfirmBulkAction,
+    isBulkOperating,
   };
 }

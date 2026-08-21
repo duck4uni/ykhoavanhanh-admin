@@ -50,6 +50,9 @@ export interface DoctorWorkSchedule {
   updated_at: string;
   doctor?: { id: string; doctor_id: string; doctor_name: string };
   exam_area?: { id: string; code: string; name: string; short_name: string | null };
+  room?: { id: string; roomid?: string; room_id?: string; roomname?: string; room_name?: string } | null;
+  room_name?: string | null;
+  scopes?: DoctorWorkScheduleScopeV2[];
 }
 
 export interface DoctorWorkScheduleListParams extends PaginationParams {
@@ -88,9 +91,16 @@ export type WorkScheduleScope = {
   area_id?: string;
   room_id?: string;
   service_id?: string;
+  price_level_code?: string;
   fee: number;
   status: "ACTIVE" | "INACTIVE";
   note?: string;
+};
+
+export type DateSlotOverrideApi = {
+  date: string;
+  slot_limit?: number;
+  scope_ids?: "all" | string[];
 };
 
 export type WorkScheduleTimeSlotV2 = {
@@ -98,6 +108,8 @@ export type WorkScheduleTimeSlotV2 = {
   end_time: string;
   slot_limit: number;
   weekday?: number;
+  dates: string[];
+  date_overrides?: DateSlotOverrideApi[];
   scope_ids: "all" | string[];
 };
 
@@ -119,6 +131,7 @@ export type DoctorWorkScheduleScopeV2 = {
   area_id?: string | null;
   room_id?: string | null;
   service_id?: string | null;
+  price_level_code?: string | null;
   fee: number | string;
   status: "ACTIVE" | "INACTIVE";
   note?: string | null;
@@ -135,6 +148,9 @@ export type DoctorWorkScheduleTimeSlotV2 = {
   end_time: string;
   slot_limit: number;
   weekday: number;
+  /** Các ngày cụ thể áp dụng, format YYYY-MM-DD. Thiếu field = toàn bộ ngày khớp weekday (legacy). */
+  dates?: string[];
+  date_overrides?: DateSlotOverrideApi[];
   /** Detail trả persisted scope IDs; một số phiên bản có thể trả "all". */
   scope_ids: "all" | string[];
 };
@@ -193,6 +209,26 @@ export const doctorWorkSchedulesService = {
     }
     throw new ApiError(res.data.message || "Cập nhật lịch khám thất bại", res.status, res.data.violations);
   },
+  activateMany: async (ids: string[]): Promise<{ affected?: number }> => {
+    const res = await apiPut<{ affected?: number }>("/doctor-work-schedules/activate", { ids });
+    if (res.data.status === "success") return res.data.responseData ?? {};
+    throw new ApiError(res.data.message || "Bật lịch khám thất bại", res.status, res.data.violations);
+  },
+  deactivateMany: async (ids: string[]): Promise<{ affected?: number }> => {
+    const res = await apiPut<{ affected?: number }>("/doctor-work-schedules/deactivate", { ids });
+    if (res.data.status === "success") return res.data.responseData ?? {};
+    throw new ApiError(res.data.message || "Tạm ngưng lịch khám thất bại", res.status, res.data.violations);
+  },
+  activateAll: async (): Promise<{ affected?: number }> => {
+    const res = await apiPut<{ affected?: number }>("/doctor-work-schedules/activate-all", {});
+    if (res.data.status === "success") return res.data.responseData ?? {};
+    throw new ApiError(res.data.message || "Bật tất cả lịch khám thất bại", res.status, res.data.violations);
+  },
+  deactivateAll: async (): Promise<{ affected?: number }> => {
+    const res = await apiPut<{ affected?: number }>("/doctor-work-schedules/deactivate-all", {});
+    if (res.data.status === "success") return res.data.responseData ?? {};
+    throw new ApiError(res.data.message || "Tạm ngưng tất cả lịch khám thất bại", res.status, res.data.violations);
+  },
 };
 
 export const doctorWorkSchedulesHooks = {
@@ -234,6 +270,58 @@ export const doctorWorkSchedulesHooks = {
       onSuccess: (data, variables, context, mutation) => {
         queryClient.invalidateQueries({ queryKey: keys.all });
         queryClient.invalidateQueries({ queryKey: keys.detail(variables.id) });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => onError?.(error, variables, context, mutation),
+      ...rest,
+    });
+  },
+  useActivateMany: (options?: UseMutationOptions<{ affected?: number }, Error, string[]>) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<{ affected?: number }, Error, string[]>({
+      mutationFn: doctorWorkSchedulesService.activateMany,
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: keys.all });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => onError?.(error, variables, context, mutation),
+      ...rest,
+    });
+  },
+  useDeactivateMany: (options?: UseMutationOptions<{ affected?: number }, Error, string[]>) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<{ affected?: number }, Error, string[]>({
+      mutationFn: doctorWorkSchedulesService.deactivateMany,
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: keys.all });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => onError?.(error, variables, context, mutation),
+      ...rest,
+    });
+  },
+  useActivateAll: (options?: UseMutationOptions<{ affected?: number }, Error, void>) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<{ affected?: number }, Error, void>({
+      mutationFn: doctorWorkSchedulesService.activateAll,
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: keys.all });
+        onSuccess?.(data, variables, context, mutation);
+      },
+      onError: (error, variables, context, mutation) => onError?.(error, variables, context, mutation),
+      ...rest,
+    });
+  },
+  useDeactivateAll: (options?: UseMutationOptions<{ affected?: number }, Error, void>) => {
+    const queryClient = useQueryClient();
+    const { onSuccess, onError, ...rest } = options ?? {};
+    return useMutation<{ affected?: number }, Error, void>({
+      mutationFn: doctorWorkSchedulesService.deactivateAll,
+      onSuccess: (data, variables, context, mutation) => {
+        queryClient.invalidateQueries({ queryKey: keys.all });
         onSuccess?.(data, variables, context, mutation);
       },
       onError: (error, variables, context, mutation) => onError?.(error, variables, context, mutation),

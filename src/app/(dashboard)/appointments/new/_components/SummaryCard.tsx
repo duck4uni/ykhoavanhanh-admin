@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Info, Save } from "lucide-react";
+import { AlertTriangle, Info, Save } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatShortLocalDate, weekdayShortLabel } from "../types";
@@ -12,11 +12,9 @@ export function SummaryCard({ ctrl }: { ctrl: ScheduleEditorController }) {
   } = ctrl;
 
   return (
-    <aside className="space-y-5">
-      <section className="sticky top-6 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
-        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <Calendar className="h-5 w-5 text-primary-600" /> Tóm tắt lịch khám
-        </h2>
+    <aside>
+      <section className="sticky top-4 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-[0_4px_18px_rgba(15,23,42,0.06)]">
+        <h2 className="text-lg font-bold text-slate-900">Thông tin cấu hình</h2>
         <div className="mt-5 space-y-3 text-sm">
           <div className="flex justify-between gap-4">
             <span className="text-slate-500">Bác sĩ</span>
