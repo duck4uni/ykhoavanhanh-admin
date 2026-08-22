@@ -3,6 +3,7 @@ import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorW
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
 import { roomsHooks } from "@/api/roomsApi";
+import { hisServicesHooks } from "@/api/hisServicesApi";
 import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
 import {
@@ -56,6 +57,24 @@ export function useAppointmentScheduleList() {
     });
     return map;
   }, [roomsData]);
+
+  const { data: servicesData } = hisServicesHooks.usePaginatedList({
+    pageSize: 100,
+    filters: "status==ACTIVE",
+  });
+  const serviceLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (servicesData?.rows ?? []).forEach((s) => {
+      const raw = s.raw_data as Record<string, unknown> | null | undefined;
+      const rawName = typeof raw?.servicename === "string" ? raw.servicename : typeof raw?.service_name === "string" ? raw.service_name : undefined;
+      const name = s.servicename || rawName;
+      if (name) {
+        if (s.id) map.set(s.id, name);
+        if (s.serviceid) map.set(s.serviceid, name);
+      }
+    });
+    return map;
+  }, [servicesData]);
 
   const deleteMutation = doctorWorkSchedulesHooks.useDelete({
     onSuccess: () => toast.success("Xóa lịch khám thành công"),
@@ -234,6 +253,7 @@ export function useAppointmentScheduleList() {
     doctorList,
     isLoadingDoctors,
     roomLookup,
+    serviceLookup,
     confirmOpen,
     setConfirmOpen,
     openConfirmDelete,

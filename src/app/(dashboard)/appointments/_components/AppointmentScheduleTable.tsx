@@ -31,6 +31,7 @@ interface AppointmentScheduleTableProps {
   onToggleSelectRow?: (id: string) => void;
   onToggleSelectAll?: (pageRows: DoctorWorkSchedule[]) => void;
   roomLookup?: Map<string, string>;
+  serviceLookup?: Map<string, string>;
 }
 
 export function AppointmentScheduleTable({
@@ -50,6 +51,7 @@ export function AppointmentScheduleTable({
   onToggleSelectRow,
   onToggleSelectAll,
   roomLookup,
+  serviceLookup,
 }: AppointmentScheduleTableProps) {
   const allCurrentPageSelected =
     rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
@@ -105,11 +107,15 @@ export function AppointmentScheduleTable({
                     const capacity = getScheduleCapacity(item);
                     const shiftCode = getScheduleShiftCode(item);
                     const legacyRoomName = item.room?.room_name ?? item.room?.roomname ?? item.room_name ?? null;
+                    const legacyServiceName = item.service?.service_name ?? item.service?.servicename ?? item.service?.name ?? item.service_name ?? null;
                     const { roomLabels, serviceLabels } = getScheduleScopeLabels(
                       item,
                       item.room_id,
                       roomLookup,
-                      legacyRoomName
+                      legacyRoomName,
+                      item.service_id,
+                      serviceLookup,
+                      legacyServiceName
                     );
                     const roomSummary = summarizeScopeLabels(roomLabels);
                     const serviceSummary = summarizeScopeLabels(serviceLabels);

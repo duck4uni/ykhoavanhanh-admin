@@ -146,6 +146,7 @@ export default function AppointmentsPage() {
         onToggleSelectRow={schedules.toggleSelectRow}
         onToggleSelectAll={schedules.toggleSelectAllCurrentPage}
         roomLookup={schedules.roomLookup}
+        serviceLookup={schedules.serviceLookup}
       />
 
       <ConfirmDialog
