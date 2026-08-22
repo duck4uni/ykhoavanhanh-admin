@@ -64,6 +64,8 @@ export interface DoctorWorkScheduleListParams extends PaginationParams {
   schedule_date?: string;
   date_from?: string;
   date_to?: string;
+  /** Lọc lịch THEO DỊCH VỤ trong scopes[] — cú pháp field<toán tử>value, vd: id==<serviceId>. */
+  service_filters?: string;
 }
 
 export type CreateDoctorWorkSchedulePayload = {
