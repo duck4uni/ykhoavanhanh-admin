@@ -87,10 +87,19 @@ export default function AppointmentsPage() {
         onSearchChange={(value) => { schedules.setSearch(value); schedules.setPage(1); }}
         dateFilter={schedules.dateFilter}
         onDateFilterChange={(value) => { schedules.setDateFilter(value); schedules.setPage(1); }}
-        shiftFilter={schedules.shiftFilter}
-        onShiftFilterChange={(value) => { schedules.setShiftFilter(value); schedules.setPage(1); }}
         statusFilter={schedules.statusFilter}
         onStatusFilterChange={(value) => { schedules.setStatusFilter(value); schedules.setPage(1); }}
+        examAreaFilter={schedules.examAreaFilter}
+        onExamAreaFilterChange={(value) => { schedules.setExamAreaFilter(value); schedules.setPage(1); }}
+        examAreaOptions={schedules.examAreas.map((area) => ({ id: area.id, name: area.name }))}
+        roomFilter={schedules.roomFilter}
+        onRoomFilterChange={(value) => { schedules.setRoomFilter(value); schedules.setPage(1); }}
+        fetchRoomOptions={schedules.fetchRoomOptions}
+        roomSelectedLabel={schedules.roomFilter ? schedules.roomLookup.get(schedules.roomFilter) : undefined}
+        serviceFilter={schedules.serviceFilter}
+        onServiceFilterChange={(value) => { schedules.setServiceFilter(value); schedules.setPage(1); }}
+        fetchServiceOptions={schedules.fetchServiceOptions}
+        serviceSelectedLabel={schedules.serviceFilter ? schedules.serviceLookup.get(schedules.serviceFilter) : undefined}
         onApply={() => schedules.setPage(1)}
         onReset={schedules.resetFilters}
       />

@@ -106,6 +106,13 @@ export function getScheduleShiftCode(item: DoctorWorkSchedule): string {
   return "NIGHT";
 }
 
+/** Phòng khám nằm ở scope (v2, nhiều phòng) hoặc field room_id cấp lịch (legacy). */
+export function scheduleIncludesRoom(item: DoctorWorkSchedule, roomId: string): boolean {
+  if (!roomId) return true;
+  if (item.room_id === roomId) return true;
+  return (item.scopes ?? []).some((scope) => scope.room_id === roomId);
+}
+
 export function scheduleIncludesDate(item: DoctorWorkSchedule, date: string): boolean {
   if (!date) return true;
   if (item.schedule_date) return item.schedule_date.slice(0, 10) === date;
