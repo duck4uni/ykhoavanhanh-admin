@@ -82,7 +82,7 @@ export default function DashboardLayout({
             className="flex-1"
             tabIndex={-1}
           >
-            <div className="mx-auto max-w-[1600px] px-6 py-7 xl:px-8">
+            <div className="w-full px-6 py-7 xl:px-8">
               {children}
             </div>
           </main>

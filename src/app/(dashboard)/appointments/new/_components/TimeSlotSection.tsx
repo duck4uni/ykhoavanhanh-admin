@@ -206,6 +206,13 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                           </button>
                         )}
                       </div>
+                      {/* Chỉ những phạm vi đã được chọn ở "Phạm vi khám mặc định của khung giờ" mới
+                          được phép gán riêng cho từng ngày bên dưới. */}
+                      {(() => {
+                        const selectableScopesForSlot = slot.scopeMode === "all"
+                          ? scopes
+                          : scopes.filter((scope) => slot.scope_ids.includes(scope.clientId));
+                        return (
                       <div className="grid gap-3 lg:grid-cols-2">
                         {(expandedCapacitySlots.has(slot.id) ? slot.dates : slot.dates.slice(0, 6)).map((date) => {
                           const weekday = new Date(`${date}T00:00:00`).getDay();
@@ -257,11 +264,15 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                                   )}
                                 </div>
 
-                                {scopes.length === 0 ? (
-                                  <p className="text-[11px] text-amber-600">Chưa có phạm vi nào được thêm ở Bước 2.</p>
+                                {selectableScopesForSlot.length === 0 ? (
+                                  <p className="text-[11px] text-amber-600">
+                                    {scopes.length === 0
+                                      ? "Chưa có phạm vi nào được thêm ở Bước 2."
+                                      : "Vui lòng chọn phạm vi khám mặc định của khung giờ ở trên trước khi gán riêng cho từng ngày."}
+                                  </p>
                                 ) : (
                                   <div className="flex flex-wrap gap-1.5">
-                                    {scopes.map((scope) => {
+                                    {selectableScopesForSlot.map((scope) => {
                                       const isChecked = dateScopeSetting === "all" || (Array.isArray(dateScopeSetting) && dateScopeSetting.includes(scope.clientId));
                                       return (
                                         <button
@@ -290,6 +301,8 @@ export function TimeSlotSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                           );
                         })}
                       </div>
+                        );
+                      })()}
                     </div>
                     </>
                   ) : <p className="mt-2 text-xs text-amber-600">Chưa chọn ngày áp dụng cho khung giờ này.</p>}

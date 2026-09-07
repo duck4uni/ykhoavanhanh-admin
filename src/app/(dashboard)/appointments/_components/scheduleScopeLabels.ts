@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/utils";
+
 type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -12,11 +14,27 @@ function unique(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
+/** Lấy mảng scopes từ item.scopes / item.raw_data.scopes / rawDataOrItem trực tiếp. */
+function extractScopes(rawDataOrItem: unknown): UnknownRecord[] {
+  const itemRecord = isRecord(rawDataOrItem) ? rawDataOrItem : undefined;
+  const rawDataRecord = isRecord(itemRecord?.raw_data) ? itemRecord.raw_data : undefined;
+
+  const rawScopes =
+    (Array.isArray(itemRecord?.scopes) ? itemRecord.scopes : undefined) ??
+    (Array.isArray(rawDataRecord?.scopes) ? rawDataRecord.scopes : undefined) ??
+    (Array.isArray(rawDataOrItem) ? rawDataOrItem : []);
+
+  return rawScopes.filter(isRecord);
+}
+
 export function getScheduleScopeLabels(
   rawDataOrItem: unknown,
   legacyRoomId?: string | null,
   roomLookup?: Map<string, string> | Record<string, string>,
-  legacyRoomName?: string | null
+  legacyRoomName?: string | null,
+  legacyServiceId?: string | null,
+  serviceLookup?: Map<string, string> | Record<string, string>,
+  legacyServiceName?: string | null
 ): {
   roomLabels: string[];
   serviceLabels: string[];
@@ -32,20 +50,37 @@ export function getScheduleScopeLabels(
     return undefined;
   };
 
+  const getResolvedServiceName = (serviceId?: string): string | undefined => {
+    if (!serviceId) return undefined;
+    if (serviceLookup instanceof Map) {
+      return serviceLookup.get(serviceId);
+    }
+    if (serviceLookup && typeof serviceLookup === "object") {
+      return serviceLookup[serviceId];
+    }
+    return undefined;
+  };
+
   const itemRecord = isRecord(rawDataOrItem) ? rawDataOrItem : undefined;
-  const rawDataRecord = isRecord(itemRecord?.raw_data) ? itemRecord.raw_data : undefined;
-
-  // Lấy scopes từ item.scopes hoặc item.raw_data.scopes hoặc rawDataOrItem.scopes
-  const rawScopes =
-    (Array.isArray(itemRecord?.scopes) ? itemRecord.scopes : undefined) ??
-    (Array.isArray(rawDataRecord?.scopes) ? rawDataRecord.scopes : undefined) ??
-    (Array.isArray(rawDataOrItem) ? rawDataOrItem : []);
-
-  const scopes = rawScopes.filter(isRecord);
+  const scopes = extractScopes(rawDataOrItem);
 
   const serviceLabels = unique(scopes.map((scope) => {
     const service = isRecord(scope.service) ? scope.service : undefined;
-    return text(scope.service_name) ?? text(service?.service_name) ?? text(service?.servicename);
+    const serviceRaw = isRecord(service?.raw_data) ? service.raw_data : undefined;
+    const directServiceName =
+      text(scope.service_name)
+      ?? text(service?.service_name)
+      ?? text(service?.servicename)
+      ?? text(service?.name)
+      ?? text(serviceRaw?.servicename)
+      ?? text(serviceRaw?.service_name);
+
+    if (directServiceName) return directServiceName;
+
+    const serviceId = text(scope.service_id) ?? text(service?.id) ?? text(service?.serviceid);
+    const lookedUpName = getResolvedServiceName(serviceId);
+
+    return lookedUpName ?? serviceId;
   }));
 
   const roomLabels = unique(scopes.map((scope) => {
@@ -83,6 +118,23 @@ export function getScheduleScopeLabels(
     }
   }
 
+  // Fallback từ root item nếu scopes chưa có serviceLabels
+  const directItemServiceName =
+    text(legacyServiceName)
+    ?? text(itemRecord?.service_name)
+    ?? (isRecord(itemRecord?.service) ? text(itemRecord.service.service_name) ?? text(itemRecord.service.servicename) ?? text(itemRecord.service.name) : undefined);
+
+  const fallbackServiceId = text(legacyServiceId) ?? (itemRecord ? text(itemRecord.service_id) : undefined);
+  const fallbackServiceName = directItemServiceName ?? getResolvedServiceName(fallbackServiceId);
+
+  if (serviceLabels.length === 0) {
+    if (fallbackServiceName) {
+      serviceLabels.push(fallbackServiceName);
+    } else if (fallbackServiceId) {
+      serviceLabels.push(fallbackServiceId);
+    }
+  }
+
   return { roomLabels, serviceLabels };
 }
 
@@ -95,4 +147,49 @@ export function summarizeScopeLabels(labels: string[]): {
     text: labels.length === 1 ? labels[0] : `${labels[0]} +${labels.length - 1}`,
     title: labels.join(", "),
   };
+}
+
+export type ServicePriceLines = {
+  name: string;
+  lines: string[];
+};
+
+/**
+ * Gom các mức giá (price_levels) của từng dịch vụ trong scopes lịch khám —
+ * ví dụ "Dịch vụ: 230.000đ", "BHYT: 185.000đ" — để hiển thị dưới tên dịch vụ.
+ */
+export function getScheduleServicePriceLines(rawDataOrItem: unknown): ServicePriceLines[] {
+  const scopes = extractScopes(rawDataOrItem);
+  const order: string[] = [];
+  const linesByService = new Map<string, string[]>();
+
+  for (const scope of scopes) {
+    const service = isRecord(scope.service) ? scope.service : undefined;
+    const serviceRaw = isRecord(service?.raw_data) ? service.raw_data : undefined;
+    const name =
+      text(scope.service_name)
+      ?? text(service?.service_name)
+      ?? text(service?.servicename)
+      ?? text(service?.name)
+      ?? text(serviceRaw?.servicename)
+      ?? text(serviceRaw?.service_name);
+
+    if (!name) continue;
+
+    const fee = typeof scope.fee === "number" ? scope.fee : Number(scope.fee);
+    if (!Number.isFinite(fee)) continue;
+
+    const code = text(scope.price_level_code);
+    const priceLevels = Array.isArray(serviceRaw?.price_levels) ? serviceRaw.price_levels.filter(isRecord) : [];
+    const matchedLevel = code ? priceLevels.find((level) => text(level.code) === code) : undefined;
+    const label = (matchedLevel && text(matchedLevel.label)) ?? code ?? "Giá";
+
+    const line = `${label}: ${formatCurrency(fee)}`;
+    const existing = linesByService.get(name) ?? [];
+    if (!existing.includes(line)) existing.push(line);
+    if (!linesByService.has(name)) order.push(name);
+    linesByService.set(name, existing);
+  }
+
+  return order.map((name) => ({ name, lines: linesByService.get(name) ?? [] }));
 }

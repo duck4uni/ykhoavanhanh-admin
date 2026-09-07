@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { doctorWorkSchedulesHooks, type DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { doctorsHooks } from "@/api/doctorsApi";
-import { roomsHooks } from "@/api/roomsApi";
+import { roomsHooks, roomsService } from "@/api/roomsApi";
+import { hisServicesHooks, hisServicesService } from "@/api/hisServicesApi";
+import type { AsyncSearchFetchResult } from "@/components/ui/AsyncSearchSelect";
 import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
 import {
   APPOINTMENT_PAGE_SIZE,
   getScheduleCapacity,
-  getScheduleShiftCode,
   scheduleIncludesDate,
+  scheduleIncludesRoom,
 } from "../types";
 
 /** State + dữ liệu cho trang danh sách lịch khám (doctor work schedules). */
@@ -18,8 +20,10 @@ export function useAppointmentScheduleList() {
   const [pageSize, setPageSize] = useState(APPOINTMENT_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
-  const [shiftFilter, setShiftFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [examAreaFilter, setExamAreaFilter] = useState("");
+  const [roomFilter, setRoomFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -32,6 +36,10 @@ export function useAppointmentScheduleList() {
     sortOrder: "DESC",
     schedule_date: dateFilter || undefined,
     filters: statusFilter ? `status==${statusFilter}` : undefined,
+    exam_area_id: examAreaFilter || undefined,
+    // Phải thêm tiền tố "his_services." vì cột "id" trùng tên với id của chính bảng lịch khám
+    // (doctor_work_schedules) — nếu không sẽ bị hiểu nhầm và lọc sai/không ra kết quả.
+    service_filters: serviceFilter ? `his_services.id==${serviceFilter}` : undefined,
   });
   const schedules = useMemo(() => data?.rows ?? [], [data]);
   const totalCount = data?.count ?? schedules.length;
@@ -56,6 +64,54 @@ export function useAppointmentScheduleList() {
     });
     return map;
   }, [roomsData]);
+
+  const { data: servicesData } = hisServicesHooks.usePaginatedList({
+    pageSize: 100,
+    filters: "status==ACTIVE",
+  });
+  const serviceLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (servicesData?.rows ?? []).forEach((s) => {
+      const raw = s.raw_data as Record<string, unknown> | null | undefined;
+      const rawName = typeof raw?.servicename === "string" ? raw.servicename : typeof raw?.service_name === "string" ? raw.service_name : undefined;
+      const name = s.servicename || rawName;
+      if (name) {
+        if (s.id) map.set(s.id, name);
+        if (s.serviceid) map.set(s.serviceid, name);
+      }
+    });
+    return map;
+  }, [servicesData]);
+
+  // Dropdown filter Phòng khám: chỉ tải 15 item/trang + tìm kiếm phía server, tránh tải hết danh sách.
+  const fetchRoomOptions = useCallback(
+    async ({ search, page, pageSize: size }: { search: string; page: number; pageSize: number }): Promise<AsyncSearchFetchResult> => {
+      const filters = search ? `status==ACTIVE,room_name@=${search}` : "status==ACTIVE";
+      const res = await roomsService.getPaginatedList({ currentPage: page, pageSize: size, filters });
+      const items = (res.rows ?? [])
+        .map((r) => ({ id: r.id, name: r.roomname || (r as unknown as { room_name?: string }).room_name || r.roomid || r.id }))
+        .filter((r) => r.id);
+      return { items, hasMore: page < (res.totalPages ?? 1) };
+    },
+    []
+  );
+
+  // Dropdown filter Dịch vụ khám: chỉ tải 15 item/trang + tìm kiếm phía server, tránh tải hết danh sách.
+  const fetchServiceOptions = useCallback(
+    async ({ search, page, pageSize: size }: { search: string; page: number; pageSize: number }): Promise<AsyncSearchFetchResult> => {
+      const filters = search ? `status==ACTIVE,service_name@=${search}` : "status==ACTIVE";
+      const res = await hisServicesService.getPaginatedList({ currentPage: page, pageSize: size, filters });
+      const items = (res.rows ?? [])
+        .map((s) => {
+          const raw = s.raw_data as Record<string, unknown> | null | undefined;
+          const rawName = typeof raw?.servicename === "string" ? raw.servicename : typeof raw?.service_name === "string" ? raw.service_name : undefined;
+          return { id: s.id, name: s.servicename || rawName || s.serviceid || s.id };
+        })
+        .filter((s) => s.id);
+      return { items, hasMore: page < (res.totalPages ?? 1) };
+    },
+    []
+  );
 
   const deleteMutation = doctorWorkSchedulesHooks.useDelete({
     onSuccess: () => toast.success("Xóa lịch khám thành công"),
@@ -173,16 +229,17 @@ export function useAppointmentScheduleList() {
         (schedule.doctor?.doctor_name ?? "").toLowerCase().includes(q) ||
         (schedule.exam_area?.name ?? "").toLowerCase().includes(q);
       const matchDate = scheduleIncludesDate(schedule, dateFilter);
-      const matchShift = !shiftFilter || getScheduleShiftCode(schedule) === shiftFilter;
-      return matchQuery && matchDate && matchShift;
+      // Chưa có param riêng ở BE để lọc theo phòng khám nên lọc phía client trên trang hiện tại.
+      const matchRoom = !roomFilter || scheduleIncludesRoom(schedule, roomFilter);
+      return matchQuery && matchDate && matchRoom;
     });
-  }, [schedules, debouncedSearch, dateFilter, shiftFilter]);
+  }, [schedules, debouncedSearch, dateFilter, roomFilter]);
 
   const totalPages = data?.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize));
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, dateFilter, shiftFilter, statusFilter, pageSize]);
+  }, [debouncedSearch, dateFilter, statusFilter, examAreaFilter, roomFilter, serviceFilter, pageSize]);
 
   const stats = useMemo(() => {
     const activeCount = schedules.filter((schedule) => schedule.status === "ACTIVE").length;
@@ -194,8 +251,10 @@ export function useAppointmentScheduleList() {
   function resetFilters() {
     setSearch("");
     setDateFilter("");
-    setShiftFilter("");
     setStatusFilter("");
+    setExamAreaFilter("");
+    setRoomFilter("");
+    setServiceFilter("");
     setPage(1);
   }
 
@@ -224,16 +283,23 @@ export function useAppointmentScheduleList() {
     setSearch,
     dateFilter,
     setDateFilter,
-    shiftFilter,
-    setShiftFilter,
     statusFilter,
     setStatusFilter,
+    examAreaFilter,
+    setExamAreaFilter,
+    roomFilter,
+    setRoomFilter,
+    serviceFilter,
+    setServiceFilter,
     stats,
     resetFilters,
     examAreas,
+    fetchRoomOptions,
+    fetchServiceOptions,
     doctorList,
     isLoadingDoctors,
     roomLookup,
+    serviceLookup,
     confirmOpen,
     setConfirmOpen,
     openConfirmDelete,

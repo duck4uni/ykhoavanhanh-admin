@@ -394,9 +394,12 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     setTimeSlots((prev) => prev.map((slot) => {
       if (slot.id !== id) return slot;
       const next = { ...slot, ...patch };
+      // Phạm vi theo từng ngày chỉ được chọn trong tập phạm vi mặc định của khung giờ
+      // (nếu là "custom") — reconcile lại để loại bỏ các phạm vi không còn thuộc mặc định.
+      const validScopeIds = next.scopeMode === "custom" ? new Set(next.scope_ids) : undefined;
       return {
         ...next,
-        date_overrides: reconcileDateOverrides(next.date_overrides, next.dates, next.slot_limit),
+        date_overrides: reconcileDateOverrides(next.date_overrides, next.dates, next.slot_limit, validScopeIds),
       };
     }));
   }
@@ -410,11 +413,15 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       prev.map((slot) => {
         if (slot.id !== slotId) return slot;
         const exists = slot.scope_ids.includes(scopeClientId);
+        const nextScopeIds = exists
+          ? slot.scope_ids.filter((id) => id !== scopeClientId)
+          : [...slot.scope_ids, scopeClientId];
+        // Bỏ chọn một phạm vi mặc định thì các ngày đang gán riêng phạm vi đó cũng phải gỡ theo.
+        const validScopeIds = slot.scopeMode === "custom" ? new Set(nextScopeIds) : undefined;
         return {
           ...slot,
-          scope_ids: exists
-            ? slot.scope_ids.filter((id) => id !== scopeClientId)
-            : [...slot.scope_ids, scopeClientId],
+          scope_ids: nextScopeIds,
+          date_overrides: reconcileDateOverrides(slot.date_overrides, slot.dates, slot.slot_limit, validScopeIds),
         };
       })
     );
@@ -492,6 +499,9 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   function toggleSlotDateScope(slotId: string, date: string, scopeClientId: string) {
     setTimeSlots((prev) => prev.map((slot) => {
       if (slot.id !== slotId) return slot;
+      // Phạm vi theo ngày chỉ được chọn trong tập phạm vi mặc định của khung giờ (nếu "custom").
+      if (slot.scopeMode === "custom" && !slot.scope_ids.includes(scopeClientId)) return slot;
+
       const existingOverride = slot.date_overrides.find((item) => item.date === date);
       let currentScopes: string[];
       if (existingOverride?.scope_ids === "all") {

@@ -65,12 +65,28 @@ function formatIsoDate(value?: string): string {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
+const WEEKDAY_LABEL = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+
+function getWeekdayText(value?: string): string {
+  if (!value) return "";
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "" : WEEKDAY_LABEL[date.getDay()];
+}
+
 export function getScheduleDateText(item: DoctorWorkSchedule): string {
   if (item.schedule_date) return formatIsoDate(item.schedule_date);
   const start = formatIsoDate(item.start_date);
   const end = formatIsoDate(item.end_date);
   if (!start && !end) return "—";
   return !end || start === end ? start || end : `${start || "—"} - ${end}`;
+}
+
+/**
+ * Trả về tên thứ (Thứ 2, Thứ 3, ...) cho ngày khám.
+ * Nếu là khoảng ngày (start_date khác end_date) thì lấy thứ của ngày bắt đầu.
+ */
+export function getScheduleWeekdayText(item: DoctorWorkSchedule): string {
+  return getWeekdayText(item.schedule_date || item.start_date);
 }
 
 export function getScheduleTimeText(item: DoctorWorkSchedule): string {
@@ -104,6 +120,13 @@ export function getScheduleShiftCode(item: DoctorWorkSchedule): string {
   if (hour < 18) return "AFTERNOON";
   if (hour < 22) return "EVENING";
   return "NIGHT";
+}
+
+/** Phòng khám nằm ở scope (v2, nhiều phòng) hoặc field room_id cấp lịch (legacy). */
+export function scheduleIncludesRoom(item: DoctorWorkSchedule, roomId: string): boolean {
+  if (!roomId) return true;
+  if (item.room_id === roomId) return true;
+  return (item.scopes ?? []).some((scope) => scope.room_id === roomId);
 }
 
 export function scheduleIncludesDate(item: DoctorWorkSchedule, date: string): boolean {

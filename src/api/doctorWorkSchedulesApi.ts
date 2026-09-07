@@ -52,6 +52,9 @@ export interface DoctorWorkSchedule {
   exam_area?: { id: string; code: string; name: string; short_name: string | null };
   room?: { id: string; roomid?: string; room_id?: string; roomname?: string; room_name?: string } | null;
   room_name?: string | null;
+  service_id?: string | null;
+  service_name?: string | null;
+  service?: { id: string; service_id?: string; serviceid?: string; service_name?: string; servicename?: string; name?: string } | null;
   scopes?: DoctorWorkScheduleScopeV2[];
 }
 
@@ -61,6 +64,8 @@ export interface DoctorWorkScheduleListParams extends PaginationParams {
   schedule_date?: string;
   date_from?: string;
   date_to?: string;
+  /** Lọc lịch THEO DỊCH VỤ trong scopes[] — cú pháp field<toán tử>value, vd: id==<serviceId>. */
+  service_filters?: string;
 }
 
 export type CreateDoctorWorkSchedulePayload = {
