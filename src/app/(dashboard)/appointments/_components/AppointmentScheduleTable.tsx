@@ -8,6 +8,7 @@ import {
   getScheduleCapacity,
   getScheduleDateText,
   getScheduleTimeText,
+  getScheduleWeekdayText,
 } from "../types";
 import { getScheduleScopeLabels, getScheduleServicePriceLines, summarizeScopeLabels } from "./scheduleScopeLabels";
 
@@ -116,6 +117,7 @@ export function AppointmentScheduleTable({
                     const serviceSummary = summarizeScopeLabels(serviceLabels);
                     const servicePriceLines = getScheduleServicePriceLines(item);
                     const servicePriceRows = servicePriceLines.flatMap((service) => service.lines);
+                    const weekdayText = getScheduleWeekdayText(item);
                     const isSelected = selectedIds.includes(item.id);
 
                     return (
@@ -151,7 +153,10 @@ export function AppointmentScheduleTable({
                           </div>
                         )}
                       </td>
-                      <td className="w-[190px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleDateText(item)}</td>
+                      <td className="w-[190px] whitespace-nowrap px-2 py-3 text-slate-600">
+                        {getScheduleDateText(item)}
+                        {weekdayText && <div className="text-[10px] text-muted-foreground">{weekdayText}</div>}
+                      </td>
                       <td className="w-[150px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleTimeText(item)}</td>
                       <td className="w-24 whitespace-nowrap px-2 py-3 font-medium text-slate-700">{item.booked_count ?? 0}/{capacity}</td>
                       <td className="w-36 whitespace-nowrap px-2 py-3">
