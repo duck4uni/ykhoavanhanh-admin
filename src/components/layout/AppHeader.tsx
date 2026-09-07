@@ -549,19 +549,19 @@ export function AppHeader() {
         </div>
 
         {/* ── CENTER: Search ── */}
-        <div className="flex-1 px-4 xl:px-8">
+        {/* <div className="flex-1 px-4 xl:px-8">
           <div className="mx-auto max-w-lg">
             <GlobalSearch />
           </div>
-        </div>
+        </div> */}
 
         {/* ── RIGHT: Actions + Profile ── */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <LiveClock />
 
           <div className="mx-1 h-6 w-px bg-gray-100" aria-hidden />
 
-          <EmergencyButton />
+          {/* <EmergencyButton /> */}
           <NotificationBell />
 
           <div className="mx-1 h-6 w-px bg-gray-100" aria-hidden />

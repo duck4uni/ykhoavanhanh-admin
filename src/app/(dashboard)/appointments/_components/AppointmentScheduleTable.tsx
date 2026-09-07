@@ -11,7 +11,6 @@ import {
   getScheduleShiftCode,
   getScheduleTimeText,
 } from "../types";
-import { SlotBar } from "./ScheduleBadges";
 import { getScheduleScopeLabels, summarizeScopeLabels } from "./scheduleScopeLabels";
 
 interface AppointmentScheduleTableProps {
@@ -67,9 +66,9 @@ export function AppointmentScheduleTable({
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-left text-[11px] font-medium uppercase tracking-wide text-slate-500">
                   {onToggleSelectRow && (
-                    <th className="w-12 px-4 py-3.5 text-center">
+                    <th className="w-12 px-4 py-2.5 text-center">
                       <input
                         type="checkbox"
                         checked={allCurrentPageSelected}
@@ -82,23 +81,23 @@ export function AppointmentScheduleTable({
                       />
                     </th>
                   )}
-                  <th className="px-6 py-3.5">STT</th>
-                  <th className="min-w-[180px] px-6 py-3.5">Bác sĩ</th>
-                  <th className="min-w-[160px] px-6 py-3.5">Khu khám</th>
-                  <th className="min-w-[240px] px-6 py-3.5">Phòng khám</th>
-                  <th className="min-w-[220px] px-6 py-3.5">Dịch vụ khám</th>
-                  <th className="min-w-[260px] px-6 py-3.5">Ngày khám</th>
-                  <th className="min-w-[150px] px-6 py-3.5">Giờ khám</th>
-                  <th className="min-w-[100px] px-6 py-3.5">Ca</th>
-                  <th className="min-w-[180px] px-6 py-3.5">Số phiếu khám</th>
-                  <th className="px-6 py-3.5">Trạng thái</th>
-                  <th className="px-6 py-3.5 text-right">Thao tác</th>
+                  <th className="px-2 py-2.5">STT</th>
+                  <th className="min-w-[140px] px-2 py-2.5">Bác sĩ</th>
+                  <th className="min-w-[130px] px-2 py-2.5">Khu khám</th>
+                  <th className="min-w-[200px] px-2 py-2.5">Phòng khám</th>
+                  <th className="min-w-[180px] px-2 py-2.5">Dịch vụ khám</th>
+                  <th className="w-[190px] whitespace-nowrap px-2 py-2.5">Ngày khám</th>
+                  <th className="w-[150px] whitespace-nowrap px-2 py-2.5">Giờ khám</th>
+                  <th className="min-w-[100px] px-2 py-2.5">Ca</th>
+                  <th className="w-24 whitespace-nowrap px-2 py-2.5">Số phiếu</th>
+                  <th className="w-36 whitespace-nowrap px-2 py-2.5">Trạng thái</th>
+                  <th className="w-44 whitespace-nowrap px-2 py-2.5 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={onToggleSelectRow ? 12 : 11} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={onToggleSelectRow ? 12 : 11} className="px-2 py-12 text-center text-sm text-muted-foreground">
                       Không tìm thấy lịch khám phù hợp.
                     </td>
                   </tr>
@@ -124,12 +123,12 @@ export function AppointmentScheduleTable({
                     return (
                     <tr
                       key={item.id}
-                      className={`text-sm transition-colors ${
+                      className={`text-xs transition-colors ${
                         isSelected ? "bg-primary-50/40 hover:bg-primary-50/60" : "hover:bg-slate-50/60"
                       }`}
                     >
                       {onToggleSelectRow && (
-                        <td className="w-12 px-4 py-4 text-center">
+                        <td className="w-12 px-4 py-3 text-center">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -138,20 +137,20 @@ export function AppointmentScheduleTable({
                           />
                         </td>
                       )}
-                      <td className="px-6 py-4 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
-                      <td className="min-w-[180px] px-6 py-4 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
-                      <td className="min-w-[160px] px-6 py-4 text-slate-600">{item.exam_area?.name ?? "—"}</td>
-                      <td className="min-w-[240px] max-w-[240px] px-6 py-4 text-slate-600" title={roomSummary.title}>
+                      <td className="px-2 py-3 text-slate-500">{(page - 1) * pageSize + index + 1}</td>
+                      <td className="min-w-[140px] px-2 py-3 font-semibold text-slate-800">{item.doctor?.doctor_name ?? "—"}</td>
+                      <td className="min-w-[130px] px-2 py-3 text-slate-600">{item.exam_area?.name ?? "—"}</td>
+                      <td className="min-w-[200px] max-w-[200px] px-2 py-3 text-slate-600" title={roomSummary.title}>
                         <span className="block truncate">{roomSummary.text}</span>
                       </td>
-                      <td className="min-w-[220px] max-w-[220px] px-6 py-4 text-slate-600" title={serviceSummary.title}>
+                      <td className="min-w-[180px] max-w-[180px] px-2 py-3 text-slate-600" title={serviceSummary.title}>
                         <span className="block truncate">{serviceSummary.text}</span>
                       </td>
-                      <td className="min-w-[260px] whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleDateText(item)}</td>
-                      <td className="min-w-[150px] whitespace-nowrap px-6 py-4 text-slate-600">{getScheduleTimeText(item)}</td>
-                      <td className="min-w-[100px] px-6 py-4 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
-                      <td className="min-w-[180px] px-6 py-4"><SlotBar booked={item.booked_count ?? 0} max={capacity} /></td>
-                      <td className="px-6 py-4">
+                      <td className="w-[190px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleDateText(item)}</td>
+                      <td className="w-[150px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleTimeText(item)}</td>
+                      <td className="min-w-[100px] px-2 py-3 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
+                      <td className="w-24 whitespace-nowrap px-2 py-3 font-medium text-slate-700">{item.booked_count ?? 0}/{capacity}</td>
+                      <td className="w-36 whitespace-nowrap px-2 py-3">
                         <StatusSwitch
                           checked={item.status === "ACTIVE"}
                           loading={togglingId === item.id}
@@ -160,13 +159,13 @@ export function AppointmentScheduleTable({
                           inactiveLabel="Tạm ngưng"
                         />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="w-44 whitespace-nowrap px-2 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <Link href={`/appointments/${item.id}/edit`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary-200 hover:text-primary">
-                            <Pencil className="h-3.5 w-3.5" /> Sửa
+                          <Link href={`/appointments/${item.id}/edit`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-primary-200 hover:text-primary">
+                            <Pencil className="h-3 w-3" /> Sửa
                           </Link>
-                          <button onClick={() => onDelete(item.id)} disabled={isDeleting} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-red-500 transition-colors hover:border-red-200 hover:bg-red-50 disabled:opacity-50">
-                            <Trash2 className="h-3.5 w-3.5" /> Xóa
+                          <button onClick={() => onDelete(item.id)} disabled={isDeleting} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-red-500 transition-colors hover:border-red-200 hover:bg-red-50 disabled:opacity-50">
+                            <Trash2 className="h-3 w-3" /> Xóa
                           </button>
                         </div>
                       </td>
@@ -179,7 +178,7 @@ export function AppointmentScheduleTable({
           </div>
 
           {filteredCount > 0 && (
-            <div className="border-t border-slate-100 px-6 py-4">
+            <div className="border-t border-slate-100 px-2 py-4">
               <TablePagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} totalItems={filteredCount} pageSize={pageSize} onPageSizeChange={onPageSizeChange} />
             </div>
           )}
