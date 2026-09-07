@@ -5,13 +5,11 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import type { DoctorWorkSchedule } from "@/api/doctorWorkSchedulesApi";
 import {
-  SHIFT_LABEL,
   getScheduleCapacity,
   getScheduleDateText,
-  getScheduleShiftCode,
   getScheduleTimeText,
 } from "../types";
-import { getScheduleScopeLabels, summarizeScopeLabels } from "./scheduleScopeLabels";
+import { getScheduleScopeLabels, getScheduleServicePriceLines, summarizeScopeLabels } from "./scheduleScopeLabels";
 
 interface AppointmentScheduleTableProps {
   rows: DoctorWorkSchedule[];
@@ -88,7 +86,6 @@ export function AppointmentScheduleTable({
                   <th className="min-w-[180px] px-2 py-2.5">Dịch vụ khám</th>
                   <th className="w-[190px] whitespace-nowrap px-2 py-2.5">Ngày khám</th>
                   <th className="w-[150px] whitespace-nowrap px-2 py-2.5">Giờ khám</th>
-                  <th className="min-w-[100px] px-2 py-2.5">Ca</th>
                   <th className="w-24 whitespace-nowrap px-2 py-2.5">Số phiếu</th>
                   <th className="w-36 whitespace-nowrap px-2 py-2.5">Trạng thái</th>
                   <th className="w-44 whitespace-nowrap px-2 py-2.5 text-right">Thao tác</th>
@@ -97,14 +94,13 @@ export function AppointmentScheduleTable({
               <tbody className="divide-y divide-slate-100">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={onToggleSelectRow ? 12 : 11} className="px-2 py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={onToggleSelectRow ? 11 : 10} className="px-2 py-12 text-center text-sm text-muted-foreground">
                       Không tìm thấy lịch khám phù hợp.
                     </td>
                   </tr>
                 ) : (
                   rows.map((item, index) => {
                     const capacity = getScheduleCapacity(item);
-                    const shiftCode = getScheduleShiftCode(item);
                     const legacyRoomName = item.room?.room_name ?? item.room?.roomname ?? item.room_name ?? null;
                     const legacyServiceName = item.service?.service_name ?? item.service?.servicename ?? item.service?.name ?? item.service_name ?? null;
                     const { roomLabels, serviceLabels } = getScheduleScopeLabels(
@@ -118,6 +114,8 @@ export function AppointmentScheduleTable({
                     );
                     const roomSummary = summarizeScopeLabels(roomLabels);
                     const serviceSummary = summarizeScopeLabels(serviceLabels);
+                    const servicePriceLines = getScheduleServicePriceLines(item);
+                    const servicePriceRows = servicePriceLines.flatMap((service) => service.lines);
                     const isSelected = selectedIds.includes(item.id);
 
                     return (
@@ -143,12 +141,18 @@ export function AppointmentScheduleTable({
                       <td className="min-w-[200px] max-w-[200px] px-2 py-3 text-slate-600" title={roomSummary.title}>
                         <span className="block truncate">{roomSummary.text}</span>
                       </td>
-                      <td className="min-w-[180px] max-w-[180px] px-2 py-3 text-slate-600" title={serviceSummary.title}>
-                        <span className="block truncate">{serviceSummary.text}</span>
+                      <td className="min-w-[180px] max-w-[220px] px-2 py-3 text-slate-600">
+                        <div className="truncate" title={serviceSummary.title}>{serviceSummary.text}</div>
+                        {servicePriceRows.length > 0 && (
+                          <div className="mt-0.5 space-y-0.5 text-[10px] text-muted-foreground">
+                            {servicePriceRows.map((line) => (
+                              <div key={line} className="truncate" title={line}>{line}</div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="w-[190px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleDateText(item)}</td>
                       <td className="w-[150px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleTimeText(item)}</td>
-                      <td className="min-w-[100px] px-2 py-3 text-slate-600">{SHIFT_LABEL[shiftCode] ?? (shiftCode || "—")}</td>
                       <td className="w-24 whitespace-nowrap px-2 py-3 font-medium text-slate-700">{item.booked_count ?? 0}/{capacity}</td>
                       <td className="w-36 whitespace-nowrap px-2 py-3">
                         <StatusSwitch

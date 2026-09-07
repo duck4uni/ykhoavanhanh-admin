@@ -170,7 +170,9 @@ function LiveClock() {
 }
 
 // ── Global search ────────────────────────────────────────────────────────────
+// (Hiện đang tắt trong AppHeader — giữ lại để bật lại khi cần)
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function GlobalSearch() {
   const [focused, setFocused] = useState(false);
   return (
@@ -323,7 +325,9 @@ function NotificationBell() {
 }
 
 // ── Emergency button ─────────────────────────────────────────────────────────
+// (Hiện đang tắt trong AppHeader — giữ lại để bật lại khi cần)
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function EmergencyButton() {
   return (
     <button
