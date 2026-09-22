@@ -82,10 +82,30 @@ export function getScheduleDateText(item: DoctorWorkSchedule): string {
 }
 
 /**
- * Trả về tên thứ (Thứ 2, Thứ 3, ...) cho ngày khám.
- * Nếu là khoảng ngày (start_date khác end_date) thì lấy thứ của ngày bắt đầu.
+ * Trả về tên (các) thứ trong tuần áp dụng cho lịch khám.
+ * Nếu lịch có nhiều thứ (item.weekdays, vd lịch lặp theo tuần) thì liệt kê hết,
+ * ví dụ "Thứ 2, Thứ 3, Thứ 4". Nếu không có weekdays thì fallback về thứ của
+ * ngày khám đơn (schedule_date) hoặc ngày bắt đầu (start_date).
  */
 export function getScheduleWeekdayText(item: DoctorWorkSchedule): string {
+  const weekdays = item.weekdays?.length
+    ? item.weekdays
+    : Array.from(
+        new Set(
+          (item.time_slots ?? [])
+            .map((slot) => slot.weekday)
+            .filter((value): value is number => value !== undefined)
+        )
+      );
+
+  if (weekdays.length > 0) {
+    return [...weekdays]
+      .sort((a, b) => a - b)
+      .map((day) => WEEKDAY_LABEL[day] ?? "")
+      .filter(Boolean)
+      .join(", ");
+  }
+
   return getWeekdayText(item.schedule_date || item.start_date);
 }
 
