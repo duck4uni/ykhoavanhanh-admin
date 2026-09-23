@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -16,8 +16,8 @@ import {
   CheckCircle, Clock, Landmark, Smartphone,
 } from "lucide-react";
 
-export default function PaymentDetailPage({ params }: { params: Promise<{ paymentId: string }> }) {
-  const { paymentId } = use(params);
+export default function PaymentDetailPage() {
+  const { paymentId } = useParams<{ paymentId: string }>();
   const router = useRouter();
 
   // Không có GET-by-id cho payments — dùng filters=id==<id>&pageSize=1 trên
