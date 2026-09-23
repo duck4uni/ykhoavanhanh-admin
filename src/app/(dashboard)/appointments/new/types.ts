@@ -6,6 +6,7 @@ import type {
 } from "@/api/doctorWorkSchedulesApi";
 import type { HisDoctor } from "@/api/doctorsApi";
 import type { HisService } from "@/api/hisServicesApi";
+import type { HisRoom } from "@/api/roomsApi";
 import type { DateSlotOverride } from "./dateSlotOverrides";
 
 export type ScheduleForm = {
@@ -178,6 +179,23 @@ export function sortWeekdays(weekdays: number[]): number[] {
 
 export function weekdayShortLabel(weekday: number): string {
   return weekday === 0 ? "CN" : `T${weekday + 1}`;
+}
+
+/**
+ * Lọc danh sách phòng theo chuyên khoa đã chọn (nếu có), dựa vào quan hệ
+ * his_room_specialties. Việc gán chuyên khoa cho phòng là tùy chọn (nhiều
+ * phòng chưa được gán) và server không filter được theo specialty_id (bảng
+ * nối, không phải cột trực tiếp trên his_rooms), nên filter này chỉ mang
+ * tính gợi ý: nếu không có phòng nào khớp thì fallback về toàn bộ danh sách
+ * đã truyền vào thay vì để trống — tránh chặn người dùng khi chọn Chuyên
+ * khoa trước Khu vực/Phòng.
+ */
+export function filterRoomsBySpecialty(rooms: HisRoom[], specialtyId: string): HisRoom[] {
+  if (!specialtyId) return rooms;
+  const matched = rooms.filter((r) =>
+    (r.his_room_specialties ?? []).some((rel) => rel.specialty_id === specialtyId)
+  );
+  return matched.length > 0 ? matched : rooms;
 }
 
 export const emptyScopeDraft = (): Omit<ScopeRow, "clientId"> => ({

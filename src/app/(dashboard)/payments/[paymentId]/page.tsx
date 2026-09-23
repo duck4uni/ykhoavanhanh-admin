@@ -1,77 +1,83 @@
 "use client";
 
-import { use } from "react";
+import { use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { mockPayments } from "@/mock-data/payments";
-import { Payment } from "@/types/payment";
+import { appointmentBookingPaymentsHooks } from "@/api/appointmentBookingPaymentsApi";
+import { doctorsHooks } from "@/api/doctorsApi";
+import { examAreasHooks } from "@/api/examAreasApi";
+import { hisServicesHooks } from "@/api/hisServicesApi";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { getReconcileMeta, statusLabels } from "../helpers";
 import {
-  User, FileText, Calendar, Receipt, ArrowLeft,
-  CheckCircle, Clock, XCircle, RefreshCw, Banknote
+  User, FileText, Receipt, ArrowLeft,
+  CheckCircle, Clock, Landmark, Smartphone,
 } from "lucide-react";
-
-const statusLabels: Record<Payment["status"], string> = {
-  pending: "Chờ thanh toán",
-  paid: "Đã thanh toán",
-  failed: "Thất bại",
-  refunded: "Đã hoàn tiền",
-  expired: "Hết hạn",
-};
-const statusVariant: Record<Payment["status"], "warning" | "success" | "danger" | "info" | "default"> = {
-  pending: "warning",
-  paid: "success",
-  failed: "danger",
-  refunded: "info",
-  expired: "default",
-};
-const statusIcon: Record<Payment["status"], React.ElementType> = {
-  pending: Clock,
-  paid: CheckCircle,
-  failed: XCircle,
-  refunded: RefreshCw,
-  expired: XCircle,
-};
-const methodLabels: Record<Payment["method"], string> = {
-  vcb_qr: "QR Code VietcomBank",
-  vcb_transfer: "Chuyển khoản VietcomBank",
-  vcb_card: "Thẻ VietcomBank",
-  cash: "Tiền mặt",
-};
 
 export default function PaymentDetailPage({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = use(params);
   const router = useRouter();
 
-  const payment = mockPayments.find((p) => p.id === paymentId);
+  // Không có GET-by-id cho payments — dùng filters=id==<id>&pageSize=1 trên
+  // endpoint danh sách (xem docs/api/appointmentBookingPayment.md mục 3.9).
+  const { data, isLoading } = appointmentBookingPaymentsHooks.useList({
+    filters: `id==${paymentId},payment_status==PENDING|PAID`,
+    pageSize: 1,
+  });
+  const payment = data?.rows?.[0];
+
+  const { data: doctors } = doctorsHooks.useList();
+  const { data: areasData } = examAreasHooks.useList();
+  const { data: servicesData } = hisServicesHooks.usePaginatedList({ pageSize: 100, filters: "status==ACTIVE" });
+
+  const doctorName = useMemo(
+    () => doctors?.find((d) => d.id === payment?.booking?.doctor_id)?.doctorname,
+    [doctors, payment],
+  );
+  const areaName = useMemo(
+    () => areasData?.rows?.find((a) => a.id === payment?.booking?.exam_area_id)?.name,
+    [areasData, payment],
+  );
+  const serviceName = useMemo(
+    () => servicesData?.rows?.find((s) => s.id === payment?.booking?.service_id)?.servicename,
+    [servicesData, payment],
+  );
+
+  if (isLoading) {
+    return (
+      <div className="py-16 text-center text-sm text-muted-foreground">Đang tải giao dịch...</div>
+    );
+  }
 
   if (!payment) {
     return (
-      <div className="text-center py-16">
-        <p className="text-gray-500 text-lg">Không tìm thấy giao dịch.</p>
+      <div className="py-16 text-center">
+        <p className="text-lg text-gray-500">Không tìm thấy giao dịch.</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>Quay lại</Button>
       </div>
     );
   }
 
-  const StatusIcon = statusIcon[payment.status];
+  const isPaid = payment.payment_status === "PAID";
+  const reconcile = getReconcileMeta(payment);
+  const GatewayIcon = payment.payment_gateway === "VCB" ? Landmark : Smartphone;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Quay lại
+          <ArrowLeft className="mr-1 h-4 w-4" /> Quay lại
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900 font-mono">{payment.code}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Chi tiết giao dịch thanh toán</p>
+          <h1 className="font-mono text-2xl font-bold text-gray-900">{payment.transaction_id ?? payment.id}</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Chi tiết giao dịch thanh toán</p>
         </div>
-        <Badge variant={statusVariant[payment.status]} className="text-sm px-3 py-1">
-          <StatusIcon className="h-4 w-4 mr-1.5 inline" />
-          {statusLabels[payment.status]}
+        <Badge variant={isPaid ? "success" : "warning"} className="px-3 py-1 text-sm">
+          {isPaid ? <CheckCircle className="mr-1.5 inline h-4 w-4" /> : <Clock className="mr-1.5 inline h-4 w-4" />}
+          {statusLabels[payment.payment_status]}
         </Badge>
       </div>
 
@@ -83,30 +89,35 @@ export default function PaymentDetailPage({ params }: { params: Promise<{ paymen
             <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary-600" />Thông tin giao dịch</CardTitle></CardHeader>
             <CardContent>
               <dl className="grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-sm text-gray-500">Mã giao dịch</dt>
-                  <dd className="font-mono font-semibold text-primary-700 mt-1">{payment.code}</dd>
-                </div>
-                {payment.transactionId && (
+                {payment.transaction_id && (
                   <div>
                     <dt className="text-sm text-gray-500">Mã GD ngân hàng</dt>
-                    <dd className="font-mono text-gray-800 mt-1">{payment.transactionId}</dd>
+                    <dd className="mt-1 font-mono text-gray-800">{payment.transaction_id}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-sm text-gray-500">Số tiền</dt>
-                  <dd className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(payment.amount)}</dd>
+                  <dt className="text-sm text-gray-500">Mã lịch hẹn</dt>
+                  <dd className="mt-1 font-mono text-primary-600">{payment.booking_id}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-gray-500">Phương thức</dt>
-                  <dd className="flex items-center gap-2 mt-1">
-                    <Banknote className="h-4 w-4 text-gray-400" />
-                    <span className="font-medium">{methodLabels[payment.method]}</span>
+                  <dt className="text-sm text-gray-500">Số tiền</dt>
+                  <dd className="mt-1 text-2xl font-bold text-green-600">{formatCurrency(Number(payment.amount))}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-gray-500">Cổng thanh toán</dt>
+                  <dd className="mt-1 flex items-center gap-2">
+                    <GatewayIcon className="h-4 w-4 text-gray-400" />
+                    <span className="font-medium">{payment.payment_gateway === "VCB" ? "VietcomBank" : "MoMo"}</span>
+                    {payment.payment_method && (
+                      <span className="text-xs text-gray-400">({payment.payment_method})</span>
+                    )}
                   </dd>
                 </div>
                 <div className="col-span-2">
                   <dt className="text-sm text-gray-500">Mô tả dịch vụ</dt>
-                  <dd className="font-medium mt-1">{payment.description}</dd>
+                  <dd className="mt-1 font-medium">
+                    {[doctorName, areaName, serviceName].filter(Boolean).join(" · ") || "—"}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
@@ -119,74 +130,52 @@ export default function PaymentDetailPage({ params }: { params: Promise<{ paymen
               <dl className="grid grid-cols-2 gap-4">
                 <div>
                   <dt className="text-sm text-gray-500">Tên bệnh nhân</dt>
-                  <dd className="font-medium mt-1">{payment.patientName}</dd>
+                  <dd className="mt-1 font-medium">{payment.patient?.patient_full_name ?? "—"}</dd>
                 </div>
-                {payment.appointmentId && (
-                  <div>
-                    <dt className="text-sm text-gray-500">Mã lịch hẹn</dt>
-                    <dd className="font-mono text-primary-600 mt-1">{payment.appointmentId}</dd>
-                  </div>
-                )}
+                <div>
+                  <dt className="text-sm text-gray-500">Số điện thoại</dt>
+                  <dd className="mt-1 font-medium">{payment.patient?.phone_number ?? "—"}</dd>
+                </div>
               </dl>
-            </CardContent>
-          </Card>
-
-          {/* Timeline */}
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary-600" />Lịch sử giao dịch</CardTitle></CardHeader>
-            <CardContent>
-              <ol className="relative border-l border-gray-200 ml-3 space-y-4">
-                <li className="ml-4">
-                  <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-gray-300 border-2 border-white" />
-                  <p className="text-sm font-medium text-gray-700">Tạo giao dịch</p>
-                  <p className="text-xs text-gray-500">{formatDateTime(payment.createdAt)}</p>
-                </li>
-                {payment.paidAt && (
-                  <li className="ml-4">
-                    <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
-                    <p className="text-sm font-medium text-green-700">Thanh toán thành công</p>
-                    <p className="text-xs text-gray-500">{formatDateTime(payment.paidAt)}</p>
-                  </li>
-                )}
-                {payment.refundedAt && (
-                  <li className="ml-4">
-                    <div className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
-                    <p className="text-sm font-medium text-blue-700">Đã hoàn tiền{payment.refundAmount ? ` – ${formatCurrency(payment.refundAmount)}` : ""}</p>
-                    <p className="text-xs text-gray-500">{formatDateTime(payment.refundedAt)}</p>
-                  </li>
-                )}
-              </ol>
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar actions */}
+        {/* Sidebar */}
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Thao tác</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Đối soát / Hoàn tiền</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {payment.status === "pending" && (
-                <Button variant="primary" className="w-full">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Xác nhận đã thanh toán
-                </Button>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${reconcile.className}`}>
+                {reconcile.label}
+              </span>
+              {payment.refund && (
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-gray-500">Số tiền hoàn</dt>
+                    <dd className="font-medium">{formatCurrency(Number(payment.refund.refund_amount))}</dd>
+                  </div>
+                  {payment.refund.refund_gateway && (
+                    <div className="flex justify-between">
+                      <dt className="text-gray-500">Cổng hoàn tiền</dt>
+                      <dd className="font-medium">{payment.refund.refund_gateway}</dd>
+                    </div>
+                  )}
+                  {payment.refund.processed_at && (
+                    <div className="flex justify-between">
+                      <dt className="text-gray-500">Thời gian xử lý</dt>
+                      <dd className="text-xs">{formatDateTime(payment.refund.processed_at)}</dd>
+                    </div>
+                  )}
+                </dl>
               )}
-              {payment.status === "paid" && (
-                <Button variant="outline" className="w-full text-red-600 border-red-300 hover:bg-red-50">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Hoàn tiền
-                </Button>
-              )}
+              {/* Trạng thái chỉ hiển thị, không thao tác được ở đây — endpoint
+                  trigger hoàn tiền VCB không yêu cầu Bearer auth nên không an
+                  toàn để expose thao tác qua trang admin này. */}
               <Button variant="ghost" className="w-full">
-                <FileText className="h-4 w-4 mr-2" />
+                <FileText className="mr-2 h-4 w-4" />
                 Xuất biên lai
               </Button>
-              {payment.appointmentId && (
-                <Button variant="ghost" className="w-full" onClick={() => router.push(`/appointments/${payment.appointmentId}`)}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Xem lịch hẹn
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -199,12 +188,18 @@ export default function PaymentDetailPage({ params }: { params: Promise<{ paymen
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Tạo lúc</span>
-                <span className="text-xs">{formatDateTime(payment.createdAt)}</span>
+                <span className="text-xs">{formatDateTime(payment.created_at)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Cập nhật</span>
-                <span className="text-xs">{formatDateTime(payment.updatedAt)}</span>
+                <span className="text-xs">{formatDateTime(payment.updated_at)}</span>
               </div>
+              {payment.payment_time && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Thời điểm thanh toán</span>
+                  <span className="text-xs">{formatDateTime(payment.payment_time)}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MoreVertical, UserRound } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, UserRound } from "lucide-react";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import type { AppointmentReview } from "@/api/appointmentReviewsApi";
@@ -14,9 +14,22 @@ interface ReviewTableProps {
   totalPages: number;
   totalItems: number;
   onPageChange: (page: number) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  togglingId: string | null;
 }
 
-export function ReviewTable({ rows, isLoading, page, totalPages, totalItems, onPageChange }: ReviewTableProps) {
+export function ReviewTable({
+  rows,
+  isLoading,
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+  onApprove,
+  onReject,
+  togglingId,
+}: ReviewTableProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
       {isLoading ? (
@@ -48,6 +61,9 @@ export function ReviewTable({ rows, isLoading, page, totalPages, totalItems, onP
                 ) : (
                   rows.map((review) => {
                     const name = review.is_anonymous ? "Ẩn danh" : review.patient?.patient_full_name ?? "—";
+                    const isToggling = togglingId === review.id;
+                    const isApproved = review.status === "APPROVED";
+                    const isRejected = review.status === "REJECTED";
                     return (
                       <tr key={review.id} className="text-sm transition-colors hover:bg-slate-50/60">
                         <td className="px-6 py-4">
@@ -79,14 +95,37 @@ export function ReviewTable({ rows, isLoading, page, totalPages, totalItems, onP
                         <td className="px-6 py-4"><StatusBadge status={review.status} /></td>
                         <td className="px-6 py-4"><ReplyCell review={review} /></td>
                         <td className="px-6 py-4 text-slate-600">{formatDate(review.created_at)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <Link
-                            href={`/reviews/${review.id}`}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                            aria-label="Chi tiết"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Link>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              href={`/reviews/${review.id}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600"
+                              aria-label="Xem chi tiết"
+                              title="Xem"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => onApprove(review.id)}
+                              disabled={isApproved || isToggling}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-success-light hover:text-success disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                              aria-label="Duyệt"
+                              title="Duyệt"
+                            >
+                              {isToggling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onReject(review.id)}
+                              disabled={isRejected || isToggling}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-error-light hover:text-error disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                              aria-label="Ẩn (không duyệt)"
+                              title="Ẩn (không duyệt)"
+                            >
+                              <EyeOff className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

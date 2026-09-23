@@ -78,11 +78,15 @@ export default function ReviewDetailPage() {
   const doctorName = review.doctor?.doctor_name ?? "—";
 
   function handleSaveReply() {
+    // Chỉ gửi admin_reply: PUT /appointment-reviews/:id chỉ cho phép
+    // administrator gửi admin_reply/status, không được tự đặt
+    // admin_replied_at — server tự set admin_replied_at = now() khi có
+    // admin_reply. Gửi kèm admin_replied_at sẽ bị BE từ chối (400 field
+    // không thuộc allowlist của vai trò).
     updateMutation.mutate({
       id: reviewId,
       data: {
         admin_reply: adminReply,
-        admin_replied_at: new Date().toISOString(),
       },
     });
   }

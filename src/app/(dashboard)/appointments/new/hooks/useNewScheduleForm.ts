@@ -25,6 +25,7 @@ import {
   createInitialForm,
   defaultServicePrice,
   emptyScopeDraft,
+  filterRoomsBySpecialty,
   formatServiceOptionLabel,
   getDatesByWeekday,
   hydrateScheduleEditor,
@@ -148,12 +149,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   );
   // API rooms không hỗ trợ filter theo chuyên khoa (his_room_specialties là bảng nối, không lọc
   // được ở server) — lọc bổ sung phía client theo chuyên khoa đã chọn, dựa vào quan hệ đã include sẵn.
-  const rooms = useMemo(() => {
-    if (!scopeDraft.specialty_id) return roomsFetched;
-    return roomsFetched.filter((r) =>
-      (r.his_room_specialties ?? []).some((rel) => rel.specialty_id === scopeDraft.specialty_id)
-    );
-  }, [roomsFetched, scopeDraft.specialty_id]);
+  // Đây chỉ là gợi ý thu hẹp: nếu không phòng nào khớp (quan hệ chưa được gán, hoặc người dùng
+  // chọn Chuyên khoa trước Khu vực/Phòng) thì filterRoomsBySpecialty tự fallback về danh sách đầy
+  // đủ để không chặn việc chọn phòng.
+  const rooms = useMemo(
+    () => filterRoomsBySpecialty(roomsFetched, scopeDraft.specialty_id),
+    [roomsFetched, scopeDraft.specialty_id]
+  );
   const hasMoreRooms = (roomPageData?.currentPage ?? roomPicker.page) < (roomPageData?.totalPages ?? 1);
   // Về trang 1 khi khu vực áp dụng cho bộ lọc phòng thay đổi.
   useEffect(() => {
