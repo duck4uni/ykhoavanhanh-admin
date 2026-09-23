@@ -1,6 +1,5 @@
 "use client";
 
-import { FileBarChart } from "lucide-react";
 import { useReviewsList } from "./hooks/useReviewsList";
 import { ReviewStatsCards } from "./_components/ReviewStatsCards";
 import { ReviewFilters } from "./_components/ReviewFilters";
@@ -19,11 +18,11 @@ export default function ReviewsPage() {
             Quản lý đánh giá lịch khám, phản hồi bệnh nhân và kiểm duyệt hiển thị.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <button className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary">
             <FileBarChart className="h-4 w-4" /> Báo cáo đánh giá
           </button>
-        </div>
+        </div> */}
       </div>
 
       <ReviewStatsCards totalItems={reviews.totalItems} stats={reviews.stats} />
@@ -67,6 +66,9 @@ export default function ReviewsPage() {
         totalPages={reviews.totalPages}
         totalItems={reviews.totalItems}
         onPageChange={reviews.setPage}
+        onApprove={(id) => reviews.setReviewStatus(id, "APPROVED")}
+        onReject={(id) => reviews.setReviewStatus(id, "REJECTED")}
+        togglingId={reviews.togglingId}
       />
     </div>
   );

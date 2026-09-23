@@ -8,7 +8,6 @@ export type { MemberProfile, FamilyGroup, FamilyMember, PointTransaction, Gift, 
 export type { Article, NewsItem, VideoItem, ContentCategory, ArticleStatus } from "./content";
 export type { DoctorReview } from "./review";
 export type { AdminNotification, NotificationChannel, NotificationType } from "./notification";
-export type { Payment, PaymentStatus, PaymentMethod } from "./payment";
 export type { Promotion } from "./promotion";
 export type { DashboardKpi, AppointmentStat, DoctorPerformance, RevenueData } from "./report";
 export type { PaginatedResponse, PaginationParams, FilterParams, SortParams, ApiResponse, AuthTokenResponse, LoginPayload } from "./api";
