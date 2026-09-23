@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import type { AppointmentBooking } from "@/api/appointmentBookingsApi";
-import { getBookingDateTimeText } from "../types";
+import { formatBookingStatus, formatExamType, getBookingDateTimeText, getBookingStatusBadge } from "../types";
 import type { BookingListController } from "../hooks/useBookingList";
 
 interface BookingTableProps {
@@ -39,13 +39,14 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                   <th className="px-5 py-3.5 text-center">STT</th>
                   <th className="px-5 py-3.5">Bệnh nhân</th>
                   <th className="px-5 py-3.5">Mã BN HIS</th>
-                  <th className="px-5 py-3.5">Mã đặt khám</th>
+                  {/* <th className="px-5 py-3.5">Mã đặt khám</th> */}
                   <th className="px-5 py-3.5">Khu khám</th>
                   <th className="px-5 py-3.5">Bác sĩ</th>
                   <th className="px-5 py-3.5">Chuyên khoa</th>
                   <th className="px-5 py-3.5">Dịch vụ</th>
+                  <th className="px-5 py-3.5">Đối tượng khám</th>
                   {/* <th className="px-5 py-3.5">Nguồn</th> */}
-                  {/* <th className="px-5 py-3.5">Trạng thái</th> */}
+                  <th className="px-5 py-3.5">Trạng thái</th>
                   <th className="px-5 py-3.5 text-center">Thao tác</th>
                 </tr>
               </thead>
@@ -71,9 +72,9 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                       <td className="px-5 py-4 font-mono text-primary-600">
                         {booking.his_patient_id ?? booking.patient?.his_patient_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      {/* <td className="px-5 py-4 text-muted-foreground">
                         {booking.his_booking_id ?? booking.request_booking_id ?? booking.id}
-                      </td>
+                      </td> */}
                       <td className="px-5 py-4 text-muted-foreground">
                         {booking.exam_area?.name ?? booking.exam_area_id ?? "—"}
                       </td>
@@ -86,12 +87,15 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                       <td className="px-5 py-4 text-muted-foreground">
                         {booking.service?.service_name ?? booking.service_id ?? "—"}
                       </td>
+                      <td className="px-5 py-4 text-muted-foreground">
+                        {formatExamType(booking.exam_type)}
+                      </td>
                       {/* <td className="px-5 py-4 text-muted-foreground">{booking.source ?? "—"}</td> */}
-                      {/* <td className="px-5 py-4">
-                        <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
-                          {formatBookingStatus(booking.local_status)}
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getBookingStatusBadge(booking.status ?? booking.local_status)}`}>
+                          {formatBookingStatus(booking.status ?? booking.local_status)}
                         </span>
-                      </td> */}
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-center">
                           <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-primary-600" onClick={() => onViewDetail(booking)}>

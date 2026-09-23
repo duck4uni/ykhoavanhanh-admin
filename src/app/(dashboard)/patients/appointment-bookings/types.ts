@@ -32,12 +32,44 @@ export function formatBookingStatus(status: string | null | undefined): string {
     HIS_SYNCED: "Đã đồng bộ HIS",
     CONFIRMED: "Đã xác nhận",
     PAID: "Đã thanh toán",
+    PENDING_PAYMENT: "Chờ thanh toán",
     CANCELED: "Đã hủy",
     CANCELLED: "Đã hủy",
     PENDING: "Đang chờ",
     COMPLETED: "Hoàn tất",
   };
   return labels[status] ?? status;
+}
+
+/** Màu badge trạng thái lịch đặt khám, dùng ở bảng danh sách. */
+export function getBookingStatusBadge(status: string | null | undefined): string {
+  switch (status) {
+    case "PAID":
+    case "COMPLETED":
+      return "bg-success-light text-success";
+    case "PENDING_PAYMENT":
+    case "PENDING":
+      return "bg-warning-light text-warning";
+    case "CANCELED":
+    case "CANCELLED":
+      return "bg-error-light text-error";
+    case "HIS_SYNCED":
+    case "CONFIRMED":
+      return "bg-primary-100 text-primary-600";
+    default:
+      return "bg-surface-secondary text-muted-foreground";
+  }
+}
+
+/** Nhãn hiển thị đối tượng khám — mã ngắn suy ra tên đầy đủ, giá trị lạ hiển thị nguyên văn. */
+export function formatExamType(examType: string | null | undefined): string {
+  if (!examType) return "—";
+  const labels: Record<string, string> = {
+    BHYT: "BHYT",
+    DV: "Dịch vụ",
+    VIP: "Khám VIP",
+  };
+  return labels[examType] ?? examType;
 }
 
 export function pruneEmptyFilters(filters: BookingFilters) {
