@@ -21,12 +21,17 @@ export interface AppointmentBooking {
   queue_number: number | null;
   price: string | number | null;
   exam_object_code: string | null;
+  /** Đối tượng khám (vd "BHYT" | "DV" | "Khám thường"). */
+  exam_type: string | null;
   service_id: string | null;
   request_mavaovien: string | null;
   request_stt: string | null;
   confirmed_stt: string | null;
   booking_type: string | null;
   source: string | null;
+  /** Trạng thái booking hiện hành (vd PENDING_PAYMENT/PAID/CANCELLED) — field thật BE trả về. */
+  status: string | null;
+  /** @deprecated Field cũ theo tài liệu trước đây; BE hiện trả `status`, không phải field này. */
   local_status: string | null;
   his_action: string | null;
   his_status: string | null;

@@ -1,6 +1,6 @@
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { AppointmentBooking } from "@/api/appointmentBookingsApi";
-import { formatBookingStatus, getBookingDateTimeText, getBookingPrice } from "../types";
+import { formatBookingStatus, formatExamType, getBookingDateTimeText, getBookingPrice, getBookingStatusBadge } from "../types";
 
 interface BookingDetailModalProps {
   booking: AppointmentBooking | null;
@@ -26,8 +26,8 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             <span className="font-mono text-sm font-semibold text-primary-600">
               {booking.his_booking_id ?? booking.request_booking_id ?? booking.id}
             </span>
-            <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700">
-              {formatBookingStatus(booking.local_status)}
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getBookingStatusBadge(booking.status ?? booking.local_status)}`}>
+              {formatBookingStatus(booking.status ?? booking.local_status)}
             </span>
           </div>
 
@@ -83,6 +83,10 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
               <div className="sm:col-span-2">
                 <dt className="text-xs font-medium text-muted-foreground">Dịch vụ</dt>
                 <dd className="mt-0.5 text-sm text-slate-700">{booking.service?.service_name || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Đối tượng khám</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">{formatExamType(booking.exam_type)}</dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-muted-foreground">Giá dịch vụ</dt>

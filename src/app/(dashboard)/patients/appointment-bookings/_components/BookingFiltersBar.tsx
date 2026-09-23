@@ -31,10 +31,11 @@ export function BookingFiltersBar({ ctrl }: { ctrl: BookingListController }) {
             className={fieldClass}
           >
             <option value="">Tất cả</option>
+            <option value="PENDING_PAYMENT">Chờ thanh toán</option>
+            <option value="PAID">Đã thanh toán</option>
+            <option value="CANCELLED">Đã hủy</option>
             <option value="HIS_SYNCED">Đã đồng bộ HIS</option>
             <option value="CONFIRMED">Đã xác nhận</option>
-            <option value="PAID">Đã thanh toán</option>
-            <option value="CANCELED">Đã hủy</option>
             <option value="PENDING">Đang chờ</option>
           </select>
         </div>
