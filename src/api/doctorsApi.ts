@@ -130,6 +130,29 @@ export interface DoctorImportReport {
   results: DoctorImportResult[];
 }
 
+// ─── Đồng bộ HIS (2 chiều) ──────────────────────────────────────────────────
+
+export interface DoctorSyncFromHisResult {
+  message: string;
+  total?: number;
+  rows?: HisDoctor[];
+}
+
+export interface DoctorSyncToHisResultRow {
+  doctor_id: string;
+  doctor_name: string;
+  status: "success" | "error";
+  error?: string;
+}
+
+export interface DoctorSyncToHisResult {
+  message: string;
+  total: number;
+  success: number;
+  error: number;
+  results: DoctorSyncToHisResultRow[];
+}
+
 export interface DoctorListParams {
   currentPage?: number;
   pageSize?: number;
@@ -231,6 +254,43 @@ export const doctorsService = {
       return res.data.responseData;
     }
     throw new Error(res.data.message || "Import bác sĩ thất bại");
+  },
+
+  /** POST /doctors/sync — lấy dữ liệu bác sĩ từ HIS. `idbv` để trống nếu không cần lọc theo cơ sở. */
+  syncFromHis: async (idbv?: string): Promise<DoctorSyncFromHisResult> => {
+    const res = await apiPost<{ total?: number; rows?: HisDoctor[] }>("/doctors/sync", undefined, {
+      params: idbv ? { idbv } : undefined,
+    });
+    if (res.data.status === "success") {
+      return {
+        message: res.data.message || "Đồng bộ dữ liệu từ HIS thành công",
+        total: res.data.responseData?.total,
+        rows: res.data.responseData?.rows,
+      };
+    }
+    throw new Error(res.data.message || "Đồng bộ từ HIS thất bại");
+  },
+
+  /**
+   * POST /doctors/sync-to-his — gửi dữ liệu bác sĩ lên HIS. BE trả HTTP 200
+   * ngay cả khi có lỗi cục bộ ở một vài bác sĩ — phải đọc `responseData`
+   * (total/success/error/results) chứ không chỉ dựa vào HTTP status.
+   */
+  syncToHis: async (): Promise<DoctorSyncToHisResult> => {
+    const res = await apiPost<{ total: number; success: number; error: number; results: DoctorSyncToHisResultRow[] }>(
+      "/doctors/sync-to-his",
+    );
+    const responseData = res.data.responseData;
+    if (responseData) {
+      return {
+        message: res.data.message || "",
+        total: responseData.total,
+        success: responseData.success,
+        error: responseData.error,
+        results: responseData.results ?? [],
+      };
+    }
+    throw new Error(res.data.message || "Đồng bộ lên HIS thất bại");
   },
 };
 
@@ -360,6 +420,42 @@ export const doctorsHooks = {
     const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
     return useMutation<DoctorImportReport, Error, File>({
       mutationFn: (file) => doctorsService.importDoctors(file),
+      onSuccess: (data, variables, context) => {
+        qc.invalidateQueries({ queryKey: doctorsKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
+
+  useSyncFromHis: (
+    options?: UseMutationOptions<DoctorSyncFromHisResult, Error, string | void>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<DoctorSyncFromHisResult, Error, string | void>({
+      mutationFn: (idbv) => doctorsService.syncFromHis(idbv ?? undefined),
+      onSuccess: (data, variables, context) => {
+        qc.invalidateQueries({ queryKey: doctorsKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
+
+  useSyncToHis: (
+    options?: UseMutationOptions<DoctorSyncToHisResult, Error, void>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<DoctorSyncToHisResult, Error, void>({
+      mutationFn: () => doctorsService.syncToHis(),
       onSuccess: (data, variables, context) => {
         qc.invalidateQueries({ queryKey: doctorsKeys.all });
         (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
