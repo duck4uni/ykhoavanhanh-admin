@@ -6,6 +6,7 @@ import { useDoctorList } from "./hooks/useDoctorList";
 import { DoctorStatsCards } from "./_components/DoctorStatsCards";
 import { DoctorFilters } from "./_components/DoctorFilters";
 import { DoctorTable } from "./_components/DoctorTable";
+import { DoctorSyncButton } from "./_components/DoctorSyncButton";
 
 export default function DoctorsPage() {
   const ctrl = useDoctorList();
@@ -20,9 +21,12 @@ export default function DoctorsPage() {
             Quản lý danh sách bác sĩ, chuyên khoa phụ trách và trạng thái hiển thị trên thông tin đặt khám
           </p>
         </div>
-        <button onClick={() => ctrl.router.push("/doctors/new")} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
-          <Plus className="h-4 w-4" /> Thêm bác sĩ
-        </button>
+        <div className="flex items-center gap-3">
+          <DoctorSyncButton />
+          <button onClick={() => ctrl.router.push("/doctors/new")} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
+            <Plus className="h-4 w-4" /> Thêm bác sĩ
+          </button>
+        </div>
       </div>
 
       <DoctorStatsCards stats={ctrl.stats} />
