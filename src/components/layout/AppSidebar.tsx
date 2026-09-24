@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Database,
   Home,
   LayoutGrid,
   MessageSquare,
@@ -129,6 +130,20 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   { id: "admin-operations", label: "Vận hành", icon: Wrench, href: "/operations", permission: "admin.all" },
+
+  // Danh mục dùng chung đồng bộ từ HIS - chỉ admin toàn quyền
+  {
+    id: "his-catalogs", label: "Danh mục HIS", icon: Database,
+    permission: "admin.all",
+    children: [
+      { name: "Quốc gia", href: "/his-catalogs/countries" },
+      { name: "Tỉnh/Thành", href: "/his-catalogs/provinces" },
+      { name: "Quận/Huyện", href: "/his-catalogs/districts" },
+      { name: "Phường/Xã", href: "/his-catalogs/wards" },
+      { name: "Dân tộc", href: "/his-catalogs/nations" },
+      { name: "Nghề nghiệp", href: "/his-catalogs/professions" },
+    ],
+  },
 
   // Tài khoản nội bộ - Admin only
   {

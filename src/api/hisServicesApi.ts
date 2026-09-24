@@ -11,6 +11,11 @@ import {
   type UseMutationOptions,
 } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPut, apiDelete, api } from "@/lib/axios";
+import type {
+  HisCatalogApplyChangeInput,
+  HisCatalogApplyResult,
+  HisCatalogSyncResult,
+} from "@/api/hisCatalogApi";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -189,6 +194,58 @@ export type CreateHisServicePayload = {
 
 export type UpdateHisServicePayload = Partial<CreateHisServicePayload>;
 
+// ─── Đồng bộ HIS (2 chiều) ──────────────────────────────────────────────────
+
+/**
+ * Shape thô lưu trong bảng `his_services`, dùng riêng cho luồng diff/accept
+ * (`POST /his-services/sync` + `/sync-apply`). Khác với `HisService` ở trên
+ * (đã chuẩn hoá theo field kiểu HIS cũ: `servicename`, `servicetype`...),
+ * `current`/`incoming` trả về từ BE dùng đúng tên cột DB (`service_name`,
+ * `service_id`...) — không dùng `HisService` ở đây để tránh nhầm field.
+ */
+export interface HisServiceSyncRow {
+  id: string;
+  exam_area_id?: string | null;
+  service_id?: string;
+  service_name?: string;
+  price?: number | string | null;
+  specialty_id?: string | null;
+  booking_note?: string | null;
+  display_priority?: number | null;
+  display_group?: number | null;
+  room_visit_instruction?: string | null;
+  detail?: string | null;
+  status?: "ACTIVE" | "INACTIVE";
+  raw_data?: Record<string, unknown> | null;
+  synced_at?: string | null;
+  is_delete?: boolean;
+}
+
+/**
+ * `POST /his-services/sync` theo pattern diff/accept dùng chung với 6 danh
+ * mục HIS khác (xem `hisCatalogApi.ts`): bản ghi mới tự thêm ngay
+ * (`inserted`), bản ghi đã có mà khác dữ liệu HIS nằm trong `changes` chờ
+ * `POST /his-services/sync-apply` xác nhận.
+ */
+export type HisServiceSyncFromHisResult = HisCatalogSyncResult<HisServiceSyncRow>;
+export type HisServiceSyncApplyChangeInput = HisCatalogApplyChangeInput<HisServiceSyncRow>;
+export type HisServiceSyncApplyResult = HisCatalogApplyResult<HisServiceSyncRow>;
+
+export interface HisServiceSyncToHisResultRow {
+  service_id: string;
+  service_name: string;
+  status: "success" | "error";
+  error?: string;
+}
+
+export interface HisServiceSyncToHisResult {
+  message: string;
+  total: number;
+  success: number;
+  error: number;
+  results: HisServiceSyncToHisResultRow[];
+}
+
 // ─── Query Keys ────────────────────────────────────────────────────────────
 
 const baseKey = "his-services";
@@ -287,6 +344,56 @@ export const hisServicesService = {
     });
     return res.data;
   },
+
+  /**
+   * `POST /his-services/sync` — kéo dữ liệu từ HIS, diff với DB theo khoá
+   * `(exam_area_id, service_id)`. `idbv` để trống nếu không cần lọc theo cơ
+   * sở. Trả `{inserted_count, inserted, changes, unchanged_count}` — bản ghi
+   * trong `changes` CHƯA ghi DB, phải gọi `syncApplyFromHis` mới áp dụng.
+   */
+  syncFromHis: async (idbv?: string): Promise<HisServiceSyncFromHisResult> => {
+    const res = await apiPost<HisServiceSyncFromHisResult>("/his-services/sync", undefined, {
+      params: idbv ? { idbv } : undefined,
+    });
+    if (res.data.status === "success" && res.data.responseData) {
+      return res.data.responseData;
+    }
+    throw new Error(res.data.message || "Đồng bộ từ HIS thất bại");
+  },
+
+  /** `POST /his-services/sync-apply` — áp dụng các `changes` người dùng đã chọn từ `syncFromHis`. */
+  syncApplyFromHis: async (
+    changes: HisServiceSyncApplyChangeInput[]
+  ): Promise<HisServiceSyncApplyResult> => {
+    const res = await apiPost<HisServiceSyncApplyResult>("/his-services/sync-apply", { changes });
+    if (res.data.status === "success" && res.data.responseData) {
+      return res.data.responseData;
+    }
+    throw new Error(res.data.message || "Áp dụng thay đổi thất bại");
+  },
+
+  /**
+   * POST /his-services/sync-to-his — gửi dữ liệu dịch vụ lên HIS. BE trả HTTP 200
+   * ngay cả khi có lỗi cục bộ ở một vài dịch vụ — phải đọc `responseData`
+   * (total/success/error/results) chứ không chỉ dựa vào HTTP status. Lưu ý:
+   * tích hợp HIS phía BE cho endpoint này chưa được verify với HIS thật.
+   */
+  syncToHis: async (): Promise<HisServiceSyncToHisResult> => {
+    const res = await apiPost<{ total: number; success: number; error: number; results: HisServiceSyncToHisResultRow[] }>(
+      "/his-services/sync-to-his",
+    );
+    const responseData = res.data.responseData;
+    if (responseData) {
+      return {
+        message: res.data.message || "",
+        total: responseData.total,
+        success: responseData.success,
+        error: responseData.error,
+        results: responseData.results ?? [],
+      };
+    }
+    throw new Error(res.data.message || "Đồng bộ lên HIS thất bại");
+  },
 };
 
 // ─── TanStack Query Hooks ──────────────────────────────────────────────────
@@ -376,6 +483,61 @@ export const hisServicesHooks = {
     const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
     return useMutation<void, Error, string>({
       mutationFn: (id) => hisServicesService.remove(id),
+      onSuccess: (data, variables, context) => {
+        qc.invalidateQueries({ queryKey: hisServicesKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
+
+  useSyncFromHis: (
+    options?: UseMutationOptions<HisServiceSyncFromHisResult, Error, string | void>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<HisServiceSyncFromHisResult, Error, string | void>({
+      mutationFn: (idbv) => hisServicesService.syncFromHis(idbv ?? undefined),
+      onSuccess: (data, variables, context) => {
+        // `inserted` đã được BE ghi thẳng vào DB ngay trong bước sync.
+        qc.invalidateQueries({ queryKey: hisServicesKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
+
+  useSyncApplyFromHis: (
+    options?: UseMutationOptions<HisServiceSyncApplyResult, Error, HisServiceSyncApplyChangeInput[]>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<HisServiceSyncApplyResult, Error, HisServiceSyncApplyChangeInput[]>({
+      mutationFn: (changes) => hisServicesService.syncApplyFromHis(changes),
+      onSuccess: (data, variables, context) => {
+        qc.invalidateQueries({ queryKey: hisServicesKeys.all });
+        (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
+      },
+      onError: (error, variables, context) => {
+        (userOnError as unknown as undefined | ((e: typeof error, v: typeof variables, c: typeof context) => unknown))?.(error, variables, context);
+      },
+      ...rest,
+    });
+  },
+
+  useSyncToHis: (
+    options?: UseMutationOptions<HisServiceSyncToHisResult, Error, void>
+  ) => {
+    const qc = useQueryClient();
+    const { onSuccess: userOnSuccess, onError: userOnError, ...rest } = options ?? {};
+    return useMutation<HisServiceSyncToHisResult, Error, void>({
+      mutationFn: () => hisServicesService.syncToHis(),
       onSuccess: (data, variables, context) => {
         qc.invalidateQueries({ queryKey: hisServicesKeys.all });
         (userOnSuccess as unknown as undefined | ((d: typeof data, v: typeof variables, c: typeof context) => unknown))?.(data, variables, context);
