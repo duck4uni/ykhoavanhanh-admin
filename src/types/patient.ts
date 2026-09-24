@@ -32,6 +32,10 @@ export interface Patient {
   his_updated_at: string | null;
   raw_data: Record<string, unknown> | null;
   synced_at: string | null;
+  /** `true` khi hồ sơ được kéo từ HIS; `false` khi tạo ở hệ thống local/admin. */
+  is_from_his: boolean;
+  /** Thời điểm đẩy bệnh nhân lên HIS thành công; `null` nếu chưa đồng bộ lên HIS. */
+  synced_to_his_at: string | null;
   created_at: string;
   updated_at: string;
 }
