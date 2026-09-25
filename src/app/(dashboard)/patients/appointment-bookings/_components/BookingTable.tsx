@@ -57,7 +57,7 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div className="flex items-center justify-between border-b border-border px-3 py-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Danh sách lịch khám</h2>
         </div>
@@ -71,23 +71,23 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[11px]">
               <thead>
-                <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3.5">Thời gian hẹn</th>
-                  <th className="px-5 py-3.5 text-center">STT</th>
-                  <th className="px-5 py-3.5">Bệnh nhân</th>
-                  <th className="px-5 py-3.5">Mã BN HIS</th>
-                  {/* <th className="px-5 py-3.5">Mã đặt khám</th> */}
-                  <th className="px-5 py-3.5">Khu khám</th>
-                  <th className="px-5 py-3.5">Bác sĩ</th>
-                  <th className="px-5 py-3.5">Chuyên khoa</th>
-                  <th className="px-5 py-3.5">Dịch vụ</th>
-                  <th className="px-5 py-3.5">Đối tượng khám</th>
-                  {/* <th className="px-5 py-3.5">Nguồn</th> */}
-                  <th className="px-5 py-3.5">Trạng thái</th>
-                  <th className="px-5 py-3.5">Đồng bộ HIS</th>
-                  <th className="px-5 py-3.5 text-center">Thao tác</th>
+                <tr className="border-b border-border text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-3">Thời gian hẹn</th>
+                  <th className="px-3 py-3 text-center">STT</th>
+                  <th className="px-3 py-3">Bệnh nhân</th>
+                  <th className="px-3 py-3">Mã BN HIS</th>
+                  {/* <th className="px-3 py-3">Mã đặt khám</th> */}
+                  <th className="px-3 py-3">Khu khám</th>
+                  <th className="px-3 py-3">Bác sĩ</th>
+                  <th className="px-3 py-3">Chuyên khoa</th>
+                  <th className="px-3 py-3">Dịch vụ</th>
+                  <th className="px-3 py-3">Đối tượng khám</th>
+                  {/* <th className="px-3 py-3">Nguồn</th> */}
+                  <th className="px-3 py-3">Trạng thái</th>
+                  <th className="px-3 py-3">Đồng bộ HIS</th>
+                  <th className="px-3 py-3 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,46 +103,46 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                     const isSyncing = syncingId === booking.id;
                     return (
                     <tr key={booking.id} className="border-b border-border transition-colors last:border-0 hover:bg-surface-secondary/40">
-                      <td className="px-5 py-4 font-medium text-foreground">
+                      <td className="px-3 py-3 font-medium text-foreground">
                         {getBookingDateTimeText(booking)}
                       </td>
-                      <td className="px-5 py-4 text-center font-semibold text-slate-700">
+                      <td className="px-3 py-3 text-center font-semibold text-slate-700">
                         {booking.queue_number ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {booking.patient?.patient_full_name ?? booking.patient_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 font-mono text-primary-600">
+                      <td className="px-3 py-3 font-mono text-primary-600">
                         {booking.his_patient_id ?? booking.patient?.his_patient_id ?? "—"}
                       </td>
-                      {/* <td className="px-5 py-4 text-muted-foreground">
+                      {/* <td className="px-3 py-3 text-muted-foreground">
                         {booking.his_booking_id ?? booking.request_booking_id ?? booking.id}
                       </td> */}
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {booking.exam_area?.name ?? booking.exam_area_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {booking.doctor?.doctor_name ?? booking.doctor_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {booking.specialty?.name ?? booking.specialty_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {booking.service?.service_name ?? booking.service_id ?? "—"}
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground">
+                      <td className="px-3 py-3 text-muted-foreground">
                         {formatExamType(booking.exam_type)}
                       </td>
-                      {/* <td className="px-5 py-4 text-muted-foreground">{booking.source ?? "—"}</td> */}
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getBookingStatusBadge(booking.status ?? booking.local_status)}`}>
+                      {/* <td className="px-3 py-3 text-muted-foreground">{booking.source ?? "—"}</td> */}
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${getBookingStatusBadge(booking.status ?? booking.local_status)}`}>
                           {formatBookingStatus(booking.status ?? booking.local_status)}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-3">
                         <div className="min-w-[145px]">
                           <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getHisSyncStatusBadge(booking.his_sync_status)}`}
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${getHisSyncStatusBadge(booking.his_sync_status)}`}
                             title={booking.last_his_sync_error || undefined}
                           >
                             {formatHisSyncStatus(booking.his_sync_status)}
@@ -174,15 +174,15 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1.5">
-                          <Button variant="outline" size="sm" className="gap-1.5 rounded-lg text-primary-600" onClick={() => onViewDetail(booking)}>
+                          <Button variant="outline" size="sm" className="gap-1 rounded-lg px-2 text-xs text-primary-600" onClick={() => onViewDetail(booking)}>
                             <FiEye className="h-3.5 w-3.5" /> Chi tiết
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 rounded-lg"
+                            className="gap-1 rounded-lg px-2 text-xs"
                             disabled={!syncAction.enabled || isSyncing}
                             title={syncAction.reason}
                             onClick={() => handleSyncToHis(booking)}
