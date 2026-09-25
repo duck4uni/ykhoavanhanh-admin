@@ -1,6 +1,14 @@
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import type { AppointmentBooking } from "@/api/appointmentBookingsApi";
-import { formatBookingStatus, formatExamType, getBookingDateTimeText, getBookingPrice, getBookingStatusBadge } from "../types";
+import {
+  formatBookingStatus,
+  formatExamType,
+  formatHisSyncStatus,
+  getBookingDateTimeText,
+  getBookingPrice,
+  getBookingStatusBadge,
+  getHisSyncStatusBadge,
+} from "../types";
 
 interface BookingDetailModalProps {
   booking: AppointmentBooking | null;
@@ -112,17 +120,43 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thông tin hệ thống</h3>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Trạng thái HIS</dt>
-                <dd className="mt-0.5 text-sm text-slate-700">{booking.his_status || "—"}</dd>
+                <dt className="text-xs font-medium text-muted-foreground">Trạng thái đồng bộ HIS</dt>
+                <dd className="mt-1">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getHisSyncStatusBadge(booking.his_sync_status)}`}>
+                    {formatHisSyncStatus(booking.his_sync_status)}
+                  </span>
+                </dd>
               </div>
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Hành động HIS</dt>
-                <dd className="mt-0.5 text-sm text-slate-700">{booking.his_action || "—"}</dd>
+                <dt className="text-xs font-medium text-muted-foreground">Mã booking HIS</dt>
+                <dd className="mt-0.5 font-mono text-sm text-slate-700">{booking.his_booking_id || "—"}</dd>
               </div>
-              {booking.his_error_message && (
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Mã vào viện HIS</dt>
+                <dd className="mt-0.5 font-mono text-sm text-slate-700">{booking.his_mavaovien || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">STT HIS</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">{booking.his_stt || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Lần thử gần nhất</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">
+                  {booking.last_his_sync_attempt_at ? formatDateTime(booking.last_his_sync_attempt_at) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">Đồng bộ thành công lúc</dt>
+                <dd className="mt-0.5 text-sm text-slate-700">
+                  {booking.synced_to_his_at ? formatDateTime(booking.synced_to_his_at) : "—"}
+                </dd>
+              </div>
+              {(booking.last_his_sync_error || booking.his_error_message) && (
                 <div className="sm:col-span-2">
-                  <dt className="text-xs font-medium text-muted-foreground">Lỗi HIS</dt>
-                  <dd className="mt-0.5 text-sm text-red-600">{booking.his_error_message}</dd>
+                  <dt className="text-xs font-medium text-muted-foreground">Lỗi HIS gần nhất</dt>
+                  <dd className="mt-0.5 text-sm text-red-600">
+                    {booking.last_his_sync_error || booking.his_error_message}
+                  </dd>
                 </div>
               )}
               <div>
