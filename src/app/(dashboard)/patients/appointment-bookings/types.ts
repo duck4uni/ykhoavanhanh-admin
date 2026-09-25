@@ -72,6 +72,66 @@ export function formatExamType(examType: string | null | undefined): string {
   return labels[examType] ?? examType;
 }
 
+export function formatHisSyncStatus(status: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    PENDING: "Chưa đồng bộ",
+    PROCESSING: "Đang xử lý",
+    SYNCED: "Đã đồng bộ",
+    FAILED: "Đồng bộ lỗi",
+    REVIEW_REQUIRED: "Cần đối soát",
+  };
+  return status ? labels[status] ?? status : "Chưa đồng bộ";
+}
+
+export function getHisSyncStatusBadge(status: string | null | undefined): string {
+  switch (status) {
+    case "SYNCED":
+      return "bg-success-light text-success";
+    case "PROCESSING":
+      return "bg-primary-100 text-primary-600";
+    case "FAILED":
+      return "bg-error-light text-error";
+    case "REVIEW_REQUIRED":
+      return "bg-orange-100 text-orange-700";
+    case "PENDING":
+    default:
+      return "bg-warning-light text-warning";
+  }
+}
+
+export function getHisSyncActionState(booking: {
+  status?: string | null;
+  queue_number?: number | null;
+  his_sync_status?: string | null;
+  patient?: { his_patient_id?: string | null } | null;
+}): { enabled: boolean; reason: string } {
+  if (booking.status === "CANCELLED" || booking.status === "CANCELED") {
+    return { enabled: false, reason: "Lịch khám đã hủy" };
+  }
+  if (booking.status !== "PAID") {
+    return { enabled: false, reason: "Lịch khám chưa thanh toán" };
+  }
+  if (booking.queue_number == null) {
+    return { enabled: false, reason: "Lịch khám chưa có số thứ tự" };
+  }
+  if (!booking.patient?.his_patient_id) {
+    return { enabled: false, reason: "Bệnh nhân chưa được đồng bộ lên HIS" };
+  }
+  if (booking.his_sync_status === "SYNCED") {
+    return { enabled: false, reason: "Lịch đã được đồng bộ lên HIS" };
+  }
+  if (booking.his_sync_status === "PROCESSING") {
+    return { enabled: false, reason: "Lịch đang được HIS xử lý" };
+  }
+  if (booking.his_sync_status === "FAILED") {
+    return { enabled: true, reason: "Thử lại đồng bộ lịch khám lên HIS" };
+  }
+  if (booking.his_sync_status === "REVIEW_REQUIRED") {
+    return { enabled: true, reason: "Cần đối soát HIS — bấm để backend kiểm tra lại" };
+  }
+  return { enabled: true, reason: "Đồng bộ lịch khám lên HIS" };
+}
+
 export function pruneEmptyFilters(filters: BookingFilters) {
   return Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value.trim() !== ""),
