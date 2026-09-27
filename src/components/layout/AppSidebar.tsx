@@ -17,6 +17,7 @@ import {
   Home,
   LayoutGrid,
   MessageSquare,
+  RefreshCw,
   Settings,
   Stethoscope,
   Users,
@@ -144,6 +145,9 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Nghề nghiệp", href: "/his-catalogs/professions" },
     ],
   },
+
+  // Cấu hình đồng bộ tự động (nightly) lên HIS - chỉ admin toàn quyền
+  { id: "his-auto-sync", label: "Đồng bộ tự động HIS", icon: RefreshCw, href: "/his-auto-sync", permission: "admin.all" },
 
   // Tài khoản nội bộ - Admin only
   {
