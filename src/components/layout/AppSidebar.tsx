@@ -72,6 +72,8 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Lịch khám", href: "/appointments" },
       // TODO: { name: "Lịch nghỉ phép BS", href: "/doctor-leaves" },
+      // Cấu hình nhắc lịch khám qua OneSignal - chỉ admin toàn quyền (BE gate is_admin)
+      { name: "Cấu hình nhắc lịch", href: "/appointments/reminder-config", permission: "admin.all" },
     ],
   },
 
