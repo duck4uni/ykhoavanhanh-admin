@@ -5,16 +5,21 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  CheckCircle2,
   ClipboardList,
   Cog,
+  Eye,
   HelpCircle,
   Info,
   Play,
   RefreshCw,
+  XCircle,
 } from "lucide-react";
 import {
   hisAutoSyncConfigHooks,
   type HisAutoSyncCategorySummary,
+  type HisAutoSyncLastRunAppointmentItem,
+  type HisAutoSyncLastRunPatientItem,
   type HisAutoSyncRunStatus,
 } from "@/api/hisAutoSyncConfigApi";
 import { toast } from "@/components/ui/Toast";
@@ -23,8 +28,14 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Toggle } from "@/components/ui/Toggle";
 import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { cn } from "@/lib/utils";
+import {
+  formatHisSyncStatus,
+  getBookingDateTimeText,
+  getHisSyncStatusBadge,
+} from "@/app/(dashboard)/patients/appointment-bookings/types";
 
 // ─── Time helpers ────────────────────────────────────────────────────────────
 // BE dùng "HH:mm:ss"; UI chỉ hiển thị/chỉnh giờ:phút, không hiển thị giây.
@@ -111,12 +122,15 @@ function CategoryStatCard({
   summary,
   status,
   errorTitle,
+  onViewDetail,
 }: {
   title: string;
   description: string;
   summary: HisAutoSyncCategorySummary | undefined;
   status: HisAutoSyncRunStatus | null;
   errorTitle: string;
+  /** Có khi đã có ít nhất 1 lần chạy -> cho phép xem danh sách chi tiết từng dòng. */
+  onViewDetail?: () => void;
 }) {
   const hasMessage = !!summary?.message;
   return (
@@ -147,7 +161,180 @@ function CategoryStatCard({
           <StatCell label="Bỏ qua" value={summary?.skipped ?? 0} className="text-slate-500" />
         </div>
       )}
+
+      {onViewDetail && (
+        <button
+          type="button"
+          onClick={onViewDetail}
+          className="mt-3 flex items-center gap-1.5 self-start text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Xem danh sách chi tiết
+        </button>
+      )}
     </div>
+  );
+}
+
+// ─── Modal chi tiết lần chạy gần nhất ────────────────────────────────────────
+
+type DetailTab = "appointments" | "patients";
+
+const DETAIL_TABS: { id: DetailTab; label: string }[] = [
+  { id: "appointments", label: "Lịch hẹn khám" },
+  { id: "patients", label: "Hồ sơ bệnh nhân" },
+];
+
+function AppointmentDetailRow({ item }: { item: HisAutoSyncLastRunAppointmentItem }) {
+  const hisCode = [item.his_mavaovien, item.his_stt].filter(Boolean).join(" · ");
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-slate-800">
+            Lịch khám {getBookingDateTimeText(item)}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Mã lịch: {item.appointment_id}
+            {item.patient_id ? ` · Bệnh nhân: ${item.patient_id}` : ""}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+            getHisSyncStatusBadge(item.his_sync_status),
+          )}
+        >
+          {formatHisSyncStatus(item.his_sync_status)}
+        </span>
+      </div>
+
+      {(hisCode || item.his_booking_id || item.synced_to_his_at) && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {item.his_booking_id && <span>Mã HIS: {item.his_booking_id}</span>}
+          {hisCode && <span>{hisCode}</span>}
+          {item.synced_to_his_at && <span>Đồng bộ lúc: {formatRunAt(item.synced_to_his_at)}</span>}
+        </div>
+      )}
+
+      {item.last_his_sync_error && (
+        <p className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
+          {item.last_his_sync_error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PatientDetailRow({ item }: { item: HisAutoSyncLastRunPatientItem }) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-slate-800">
+            {item.patient_name || `Bệnh nhân ${item.patient_id}`}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {item.phone_number || item.patient_id}
+            {item.his_patient_id ? ` · Mã HIS: ${item.his_patient_id}` : ""}
+          </p>
+        </div>
+        {item.is_success ? (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-xs font-medium text-success">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Thành công
+          </span>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-error-light px-2 py-0.5 text-xs font-medium text-error">
+            <XCircle className="h-3.5 w-3.5" />
+            Lỗi
+          </span>
+        )}
+      </div>
+
+      {item.error_message && (
+        <p className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{item.error_message}</p>
+      )}
+    </div>
+  );
+}
+
+function LastRunDetailModal({
+  open,
+  initialTab,
+  onClose,
+}: {
+  open: boolean;
+  initialTab: DetailTab;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<DetailTab>(initialTab);
+
+  // Mỗi lần mở modal, nhảy đúng tab tương ứng với nút vừa bấm.
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
+
+  const { data, isLoading, isError, error } = hisAutoSyncConfigHooks.useLastRunDetail({ enabled: open });
+
+  const neverRun = !isLoading && !isError && !data?.last_run_at;
+  const appointments = data?.appointments ?? [];
+  const patients = data?.patients ?? [];
+  const activeList = tab === "appointments" ? appointments : patients;
+
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Chi tiết lần chạy gần nhất" size="xl">
+      <div className="space-y-4">
+        {data?.last_run_at && (
+          <p className="text-xs text-muted-foreground">
+            Lần chạy: {formatRunAt(data.last_run_at)}
+            <span className="ml-1">(giờ Việt Nam)</span>
+          </p>
+        )}
+
+        <div className="flex gap-2 border-b border-slate-200">
+          {DETAIL_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                tab === t.id
+                  ? "border-primary-600 text-primary-700"
+                  : "border-transparent text-muted-foreground hover:text-slate-700",
+              )}
+            >
+              {t.label} ({t.id === "appointments" ? appointments.length : patients.length})
+            </button>
+          ))}
+        </div>
+
+        {isLoading ? (
+          <LoadingSection text="Đang tải chi tiết..." />
+        ) : isError ? (
+          <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error?.message || "Không tải được chi tiết lần chạy gần nhất"}</span>
+          </div>
+        ) : neverRun ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+            <ClipboardList className="h-8 w-8 text-slate-300" />
+            <p className="text-sm font-medium text-slate-700">Chưa có lần đồng bộ nào</p>
+          </div>
+        ) : activeList.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Không có dòng nào trong lần chạy này.
+          </p>
+        ) : (
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+            {tab === "appointments"
+              ? appointments.map((item) => <AppointmentDetailRow key={item.appointment_id} item={item} />)
+              : patients.map((item, idx) => <PatientDetailRow key={`${item.patient_id}-${idx}`} item={item} />)}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -162,6 +349,7 @@ interface EditableForm {
 function HisAutoSyncConfigContent() {
   const { data: config, isLoading, isFetching, refetch } = hisAutoSyncConfigHooks.useConfig();
   const [form, setForm] = useState<EditableForm | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab | null>(null);
 
   // Chỉ nạp form từ dữ liệu server 1 lần (lần load đầu) để tránh đè nội dung
   // người dùng đang chỉnh khi query refetch nền (invalidate sau run-now, "Làm mới"...).
@@ -356,6 +544,7 @@ function HisAutoSyncConfigContent() {
                 summary={config?.last_run_summary?.appointments}
                 status={config?.last_run_status ?? null}
                 errorTitle="Không thể đồng bộ lịch hẹn"
+                onViewDetail={() => setDetailTab("appointments")}
               />
               <CategoryStatCard
                 title="Hồ sơ bệnh nhân"
@@ -363,6 +552,7 @@ function HisAutoSyncConfigContent() {
                 summary={config?.last_run_summary?.patients}
                 status={config?.last_run_status ?? null}
                 errorTitle="Không thể đồng bộ hồ sơ bệnh nhân"
+                onViewDetail={() => setDetailTab("patients")}
               />
             </div>
           )}
@@ -396,6 +586,12 @@ function HisAutoSyncConfigContent() {
           </div>
         </CardContent>
       </Card>
+
+      <LastRunDetailModal
+        open={detailTab !== null}
+        initialTab={detailTab ?? "appointments"}
+        onClose={() => setDetailTab(null)}
+      />
     </div>
   );
 }

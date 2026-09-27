@@ -6,14 +6,18 @@
  * `hisServicesApi.ts`, `appointmentBookingsApi.ts`).
  *
  * Endpoints:
- * - GET  /his-auto-sync-config           → đọc cấu hình hiện tại.
- * - PUT  /his-auto-sync-config           → cập nhật `is_enabled` / `sync_time`.
- * - POST /his-auto-sync-config/run-now   → chạy đồng bộ ngay (blocking call,
+ * - GET  /his-auto-sync-config                    → đọc cấu hình hiện tại.
+ * - PUT  /his-auto-sync-config                    → cập nhật `is_enabled` / `sync_time`.
+ * - POST /his-auto-sync-config/run-now            → chạy đồng bộ ngay (blocking call,
  *   luôn trả HTTP 200; `started: false` nghĩa là không có gì để chạy/đang chạy
  *   dở, KHÔNG phải lỗi).
+ * - GET  /his-auto-sync-config/last-run-detail    → danh sách chi tiết từng lịch
+ *   khám/bệnh nhân đã xử lý trong lần chạy gần nhất (chỉ giữ 1 lần gần nhất, không
+ *   có lịch sử nhiều lần chạy).
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPut, apiPost } from "@/lib/axios";
+import type { AppointmentHisSyncStatus } from "@/api/appointmentBookingsApi";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,11 +61,47 @@ export interface HisAutoSyncRunNowResult {
   summary?: HisAutoSyncSummary;
 }
 
+/** 1 lịch hẹn khám đã được xử lý trong lần chạy auto-sync gần nhất. */
+export interface HisAutoSyncLastRunAppointmentItem {
+  appointment_id: string;
+  patient_id: string | null;
+  appointment_date: string | null;
+  appointment_time: string | null;
+  his_sync_status: AppointmentHisSyncStatus;
+  synced_to_his_at: string | null;
+  his_booking_id: string | null;
+  his_mavaovien: string | null;
+  his_stt: string | null;
+  last_his_sync_error: string | null;
+}
+
+/** 1 hồ sơ bệnh nhân đã được xử lý trong lần chạy auto-sync gần nhất. */
+export interface HisAutoSyncLastRunPatientItem {
+  patient_id: string;
+  his_patient_id: string | null;
+  patient_name: string | null;
+  phone_number: string | null;
+  /** Kết quả của LẦN THỬ TRONG LẦN CHẠY NÀY, không phải trạng thái hiện tại của bệnh nhân. */
+  is_success: boolean;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface HisAutoSyncLastRunDetail {
+  /** `null` nghĩa là chưa từng chạy lần nào — khi đó 2 mảng dưới luôn rỗng. */
+  last_run_at: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  appointments: HisAutoSyncLastRunAppointmentItem[];
+  patients: HisAutoSyncLastRunPatientItem[];
+}
+
 // ─── Query keys ──────────────────────────────────────────────────────────────
 
 export const hisAutoSyncConfigKeys = {
   all: ["his-auto-sync-config"] as const,
   detail: () => [...hisAutoSyncConfigKeys.all, "detail"] as const,
+  lastRunDetail: () => [...hisAutoSyncConfigKeys.all, "last-run-detail"] as const,
 };
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -83,6 +123,11 @@ export const hisAutoSyncConfigService = {
     const res = await apiPost<HisAutoSyncRunNowResult>("/his-auto-sync-config/run-now");
     if (res.data.responseData) return res.data.responseData;
     throw new Error(res.data.message || "Không thể chạy đồng bộ HIS ngay bây giờ");
+  },
+  getLastRunDetail: async (): Promise<HisAutoSyncLastRunDetail> => {
+    const res = await apiGet<HisAutoSyncLastRunDetail>("/his-auto-sync-config/last-run-detail");
+    if (res.data.responseData) return res.data.responseData;
+    throw new Error(res.data.message || "Không tải được chi tiết lần chạy gần nhất");
   },
 };
 
@@ -125,4 +170,14 @@ export const hisAutoSyncConfigHooks = {
       onError: (error: Error) => options?.onError?.(error),
     });
   },
+
+  // Chỉ fetch khi modal chi tiết được mở (enabled) — tránh gọi API này ngay khi
+  // vào trang trong khi phần lớn thời gian người dùng không cần xem chi tiết.
+  useLastRunDetail: (options?: { enabled?: boolean }) =>
+    useQuery({
+      queryKey: hisAutoSyncConfigKeys.lastRunDetail(),
+      queryFn: hisAutoSyncConfigService.getLastRunDetail,
+      enabled: options?.enabled ?? false,
+      staleTime: 30_000,
+    }),
 };
