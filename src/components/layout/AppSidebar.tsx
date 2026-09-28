@@ -167,6 +167,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Tin tức", href: "/content/news" },
       { name: "Danh mục bài viết", href: "/content/categories" },
       { name: "Banner", href: "/content/banners" },
+      { name: "Chính sách sử dụng", href: "/content/policies" },
     ],
   },
 
