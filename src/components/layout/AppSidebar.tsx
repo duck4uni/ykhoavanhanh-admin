@@ -19,6 +19,7 @@ import {
   MessageSquare,
   RefreshCw,
   Settings,
+  Smartphone,
   Stethoscope,
   Users,
   Wrench,
@@ -170,6 +171,9 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Chính sách sử dụng", href: "/content/policies" },
     ],
   },
+
+  // Quản lý bản cập nhật ứng dụng di động - chỉ admin toàn quyền
+  { id: "app-versions", label: "Bản cập nhật ứng dụng", icon: Smartphone, href: "/app-versions", permission: "admin.all" },
 
   // Thông báo - Ai cũng thấy
   { id: "notifications", label: "Thông báo", icon: Bell, href: "/notifications" },
