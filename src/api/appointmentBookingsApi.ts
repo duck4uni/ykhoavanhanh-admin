@@ -53,6 +53,19 @@ export interface AppointmentBooking {
   last_sync_at: string | null;
   note: string | null;
   created_by: string | null;
+  updated_by?: string | null;
+  booking_group_id?: string | null;
+  /** Ảnh chụp công thức tính giá lúc đặt lịch. */
+  pricing_snapshot?: {
+    exam_type?: string | null;
+    is_second_visit?: boolean;
+    bhyt_price?: number | string | null;
+    dv_price?: number | string | null;
+    formula?: string | null;
+    amount_payable?: number | string | null;
+  } | null;
+  reminder_1_sent_at?: string | null;
+  reminder_2_sent_at?: string | null;
   created_at: string;
   updated_at: string;
   patient?: {

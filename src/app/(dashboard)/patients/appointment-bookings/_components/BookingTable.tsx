@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FiEye, FiRefreshCw } from "react-icons/fi";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { toast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
+import { usePermission } from "@/hooks/usePermission";
 import { appointmentBookingsHooks, type AppointmentBooking } from "@/api/appointmentBookingsApi";
 import {
   formatBookingStatus,
@@ -15,10 +14,14 @@ import {
   formatHisSyncStatus,
   getBookingDateTimeText,
   getBookingStatusBadge,
+  getCancelActionState,
   getHisSyncActionState,
   getHisSyncStatusBadge,
+  isCancelledBooking,
 } from "../types";
 import type { BookingListController } from "../hooks/useBookingList";
+import { BookingActionsMenu } from "./BookingActionsMenu";
+import { BookingCancelRefundDialog } from "./BookingCancelRefundDialog";
 
 interface BookingTableProps {
   ctrl: BookingListController;
@@ -29,6 +32,8 @@ interface BookingTableProps {
 export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
   const { isLoading, bookings, total, totalPages, currentPage, setPage, pageSize, setPageSize } = ctrl;
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<AppointmentBooking | null>(null);
+  const { isAdmin } = usePermission();
 
   const syncToHis = appointmentBookingsHooks.useSyncToHis({
     onSuccess: (data) => {
@@ -101,6 +106,8 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                   bookings.map((booking) => {
                     const syncAction = getHisSyncActionState(booking);
                     const isSyncing = syncingId === booking.id;
+                    const cancelAction = getCancelActionState(booking);
+                    const isCancelled = isCancelledBooking(booking.status);
                     return (
                     <tr key={booking.id} className="border-b border-border transition-colors last:border-0 hover:bg-surface-secondary/40">
                       <td className="px-3 py-3 font-medium text-foreground">
@@ -175,21 +182,19 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Button variant="outline" size="sm" className="gap-1 rounded-lg px-2 text-xs text-primary-600" onClick={() => onViewDetail(booking)}>
-                            <FiEye className="h-3.5 w-3.5" /> Chi tiết
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1 rounded-lg px-2 text-xs"
-                            disabled={!syncAction.enabled || isSyncing}
-                            title={syncAction.reason}
-                            onClick={() => handleSyncToHis(booking)}
-                          >
-                            <FiRefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-                            Đồng bộ HIS
-                          </Button>
+                        <div className="flex items-center justify-center">
+                          <BookingActionsMenu
+                            onViewDetail={() => onViewDetail(booking)}
+                            onSyncToHis={() => handleSyncToHis(booking)}
+                            syncEnabled={syncAction.enabled}
+                            syncReason={syncAction.reason}
+                            isSyncing={isSyncing}
+                            showCancelRefund={isAdmin}
+                            isCancelled={isCancelled}
+                            cancelEnabled={cancelAction.enabled}
+                            cancelReason={cancelAction.reason}
+                            onCancelRefund={() => setCancelTarget(booking)}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -210,6 +215,9 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
             />
           </div>
         </>
+      )}
+      {cancelTarget && (
+        <BookingCancelRefundDialog key={cancelTarget.id} booking={cancelTarget} onClose={() => setCancelTarget(null)} />
       )}
     </Card>
   );

@@ -18,6 +18,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { authService } from "@/api/authApi";
 import { notificationsHooks, type Notification as ApiNotification } from "@/api/notificationsApi";
 import { useCurrentUser } from "@/store/authStore";
+import { useChatStore } from "@/store/chatStore";
 import { AdminRole, AdminUser } from "@/types/user";
 import { ROLE_LABELS, type RoleType } from "@/types/permissions";
 import {
@@ -209,11 +210,15 @@ function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const { data, isFetching } = notificationsHooks.useList({ currentPage: 1, pageSize: 5 });
+  const { data, isFetching } = notificationsHooks.useList(
+    { currentPage: 1, pageSize: 5 },
+    { refetchInterval: 30_000 }
+  );
   const rows = data?.rows ?? [];
   const unreadCount = rows.filter((r) => !r.has_user_read).length;
 
   const markReadMutation = notificationsHooks.useMarkAsReadById();
+  const setSelectedConversationId = useChatStore((s) => s.setSelectedConversationId);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -227,6 +232,13 @@ function NotificationBell() {
     setOpen(false);
     if (!notif.has_user_read) {
       markReadMutation.mutate(notif.id);
+    }
+    // Thông báo chat: mở thẳng hội thoại trong trang /chats thay vì trang chi tiết thông báo.
+    const conversationId = notif.additional_data?.conversationId;
+    if (notif.category === "CHAT" && conversationId) {
+      setSelectedConversationId(conversationId);
+      router.push("/chats");
+      return;
     }
     router.push(`/notifications/${notif.id}`);
   };
