@@ -28,7 +28,10 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly violations?: Array<{ field?: string; message: string }>
+    public readonly violations?: Array<{ field?: string; message: string }>,
+    /** `responseData` của body lỗi (vd 409 `requires_group_cancel` khi hủy lịch). */
+    public readonly data?: unknown,
+    public readonly messageEn?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -149,10 +152,10 @@ api.interceptors.response.use(
     // Skip auth routes - don't handle 401 for login/register
     if (isPublicRoute(originalRequest.url)) {
       if (error.response?.data) {
-        const { message, message_en, violations } = error.response.data;
+        const { message, message_en, violations, responseData } = error.response.data;
         const errorMessage =
           message || message_en || error.response.statusText || "Đã xảy ra lỗi";
-        return Promise.reject(new ApiError(errorMessage, error.response.status, violations));
+        return Promise.reject(new ApiError(errorMessage, error.response.status, violations, responseData, message_en));
       }
       return Promise.reject(error);
     }
@@ -160,10 +163,10 @@ api.interceptors.response.use(
     // Only handle 401
     if (error.response?.status !== 401) {
       if (error.response?.data) {
-        const { message, message_en, violations } = error.response.data;
+        const { message, message_en, violations, responseData } = error.response.data;
         const errorMessage =
           message || message_en || error.response.statusText || "Đã xảy ra lỗi";
-        return Promise.reject(new ApiError(errorMessage, error.response.status, violations));
+        return Promise.reject(new ApiError(errorMessage, error.response.status, violations, responseData, message_en));
       }
 
       if (!error.response) {

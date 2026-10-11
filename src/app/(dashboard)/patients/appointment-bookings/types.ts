@@ -154,3 +154,49 @@ export function getBookingPrice(price: string | number | null | undefined): numb
   const value = typeof price === "string" ? Number(price) : price;
   return Number.isFinite(value) ? value : null;
 }
+
+// ─── Hủy lịch & hoàn tiền ─────────────────────────────────────────────────────
+
+/** Trạng thái cho phép admin hủy lịch (DELETE /appointments/{id}). */
+const CANCELLABLE_BOOKING_STATUSES = ["PENDING_PAYMENT", "PAID", "CONFIRMED"];
+
+export function isCancelledBooking(status: string | null | undefined): boolean {
+  return status === "CANCELLED" || status === "CANCELED";
+}
+
+/** Lịch chưa hoàn tất, chưa hủy và chưa qua ngày khám mới được hủy. */
+export function getCancelActionState(booking: {
+  status?: string | null;
+  appointment_date?: string | null;
+}): { enabled: boolean; reason: string } {
+  if (isCancelledBooking(booking.status)) return { enabled: false, reason: "Lịch khám đã hủy" };
+  if (booking.status === "COMPLETED") return { enabled: false, reason: "Lịch khám đã hoàn tất, không thể hủy" };
+  if (!booking.status || !CANCELLABLE_BOOKING_STATUSES.includes(booking.status)) {
+    return { enabled: false, reason: "Trạng thái lịch khám hiện tại không cho phép hủy" };
+  }
+  if (booking.appointment_date) {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    if (booking.appointment_date.slice(0, 10) < todayKey) {
+      return { enabled: false, reason: "Đã qua ngày khám, không thể hủy lịch và hoàn tiền" };
+    }
+  }
+  return { enabled: true, reason: "Hủy lịch khám và hoàn tiền" };
+}
+
+export const REFUND_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Đang xử lý hoàn tiền",
+  SUCCESS: "Đã hoàn tiền",
+  FAILED: "Hoàn tiền thất bại",
+};
+
+export function getRefundStatusBadge(status: string | null | undefined): string {
+  switch (status) {
+    case "SUCCESS":
+      return "bg-success-light text-success";
+    case "FAILED":
+      return "bg-error-light text-error";
+    default:
+      return "bg-warning-light text-warning";
+  }
+}
