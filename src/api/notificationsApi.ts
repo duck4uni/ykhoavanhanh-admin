@@ -10,9 +10,15 @@ import { createApi } from "./createApi";
 
 // ─── Types (theo api.md) ────────────────────────────────────────────────
 
-export type NotificationCategory = "APPOINTMENT" | "SYSTEM";
+export type NotificationCategory = "APPOINTMENT" | "SYSTEM" | "CHAT";
 
-export type NotificationSubCategory = "CONFIRMED" | "CANCELLED" | "REMINDER" | "SYSTEM";
+export type NotificationSubCategory =
+  | "CONFIRMED"
+  | "CANCELLED"
+  | "REMINDER"
+  | "SYSTEM"
+  | "CHAT_NEW_MESSAGE"
+  | "CHAT_REPLY";
 
 export interface Notification {
   id: string;
@@ -20,6 +26,8 @@ export interface Notification {
   content: string;
   category: NotificationCategory;
   sub_category?: NotificationSubCategory;
+  /** Dữ liệu kèm theo; thông báo chat: { type: "CHAT_MESSAGE", conversationId } */
+  additional_data?: { type?: string; conversationId?: string } | null;
   belongs_to_user_id: string;
   has_user_read: boolean;
   sent_time: string;
@@ -118,7 +126,7 @@ export const notificationsHooks = {
 
   useList: (
     params?: NotificationQuery,
-    options?: { enabled?: boolean; staleTime?: number }
+    options?: { enabled?: boolean; staleTime?: number; refetchInterval?: number | false }
   ): UseQueryResult<PaginatedNotifications, Error> => {
     return useQuery<PaginatedNotifications, Error>({
       queryKey: notificationsKeys.list(params),
