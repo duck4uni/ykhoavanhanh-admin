@@ -2,7 +2,8 @@
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { FiEye, FiMoreVertical, FiRefreshCw, FiRotateCcw, FiXCircle } from "react-icons/fi";
-import { Button } from "@/components/ui/Button";
+import { buttonVariants } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 interface BookingActionsMenuProps {
   onViewDetail: () => void;
@@ -39,10 +40,14 @@ export function BookingActionsMenu({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="outline" size="sm" className="gap-1 rounded-lg px-2 text-xs">
+        {/* Dùng <button> thuần: `Button` không forward ref nên Radix không có anchor để đặt menu. */}
+        <button
+          type="button"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1 rounded-lg px-2 text-xs")}
+        >
           <FiMoreVertical className="h-3.5 w-3.5" />
           Thao tác
-        </Button>
+        </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

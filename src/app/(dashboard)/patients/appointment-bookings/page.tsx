@@ -13,11 +13,35 @@ import { useBookingList } from "./hooks/useBookingList";
 import { BookingFiltersBar } from "./_components/BookingFiltersBar";
 import { BookingTable } from "./_components/BookingTable";
 import { BookingDetailModal } from "./_components/BookingDetailModal";
+import { BookingCancelRefundDialog } from "./_components/BookingCancelRefundDialog";
+import { getHisSyncActionState } from "./types";
+import { usePermission } from "@/hooks/usePermission";
 
 export default function PatientAppointmentBookingsPage() {
   const ctrl = useBookingList();
   const [selectedBooking, setSelectedBooking] = useState<AppointmentBooking | null>(null);
+  const [detailCancelTarget, setDetailCancelTarget] = useState<AppointmentBooking | null>(null);
+  const { isAdmin } = usePermission();
   const [resultRows, setResultRows] = useState<AppointmentSyncToHisResultRow[] | null>(null);
+
+  const syncOneToHis = appointmentBookingsHooks.useSyncToHis({
+    onSuccess: (data) => {
+      const result = data.results[0];
+      if (result?.status === "error") {
+        toast.error(result.message || "Đồng bộ lịch khám lên HIS thất bại");
+      } else if (result?.status === "skipped") {
+        toast.warning(result.message || "Lịch khám chưa đủ điều kiện đồng bộ");
+      } else {
+        toast.success("Đồng bộ lịch khám lên HIS thành công");
+      }
+    },
+    onError: (error) => toast.error(error.message || "Đồng bộ lịch khám lên HIS thất bại"),
+  });
+
+  function handleSyncFromDetail(booking: AppointmentBooking) {
+    if (!getHisSyncActionState(booking).enabled) return;
+    syncOneToHis.mutate([booking.id]);
+  }
 
   const syncAllToHis = appointmentBookingsHooks.useSyncAllToHis({
     onSuccess: (data) => {
@@ -65,7 +89,26 @@ export default function PatientAppointmentBookingsPage() {
       <BookingFiltersBar ctrl={ctrl} />
       <BookingTable ctrl={ctrl} onViewDetail={setSelectedBooking} />
 
-      <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+      <BookingDetailModal
+        booking={ctrl.bookings.find((b) => b.id === selectedBooking?.id) ?? selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+        onSyncToHis={handleSyncFromDetail}
+        isSyncing={syncOneToHis.isPending}
+        canCancelRefund={isAdmin}
+        onCancelRefund={setDetailCancelTarget}
+        locked={syncOneToHis.isPending || detailCancelTarget !== null}
+      />
+      {detailCancelTarget && (
+        <BookingCancelRefundDialog
+          key={detailCancelTarget.id}
+          booking={detailCancelTarget}
+          onClose={() => {
+            setDetailCancelTarget(null);
+            // Trạng thái lịch đã đổi sau khi hủy/hoàn tiền → đóng panel để tránh hiển thị dữ liệu cũ.
+            setSelectedBooking(null);
+          }}
+        />
+      )}
 
       {resultRows && resultRows.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
