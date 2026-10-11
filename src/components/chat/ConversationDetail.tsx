@@ -568,7 +568,11 @@ interface DetailHeaderProps {
 }
 
 function DetailHeader({ conversation, isLoading, onStatusChange, onAssign }: DetailHeaderProps) {
-  const { data: users } = useUsersList();
+  // Chỉ nhân viên (admin đang hoạt động) mới được gán — backend cũng kiểm tra lại.
+  const { data: users } = useUsersList({
+    pageSize: 200,
+    filters: "is_admin==true,is_active==true",
+  });
   const statusConfig = conversation ? STATUS_CONFIG[conversation.status] : null;
 
   return (
