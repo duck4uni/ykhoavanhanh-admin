@@ -6,7 +6,6 @@ import { toast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useApiHelpers";
 import {
   DOCTORS_PAGE_SIZE,
-  getClinicName,
   getDoctorStatus,
   getScheduleCount,
   inferSpecialtyName,
@@ -81,17 +80,9 @@ export function useDoctorList() {
     setPage(1);
   }, [debouncedSearch, debouncedInternalIdSearch, statusFilter, specialtyFilter, clinicFilter, pageSize]);
 
-  const filtered = useMemo(() => {
-    // Tìm kiếm, chuyên khoa và trạng thái đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
-    // Lưu ý: bác sĩ chưa có quan hệ thật với phòng khám (rooms) trong dữ liệu — matchClinic chỉ là gợi ý gần đúng.
-    return allDoctors.filter((doctor) => {
-      const clinic = getClinicName(doctor);
-      const scheduleCount = getScheduleCount(doctor);
-      const matchClinic = !clinicFilter || clinic === clinicFilter;
-      const matchSchedule = scheduleFilter === "all" || (scheduleFilter === "has" ? scheduleCount > 0 : scheduleCount === 0);
-      return matchClinic && matchSchedule;
-    });
-  }, [allDoctors, clinicFilter, scheduleFilter]);
+  // Không lọc cục bộ sau khi API đã phân trang: nếu chỉ lọc 10 bản ghi của
+  // trang hiện tại thì mỗi trang có thể còn vài dòng nhưng tổng trang vẫn giữ nguyên.
+  const filtered = allDoctors;
 
   const totalPages = doctorsData?.totalPages ?? Math.max(1, Math.ceil(filtered.length / pageSize));
 
