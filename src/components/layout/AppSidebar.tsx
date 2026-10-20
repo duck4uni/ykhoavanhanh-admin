@@ -62,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Danh sách bệnh nhân", href: "/patients" },
       { name: "Danh sách lịch khám", href: "/patients/appointment-bookings" },
-      { name: "Hồ sơ bệnh án", href: "/medical-records" },
+      // { name: "Hồ sơ bệnh án", href: "/medical-records" },
     ],
   },
 
@@ -133,7 +133,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Dịch vụ khám", href: "/exam-services", permission: "admin.declare_service_price" },
     ],
   },
-  { id: "admin-operations", label: "Vận hành", icon: Wrench, href: "/operations", permission: "admin.all" },
+  // { id: "admin-operations", label: "Vận hành", icon: Wrench, href: "/operations", permission: "admin.all" },
 
   // Danh mục dùng chung đồng bộ từ HIS - chỉ admin toàn quyền
   {

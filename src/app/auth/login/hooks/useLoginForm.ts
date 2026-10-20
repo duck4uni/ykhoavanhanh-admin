@@ -6,12 +6,6 @@ import { toast } from "sonner";
 import { useLogin } from "@/api/authApi";
 import { useAuthStore } from "@/store/authStore";
 
-// Demo account for development
-const DEMO_ACCOUNT = {
-  phone: "0901234567",
-  password: "12345678",
-};
-
 export function useLoginForm() {
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -28,19 +22,6 @@ export function useLoginForm() {
     setLoading(true);
 
     try {
-      // Check for demo account first
-      if (form.email === DEMO_ACCOUNT.phone && form.password === DEMO_ACCOUNT.password) {
-        // Simulate demo login
-        setAuth({
-          accessToken: "demo-jwt-token-" + Date.now(),
-          refreshToken: "demo-refresh-token-" + Date.now(),
-          expiresIn: "86400",
-        });
-        toast.success("Đăng nhập thành công!");
-        router.push("/");
-        return;
-      }
-
       // Real API login - use phone as identifier
       const res = await loginMutation.mutateAsync({
         email: form.email, 
