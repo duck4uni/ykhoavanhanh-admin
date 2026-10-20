@@ -19,6 +19,8 @@ export function useDoctorList() {
   const [pageSize, setPageSize] = useState(DOCTORS_PAGE_SIZE);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 400);
+  const [internalIdSearch, setInternalIdSearch] = useState("");
+  const debouncedInternalIdSearch = useDebounce(internalIdSearch, 400);
 
   const [specialtyFilter, setSpecialtyFilter] = useState("");
   const [clinicFilter, setClinicFilter] = useState("");
@@ -28,11 +30,12 @@ export function useDoctorList() {
   const serverFilters = useMemo(() => {
     const parts: string[] = [];
     if (debouncedSearch.trim()) parts.push(`doctor_name@=${debouncedSearch.trim()}`);
+    if (debouncedInternalIdSearch.trim()) parts.push(`doctor_id@=${debouncedInternalIdSearch.trim()}`);
     if (statusFilter === "Hoạt động") parts.push("status==ACTIVE");
     else if (statusFilter === "Tạm ngưng") parts.push("status==INACTIVE");
     if (specialtyFilter) parts.push(`specialty_id==${specialtyFilter}`);
     return parts.length > 0 ? parts.join(",") : undefined;
-  }, [debouncedSearch, statusFilter, specialtyFilter]);
+  }, [debouncedSearch, debouncedInternalIdSearch, statusFilter, specialtyFilter]);
 
   const { data: doctorsData, isLoading } = doctorsHooks.usePaginatedList({
     currentPage: page,
@@ -76,7 +79,7 @@ export function useDoctorList() {
   // Về trang 1 khi từ khóa tìm kiếm (đã debounce), chuyên khoa, phòng khám, trạng thái hoặc số lượng mỗi trang thay đổi.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter, specialtyFilter, clinicFilter, pageSize]);
+  }, [debouncedSearch, debouncedInternalIdSearch, statusFilter, specialtyFilter, clinicFilter, pageSize]);
 
   const filtered = useMemo(() => {
     // Tìm kiếm, chuyên khoa và trạng thái đã chuyển sang server (params.filters); tại đây chỉ lọc bổ sung.
@@ -112,6 +115,7 @@ export function useDoctorList() {
 
   function resetFilters() {
     setSearch("");
+    setInternalIdSearch("");
     setSpecialtyFilter("");
     setClinicFilter("");
     setStatusFilter("all");
@@ -133,6 +137,8 @@ export function useDoctorList() {
     // search + filters
     search,
     setSearch,
+    internalIdSearch,
+    setInternalIdSearch,
     specialtyFilter,
     setSpecialtyFilter,
     clinicFilter,

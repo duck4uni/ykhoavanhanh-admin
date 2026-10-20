@@ -103,12 +103,12 @@ const navigation: NavItem[] = [
       { name: "Hồ sơ sức khỏe", href: "/medical-records" },
     ],
   },
-  {
-    name: "Vận hành",
-    icon: FiTool,
-    roles: ["admin"],
-    children: [{ name: "Công cụ admin", href: "/operations" }],
-  },
+  // {
+  //   name: "Vận hành",
+  //   icon: FiTool,
+  //   roles: ["admin"],
+  //   children: [{ name: "Công cụ admin", href: "/operations" }],
+  // },
   {
     name: "Membership",
     icon: FiAward,
