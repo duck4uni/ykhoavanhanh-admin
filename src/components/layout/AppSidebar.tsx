@@ -110,6 +110,7 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["accountant", "admin"],
     children: [
       { name: "Thanh toán", href: "/payments" },
+      { name: "Danh sách lịch khám", href: "/accountant/appointment-bookings" },
       // TODO: { name: "Đối soát ngân hàng", href: "/reconciliation/bank" },
       // TODO: { name: "Đối soát HIS", href: "/reconciliation/his" },
     ],

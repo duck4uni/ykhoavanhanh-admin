@@ -11,7 +11,7 @@ interface BookingActionsMenuProps {
   syncEnabled: boolean;
   syncReason: string;
   isSyncing: boolean;
-  /** Chỉ admin mới có mục hủy/hoàn tiền. */
+  /** Chỉ hiện tại màn hình Kế toán khi tài khoản có quyền hủy/hoàn tiền. */
   showCancelRefund: boolean;
   isCancelled: boolean;
   cancelEnabled: boolean;

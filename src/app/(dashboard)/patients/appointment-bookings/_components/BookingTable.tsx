@@ -6,7 +6,6 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
 import { toast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
-import { usePermission } from "@/hooks/usePermission";
 import { appointmentBookingsHooks, type AppointmentBooking } from "@/api/appointmentBookingsApi";
 import {
   formatBookingStatus,
@@ -26,14 +25,14 @@ import { BookingCancelRefundDialog } from "./BookingCancelRefundDialog";
 interface BookingTableProps {
   ctrl: BookingListController;
   onViewDetail: (booking: AppointmentBooking) => void;
+  canCancelRefund?: boolean;
 }
 
 /** Bảng danh sách lịch đặt khám + phân trang. */
-export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
+export function BookingTable({ ctrl, onViewDetail, canCancelRefund = false }: BookingTableProps) {
   const { isLoading, bookings, total, totalPages, currentPage, setPage, pageSize, setPageSize } = ctrl;
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<AppointmentBooking | null>(null);
-  const { isAdmin } = usePermission();
 
   const syncToHis = appointmentBookingsHooks.useSyncToHis({
     onSuccess: (data) => {
@@ -189,7 +188,7 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
                             syncEnabled={syncAction.enabled}
                             syncReason={syncAction.reason}
                             isSyncing={isSyncing}
-                            showCancelRefund={isAdmin}
+                            showCancelRefund={canCancelRefund}
                             isCancelled={isCancelled}
                             cancelEnabled={cancelAction.enabled}
                             cancelReason={cancelAction.reason}
@@ -216,7 +215,7 @@ export function BookingTable({ ctrl, onViewDetail }: BookingTableProps) {
           </div>
         </>
       )}
-      {cancelTarget && (
+      {canCancelRefund && cancelTarget && (
         <BookingCancelRefundDialog key={cancelTarget.id} booking={cancelTarget} onClose={() => setCancelTarget(null)} />
       )}
     </Card>
