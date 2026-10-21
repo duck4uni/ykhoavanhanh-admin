@@ -26,7 +26,7 @@ interface BookingDetailModalProps {
   onClose: () => void;
   onSyncToHis: (booking: AppointmentBooking) => void;
   isSyncing: boolean;
-  /** Chỉ admin mới có thao tác hủy/hoàn tiền. */
+  /** Chỉ bật tại màn hình Kế toán khi tài khoản có quyền hủy/hoàn tiền. */
   canCancelRefund: boolean;
   onCancelRefund: (booking: AppointmentBooking) => void;
   /** Đang có thao tác (đồng bộ / hộp thoại hủy-hoàn tiền) → không cho đóng panel. */
