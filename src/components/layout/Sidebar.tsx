@@ -21,7 +21,6 @@ import {
   FiSettings,
   FiStar,
   FiTag,
-  FiTool,
   FiUser,
   FiUsers,
   FiMessageCircle,
