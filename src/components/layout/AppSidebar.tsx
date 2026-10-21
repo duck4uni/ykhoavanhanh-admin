@@ -22,7 +22,6 @@ import {
   Smartphone,
   Stethoscope,
   Users,
-  Wrench,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import type { Permission, RoleType } from "@/types/permissions";
