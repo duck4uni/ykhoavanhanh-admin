@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/axios";
+import { api, apiGet } from "@/lib/axios";
+import { filenameFromContentDisposition } from "@/lib/download";
 import type { PaginationParams } from "@/types/api-response";
 
 /**
@@ -57,6 +58,18 @@ export interface AppointmentBookingPayment {
   } | null;
 }
 
+/**
+ * Trạng thái đối soát — BE lọc được thật (dịch nhãn thành điều kiện SQL), nên
+ * KHÔNG lọc ở client: một trang chỉ có 10 dòng, lọc phía client sẽ làm `count`
+ * (con số kế toán dùng để đối soát) và phân trang sai.
+ */
+export type ReconcileStatusFilter =
+  | "RECONCILED"
+  | "UNRECONCILED"
+  | "REFUND_PENDING"
+  | "REFUNDED"
+  | "REFUND_FAILED";
+
 export interface AppointmentBookingPaymentListParams extends PaginationParams {
   /**
    * Sieve filter. **Nếu không có mệnh đề `payment_status`, BE tự mặc định
@@ -69,6 +82,8 @@ export interface AppointmentBookingPaymentListParams extends PaginationParams {
   /** `YYYY-MM-DD`, lọc theo `payment_time`. BE tự cộng 23:59:59.999 cho `to_date`. */
   from_date?: string;
   to_date?: string;
+  /** Nhãn cột "Đối soát". RECONCILED/UNRECONCILED tự hàm ý payment_status ở BE. */
+  reconcile_status?: ReconcileStatusFilter;
 }
 
 export interface PaginatedAppointmentBookingPayments {
@@ -106,6 +121,29 @@ export const appointmentBookingPaymentsService = {
     }
 
     throw new Error(data.message || "Không thể lấy danh sách thanh toán");
+  },
+
+  /**
+   * `GET /appointment-booking-payments/export` — file Excel của TOÀN BỘ dòng khớp
+   * bộ lọc (không chỉ trang đang xem). Nhận đúng bộ params của `getList`, nên
+   * luôn truyền lại nguyên params danh sách để file khớp những gì đang hiển thị.
+   * BE từ chối (400) nếu vượt 20.000 dòng — ApiError của interceptor đã có message.
+   */
+  exportList: async (
+    params?: AppointmentBookingPaymentListParams,
+  ): Promise<{ blob: Blob; filename: string | null; totalRows: number | null }> => {
+    const res = await api.get<Blob>("/appointment-booking-payments/export", {
+      params,
+      responseType: "blob",
+    });
+    // `X-Total-Rows` = số dòng thật trong file, để đối chiếu nhanh với `count`
+    // của danh sách (BE đặt header này chính vì mục đích đó).
+    const totalRows = Number(res.headers["x-total-rows"]);
+    return {
+      blob: res.data,
+      filename: filenameFromContentDisposition(res.headers["content-disposition"] as string | undefined),
+      totalRows: Number.isFinite(totalRows) ? totalRows : null,
+    };
   },
 };
 

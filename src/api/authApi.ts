@@ -4,6 +4,7 @@
 
 import { apiGet, apiPost, apiDelete } from "@/lib/axios";
 import { useAuthStore } from "@/store/authStore";
+import { clearIdleMarker, markActivity } from "@/utils/idleTimeout";
 import { queryKeys } from "@/types/api-response";
 import type { LoginPayload, AuthTokenResponse, User, ApiResponse } from "@/types/api-response";
 import type { AdminUser, AdminRole } from "@/types/user";
@@ -17,7 +18,10 @@ function mapApiUserToAdminUser(apiUser: User): AdminUser {
     fullName: apiUser.full_name || "",
     email: apiUser.email || "",
     phone: apiUser.phone,
-    role: (apiUser.is_admin ? "super_admin" : "cskh") as AdminRole,
+    // `AdminRole` là union legacy không biểu diễn được vai trò thật của nhân
+    // viên; chỉ super admin map được chắc chắn. Mọi trường hợp khác để
+    // undefined và UI đọc tên vai trò thật từ `userRoles[].roleName`.
+    role: apiUser.is_admin ? ("super_admin" as AdminRole) : undefined,
     avatar: apiUser.avatar,
     isActive: apiUser.is_active ?? true,
     is_admin: apiUser.is_admin, // Quan trọng: map is_admin để phân quyền
@@ -49,6 +53,10 @@ function unwrap<T>(res: { data: ApiResponse<T> }): T {
 async function login(payload: LoginPayload): Promise<AuthTokenResponse> {
   const res = await apiPost<AuthTokenResponse>("/auth/admin-login", payload);
   const data = unwrap(res);
+  // Đặt lại đồng hồ 30 phút TRƯỚC khi vào store. Mốc hoạt động dùng chung giữa các tab nên có
+  // thể còn giá trị cũ của phiên trước (xem idleTimeout.ts) — không đặt lại thì vừa đăng nhập
+  // đã bị tính là "không hoạt động 30 phút" và đăng xuất ngay.
+  markActivity();
   useAuthStore.getState().setAuth(data);
   return data;
 }
@@ -60,6 +68,9 @@ async function logout(): Promise<void> {
     // ignore 401 on logout
   } finally {
     useAuthStore.getState().resetStore();
+    // `resetStore()` chỉ ghi state, không gọi `removeItem` của tầng persist, nên mốc hoạt động
+    // phải tự xoá ở đây — để lại thì lần đăng nhập sau có thể bị đăng xuất ngay.
+    clearIdleMarker();
   }
 }
 

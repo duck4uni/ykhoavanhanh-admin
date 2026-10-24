@@ -17,6 +17,23 @@ const roleLabels: Record<AdminRole, string> = {
   doctor: "Bác sĩ",
 };
 
+/**
+ * Nhãn vai trò hiển thị. `AdminRole` là union legacy và chỉ đặt được cho super
+ * admin, nên ưu tiên tên vai trò thật từ `userRoles[]`.
+ */
+function getUserDisplayRole(user: AdminUser): string {
+  if (user.is_admin) return "Super Admin";
+  const roleNames = [
+    ...new Set(
+      (user.userRoles ?? [])
+        .map((ur) => (ur.description || ur.roleName || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (roleNames.length > 0) return roleNames.join(", ");
+  return (user.role && roleLabels[user.role]) || "Nhân viên";
+}
+
 const moduleTitleMap: Record<string, string> = {
   "/": "Bảng điều khiển",
   "/patients": "Quản lý bệnh nhân",
@@ -115,7 +132,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               <Avatar name={currentUser.fullName} size="sm" />
               <div className="hidden items-start sm:flex sm:flex-col">
                 <span className="text-sm font-medium text-gray-700">{currentUser.fullName}</span>
-                <span className="text-xs text-gray-500">{roleLabels[currentUser.role]}</span>
+                <span className="text-xs text-gray-500">{getUserDisplayRole(currentUser)}</span>
               </div>
               <FiChevronDown className="h-4 w-4 text-gray-500" />
             </button>
@@ -125,7 +142,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   <p className="text-sm font-semibold text-gray-900">{currentUser.fullName}</p>
                   <p className="mb-1 text-xs text-gray-500">{currentUser.email}</p>
                   <Badge variant="info" className="text-xs">
-                    {roleLabels[currentUser.role]}
+                    {getUserDisplayRole(currentUser)}
                   </Badge>
                 </div>
                 <button

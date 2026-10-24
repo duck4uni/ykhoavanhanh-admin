@@ -476,7 +476,7 @@ function AppointmentReminderConfigContent() {
 export default function AppointmentReminderConfigPage() {
   return (
     <PermissionGuard
-      permission="admin.all"
+      superAdminOnly
       fallback={<AccessDenied message="Bạn không có quyền quản lý cấu hình nhắc lịch khám" />}
     >
       <AppointmentReminderConfigContent />

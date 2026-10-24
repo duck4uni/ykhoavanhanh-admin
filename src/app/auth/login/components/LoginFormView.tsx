@@ -14,6 +14,7 @@ import {
   FiLock,
   FiEye,
   FiEyeOff,
+  FiClock,
 } from "react-icons/fi";
 
 const FEATURES = [
@@ -40,9 +41,8 @@ const FEATURES = [
 ];
 
 export function LoginFormView() {
-  const { form, loading, handleChange, handleSubmit } = useLoginForm();
+  const { form, loading, handleChange, handleSubmit, signedOutForIdle } = useLoginForm();
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
 
   return (
     <div
@@ -137,6 +137,18 @@ export function LoginFormView() {
               Vui lòng nhập tài khoản quản trị để tiếp tục
             </p>
 
+            {signedOutForIdle && (
+              <div
+                role="status"
+                className="mt-5 flex items-start gap-3 rounded-xl bg-amber-50 p-3.5 text-sm text-amber-900 ring-1 ring-amber-200"
+              >
+                <FiClock className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+                <p className="leading-relaxed">
+                  Phiên đã tự đăng xuất do không hoạt động 30 phút. Vui lòng đăng nhập lại.
+                </p>
+              </div>
+            )}
+
             <div className="mt-8 space-y-5">
               {/* Email */}
               <div>
@@ -188,17 +200,10 @@ export function LoginFormView() {
                 </div>
               </div>
 
-              {/* Remember + forgot */}
-              <div className="flex items-center justify-between">
-                <label className="flex cursor-pointer items-center gap-2 text-sm text-text-navy">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-primary-600 accent-primary-600 focus:ring-primary-500"
-                  />
-                  Ghi nhớ đăng nhập
-                </label>
+              {/* Đã bỏ checkbox "Ghi nhớ đăng nhập": phiên nay lưu ở sessionStorage và tự
+                  đăng xuất sau 30 phút không hoạt động, nên ô đó là lời hứa sai — nó vốn cũng
+                  không được dùng ở đâu (state `remember` không đi vào payload đăng nhập). */}
+              <div className="flex items-center justify-end">
                 <Link
                   href="/auth/forgot-password"
                   className="text-sm font-medium text-primary-600 hover:underline"

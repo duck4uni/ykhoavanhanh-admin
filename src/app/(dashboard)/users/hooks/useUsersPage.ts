@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useUsersList, useDeleteUser, mapApiUserToUser } from "@/api/userApi";
+import { useUserRolesList } from "@/api/userRolesApi";
 import type { User } from "@/types/api-response";
 import { toast } from "@/components/ui/Toast";
 
@@ -14,6 +15,22 @@ export function useUsersPage() {
     currentPage,
     pageSize: USERS_PAGE_SIZE,
   });
+
+  // `GET /users` không trả kèm vai trò → lấy bảng gán vai trò rồi map theo
+  // user_id để cột "Quyền" hiện tên vai trò thật thay vì cờ is_admin.
+  const { data: userRolesData } = useUserRolesList({ pageSize: 100 });
+
+  const roleNamesByUserId = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const ur of userRolesData?.rows ?? []) {
+      const name = (ur.role?.description || ur.role?.role_name || "").trim();
+      if (!name) continue;
+      const list = map.get(ur.user_id) ?? [];
+      if (!list.includes(name)) list.push(name);
+      map.set(ur.user_id, list);
+    }
+    return map;
+  }, [userRolesData?.rows]);
 
   const deleteMutation = useDeleteUser({
     onSuccess: () => {
@@ -40,6 +57,7 @@ export function useUsersPage() {
   return {
     currentPage,
     users,
+    roleNamesByUserId,
     totalItems,
     totalPages,
     isLoading,

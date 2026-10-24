@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle2, ClipboardList, MapPin, Save, Stethoscope, X } 
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { TextEditor } from "@/components/shares/rich-text-editor";
+import { RichTextContent } from "@/components/shares/RichTextContent";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { EMPTY_SPECIALTY_FORM, type SpecialtyFormValues } from "../types";
 
@@ -236,9 +237,9 @@ export function SpecialtyForm({
               {form.room_visit_instruction.trim() && (
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Hướng dẫn đến phòng khám</p>
-                  <div
+                  <RichTextContent
                     className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
-                    dangerouslySetInnerHTML={{ __html: form.room_visit_instruction }}
+                    html={form.room_visit_instruction}
                   />
                 </div>
               )}

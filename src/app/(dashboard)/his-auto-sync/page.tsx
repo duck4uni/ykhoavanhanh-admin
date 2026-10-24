@@ -599,7 +599,7 @@ function HisAutoSyncConfigContent() {
 export default function HisAutoSyncConfigPage() {
   return (
     <PermissionGuard
-      permission="admin.all"
+      superAdminOnly
       fallback={<AccessDenied message="Bạn không có quyền quản lý đồng bộ tự động lên HIS" />}
     >
       <HisAutoSyncConfigContent />

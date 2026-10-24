@@ -568,7 +568,24 @@ interface DetailHeaderProps {
 }
 
 function DetailHeader({ conversation, isLoading, onStatusChange, onAssign }: DetailHeaderProps) {
-  // Chỉ nhân viên (admin đang hoạt động) mới được gán — backend cũng kiểm tra lại.
+  // Danh sách người có thể được gán hội thoại.
+  //
+  // TODO(RBAC): bộ lọc này không còn đúng sau khi `is_admin` được thu hẹp nghĩa
+  // thành "super admin duy nhất". Nhân viên nội bộ tạo mới qua
+  // `POST /internal-accounts` có `is_admin: false`, nên danh sách này sẽ chỉ
+  // còn super admin (cộng các nhân viên cũ vẫn giữ `is_admin = true` vì không
+  // có migration). Đã kiểm tra và KHÔNG có chuỗi `filters` nào trên
+  // `GET /users` diễn tả được "user có vai trò nội bộ":
+  //   - bảng `user` không có cột nào mang nghĩa đó;
+  //   - `sequelize-api-paginate` dịch tên có dấu chấm thành `$assoc.col$`,
+  //     nhưng `getAllUsers` ở backend không truyền `include` nên
+  //     `$user_roles.role_id$` không resolve được;
+  //   - `GET /users` hiện là `[verify, verifyAdmin, ...]` → non-super-admin bị
+  //     403 bất kể filter.
+  // Cách đúng cần backend hỗ trợ: hoặc cho `GET /users` nhận filter theo vai
+  // trò (kèm `include`), hoặc dùng `GET /user-roles` làm nguồn danh sách nhân
+  // viên — nhưng endpoint đó cũng đang bị `verifyAdmin` chặn và chỉ trả về
+  // user đã được gán vai trò. Giữ nguyên filter cũ cho tới khi backend đổi.
   const { data: users } = useUsersList({
     pageSize: 200,
     filters: "is_admin==true,is_active==true",

@@ -111,45 +111,46 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
       }
     >
       <div className="space-y-4">
-        <ScopeField label="Khu vực / phòng" required>
-          <div className="grid grid-cols-2 gap-2">
-            <PaginatedCombobox
-              value={scopeDraft.area_id}
-              selectedLabel={scopeDraft.area_id ? areaName(scopeDraft.area_id) : undefined}
-              options={areaPicker.rows.map((a) => ({ value: a.id, label: a.name }))}
-              search={areaPicker.search}
-              isLoading={areaPicker.isFetching}
-              hasMore={areaPicker.hasMore}
-              placeholder="Chọn khu vực"
-              searchPlaceholder="Tìm khu vực..."
-              onSearchChange={areaPicker.setSearch}
-              onLoadMore={areaPicker.loadMore}
-              onChange={(value) => {
-                const item = areaPicker.rows.find((a) => a.id === value);
-                rememberLabel(value, item?.name ?? "");
-                setScopeDraft((p) => ({ ...p, area_id: value, room_id: "" }));
-              }}
-              onClear={() => setScopeDraft((p) => ({ ...p, area_id: "", room_id: "" }))}
-            />
-            <PaginatedCombobox
-              value={scopeDraft.room_id}
-              selectedLabel={scopeDraft.room_id ? roomName(scopeDraft.room_id) : undefined}
-              options={draftRoomOptions.map((r) => ({ value: r.id, label: r.roomname }))}
-              search={roomPicker.search}
-              isLoading={roomPicker.isFetching}
-              hasMore={roomPicker.hasMore}
-              placeholder="Chọn phòng"
-              searchPlaceholder="Tìm phòng..."
-              onSearchChange={roomPicker.setSearch}
-              onLoadMore={roomPicker.loadMore}
-              onChange={(value) => {
-                const item = draftRoomOptions.find((r) => r.id === value);
-                rememberLabel(value, item?.roomname ?? "");
-                setScopeDraft((p) => ({ ...p, room_id: value }));
-              }}
-              onClear={() => setScopeDraft((p) => ({ ...p, room_id: "" }))}
-            />
-          </div>
+        <ScopeField label="Khu vực" required>
+          <PaginatedCombobox
+            value={scopeDraft.area_id}
+            selectedLabel={scopeDraft.area_id ? areaName(scopeDraft.area_id) : undefined}
+            options={areaPicker.rows.map((a) => ({ value: a.id, label: a.name }))}
+            search={areaPicker.search}
+            isLoading={areaPicker.isFetching}
+            hasMore={areaPicker.hasMore}
+            placeholder="Chọn khu vực"
+            searchPlaceholder="Tìm khu vực..."
+            onSearchChange={areaPicker.setSearch}
+            onLoadMore={areaPicker.loadMore}
+            onChange={(value) => {
+              const item = areaPicker.rows.find((a) => a.id === value);
+              rememberLabel(value, item?.name ?? "");
+              setScopeDraft((p) => ({ ...p, area_id: value, room_id: "" }));
+            }}
+            onClear={() => setScopeDraft((p) => ({ ...p, area_id: "", room_id: "" }))}
+          />
+        </ScopeField>
+
+        <ScopeField label="Phòng" required>
+          <PaginatedCombobox
+            value={scopeDraft.room_id}
+            selectedLabel={scopeDraft.room_id ? roomName(scopeDraft.room_id) : undefined}
+            options={draftRoomOptions.map((r) => ({ value: r.id, label: r.roomname }))}
+            search={roomPicker.search}
+            isLoading={roomPicker.isFetching}
+            hasMore={roomPicker.hasMore}
+            placeholder="Chọn phòng"
+            searchPlaceholder="Tìm phòng..."
+            onSearchChange={roomPicker.setSearch}
+            onLoadMore={roomPicker.loadMore}
+            onChange={(value) => {
+              const item = draftRoomOptions.find((r) => r.id === value);
+              rememberLabel(value, item?.roomname ?? "");
+              setScopeDraft((p) => ({ ...p, room_id: value }));
+            }}
+            onClear={() => setScopeDraft((p) => ({ ...p, room_id: "" }))}
+          />
         </ScopeField>
 
         <ScopeField label="Chuyên khoa" required>
@@ -248,7 +249,7 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
 
         <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2.5 text-xs text-primary-700">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-500" />
-          <span>Mỗi phạm vi khám xác định chuyên khoa, khu vực/phòng và dịch vụ bác sĩ được phép khám trong lịch này.</span>
+          <span>Mỗi phạm vi khám xác định chuyên khoa, khu vực, phòng và dịch vụ bác sĩ được phép khám trong lịch này.</span>
         </div>
       </div>
     </Modal>

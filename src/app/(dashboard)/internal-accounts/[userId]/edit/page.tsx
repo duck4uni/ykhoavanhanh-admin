@@ -205,7 +205,7 @@ export default function EditInternalAccountPage() {
                     {currentRoles.map((ur) => (
                       <Badge key={ur.id} variant="info" className="flex items-center gap-2">
                         <span>{ur.role.description || ur.role.role_name}</span>
-                        <PermissionGuard permission="user.assign_role">
+                        <PermissionGuard superAdminOnly>
                           <button
                             type="button"
                             onClick={() => removeRoleMutation.mutate(ur.id)}
@@ -224,7 +224,7 @@ export default function EditInternalAccountPage() {
               )}
 
               {/* Add new role - chỉ admin mới thấy */}
-              <PermissionGuard permission="user.assign_role">
+              <PermissionGuard superAdminOnly>
                 <div className="flex items-end gap-2 pt-2">
                   <div className="flex-1">
                     <Select

@@ -1,15 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import { appointmentBookingPaymentsHooks } from "@/api/appointmentBookingPaymentsApi";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  appointmentBookingPaymentsHooks,
+  appointmentBookingPaymentsService,
+  type AppointmentBookingPaymentListParams,
+  type ReconcileStatusFilter,
+} from "@/api/appointmentBookingPaymentsApi";
 import { doctorsHooks } from "@/api/doctorsApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import { hisServicesHooks } from "@/api/hisServicesApi";
 import { useDebounce } from "@/hooks/useApiHelpers";
+import { downloadBlob } from "@/lib/download";
 import { PAYMENTS_PAGE_SIZE } from "../helpers";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type PaymentStatusFilter = "" | "PENDING" | "PAID";
 export type PaymentGatewayFilter = "" | "MOMO" | "VCB";
+export type PaymentReconcileFilter = "" | ReconcileStatusFilter;
 
 /** State + dữ liệu cho trang danh sách thanh toán (nối API thật). */
 export function usePaymentList() {
@@ -17,13 +25,15 @@ export function usePaymentList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PaymentStatusFilter>("");
   const [gateway, setGateway] = useState<PaymentGatewayFilter>("");
+  const [reconcile, setReconcile] = useState<PaymentReconcileFilter>("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, gateway, fromDate, toDate]);
+  }, [debouncedSearch, status, gateway, reconcile, fromDate, toDate]);
 
   // Bẫy BE: nếu `filters` không có mệnh đề payment_status, BE tự mặc định
   // payment_status=='PAID'. Vì vậy luôn gửi tường minh — "Tất cả" phải dùng
@@ -31,20 +41,38 @@ export function usePaymentList() {
   const searchTerm = debouncedSearch.trim();
   const isBookingIdSearch = UUID_RE.test(searchTerm);
 
-  const filterClauses: string[] = [`payment_status==${status || "PENDING|PAID"}`];
+  // "Đã đối soát"/"Chưa đối soát" đã tự hàm ý payment_status ở BE (PAID/PENDING).
+  // Gửi kèm mệnh đề payment_status của riêng mình sẽ AND thêm vào đó, nên chọn
+  // "Đã thanh toán" + "Chưa đối soát" cho ra danh sách rỗng mà không rõ lý do —
+  // nhường quyền quyết định cho nhãn đối soát.
+  const reconcileImpliesStatus = reconcile === "RECONCILED" || reconcile === "UNRECONCILED";
+  const effectiveStatus = reconcileImpliesStatus ? "" : status;
+
+  const filterClauses: string[] = [`payment_status==${effectiveStatus || "PENDING|PAID"}`];
   if (searchTerm && !isBookingIdSearch) {
     filterClauses.push(`transaction_id@=${searchTerm}`);
   }
   const serverFilters = filterClauses.join(",");
 
+  // Dùng CHUNG cho danh sách và xuất Excel: file xuất ra phải đúng tập dòng
+  // đang hiển thị với bộ lọc hiện tại, nên chỉ được khác nhau ở phân trang
+  // (export bỏ currentPage/pageSize vì BE xuất toàn bộ dòng khớp bộ lọc).
+  const filterParams: AppointmentBookingPaymentListParams = useMemo(
+    () => ({
+      filters: serverFilters,
+      ...(gateway ? { payment_gateway: gateway } : {}),
+      ...(searchTerm && isBookingIdSearch ? { booking_id: searchTerm } : {}),
+      ...(reconcile ? { reconcile_status: reconcile } : {}),
+      ...(fromDate ? { from_date: fromDate } : {}),
+      ...(toDate ? { to_date: toDate } : {}),
+    }),
+    [serverFilters, gateway, searchTerm, isBookingIdSearch, reconcile, fromDate, toDate],
+  );
+
   const { data, isLoading } = appointmentBookingPaymentsHooks.useList({
     currentPage: page,
     pageSize: PAYMENTS_PAGE_SIZE,
-    filters: serverFilters,
-    ...(gateway ? { payment_gateway: gateway } : {}),
-    ...(searchTerm && isBookingIdSearch ? { booking_id: searchTerm } : {}),
-    ...(fromDate ? { from_date: fromDate } : {}),
-    ...(toDate ? { to_date: toDate } : {}),
+    ...filterParams,
   });
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
@@ -89,10 +117,36 @@ export function usePaymentList() {
     setSearch("");
     setStatus("");
     setGateway("");
+    setReconcile("");
     setFromDate("");
     setToDate("");
     setPage(1);
   }
+
+  /**
+   * Xuất Excel TOÀN BỘ dòng khớp bộ lọc hiện tại (không chỉ trang đang xem) —
+   * dùng `filterParams` y như danh sách. Không đưa vào react-query: đây là một
+   * hành động tải file, không phải server state cần cache/invalidate.
+   */
+  const exportExcel = useCallback(async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const { blob, filename, totalRows } = await appointmentBookingPaymentsService.exportList(filterParams);
+      downloadBlob(blob, filename ?? `thanh-toan-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(
+        totalRows === null
+          ? "Đã xuất danh sách thanh toán"
+          : `Đã xuất ${totalRows.toLocaleString("vi-VN")} giao dịch`,
+      );
+    } catch (error) {
+      // ApiError đã mang message tiếng Việt của BE (sai định dạng ngày, trạng
+      // thái đối soát không hợp lệ, hoặc vượt giới hạn 20.000 dòng/lần xuất).
+      toast.error(error instanceof Error ? error.message : "Xuất Excel thất bại");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filterParams, isExporting]);
 
   return {
     rows,
@@ -108,11 +162,16 @@ export function usePaymentList() {
     setStatus,
     gateway,
     setGateway,
+    reconcile,
+    setReconcile,
     fromDate,
     setFromDate,
     toDate,
     setToDate,
     resetFilters,
+    // export
+    exportExcel,
+    isExporting,
     // enrich
     getDescription,
   };

@@ -7,26 +7,16 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { useUserById } from "@/api/userApi";
+import { useUserRolesList } from "@/api/userRolesApi";
 import { LoadingSection } from "@/components/ui/Spinner";
-import type { AdminRole } from "@/types/user";
 import { formatDate } from "@/lib/utils";
-
-const roleLabels: Record<AdminRole, string> = {
-  super_admin: "Quản trị viên",
-  admin_content: "Biên tập nội dung",
-  admin_membership: "Quản lý Membership",
-  cskh: "Chăm sóc khách hàng",
-  doctor: "Bác sĩ",
-};
-
-function mapRole(isAdmin?: boolean): AdminRole {
-  return isAdmin ? "super_admin" : "cskh";
-}
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const router = useRouter();
   const { data: user, isLoading, error } = useUserById(userId);
+  // Vai trò THẬT của user, thay vì suy ra từ cờ is_admin.
+  const { data: userRoles } = useUserRolesList({ user_id: userId, pageSize: 100 });
 
   if (isLoading) {
     return <LoadingSection text="Đang tải thông tin người dùng..." />;
@@ -41,8 +31,18 @@ export default function UserDetailPage() {
     );
   }
 
-  const role = mapRole(user.is_admin);
-  const roleLabel = roleLabels[role] || "Người dùng";
+  const roleNames = [
+    ...new Set(
+      (userRoles?.rows ?? [])
+        .map((ur) => (ur.role?.description || ur.role?.role_name || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const roleLabel = user.is_admin
+    ? "Super Admin"
+    : roleNames.length > 0
+      ? roleNames.join(", ")
+      : "Người dùng";
 
   return (
     <div className="space-y-6 max-w-2xl">
