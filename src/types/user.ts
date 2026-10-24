@@ -66,7 +66,11 @@ export interface AdminUser {
   fullName: string;
   email: string;
   phone?: string;
-  role: AdminRole;
+  /**
+   * Union legacy, chỉ đặt được chắc chắn cho super admin. Với nhân viên nội bộ
+   * là `undefined` — hiển thị vai trò thật qua `userRoles[].roleName`.
+   */
+  role?: AdminRole;
   avatar?: string;
   isActive: boolean;
   is_admin?: boolean; // Super Admin - có tất cả quyền

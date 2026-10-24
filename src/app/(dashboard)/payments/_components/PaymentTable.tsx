@@ -72,12 +72,12 @@ export function PaymentTable({ ctrl }: { ctrl: PaymentListController }) {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadge(p.payment_status)}`}>
+                      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${getStatusBadge(p.payment_status)}`}>
                         {statusLabels[p.payment_status]}
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${reconcile.className}`}>
+                      <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${reconcile.className}`}>
                         {reconcile.label}
                       </span>
                     </td>

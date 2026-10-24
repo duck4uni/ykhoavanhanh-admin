@@ -1,6 +1,12 @@
-# Roles / User-Roles / Internal Accounts API
+# Roles / User-Roles / Internal Accounts / Permissions API
 
-Tài liệu API quản lý **vai trò (role)**, **gán vai trò cho người dùng (user-roles)** và **tạo tài khoản nội bộ (internal-accounts)**.
+Tài liệu API quản lý **vai trò (role)**, **gán vai trò cho người dùng (user-roles)**, **tạo tài khoản nội bộ (internal-accounts)** và **phân quyền thật (permissions)**.
+
+> **`is_admin` đã thu hẹp nghĩa.** Từ bản RBAC này, `is_admin = true` chỉ còn
+> nghĩa **"super admin duy nhất"** (bỏ qua mọi kiểm tra quyền). Nhân viên nội bộ
+> tạo mới qua `POST /internal-accounts` có `is_admin: false` và lấy quyền từ
+> `role_permissions`. Nhân viên cũ **vẫn giữ `is_admin = true`** vì không có
+> migration hạ cờ — cần chỉnh tay trên DB nếu muốn họ chịu kiểm tra quyền.
 
 ## Quy ước chung
 
@@ -31,6 +37,10 @@ Tài liệu API quản lý **vai trò (role)**, **gán vai trò cho người dù
 | `/user-roles/{id}` | GET | – |
 | `/user-roles/{id}` | DELETE | Bearer |
 | `/internal-accounts` | POST | Bearer |
+| `/permissions` | GET | Bearer (super admin) |
+| `/roles/{id}/permissions` | GET | Bearer (super admin) |
+| `/roles/{id}/permissions` | PUT | Bearer (super admin) |
+| `/users/me/permissions` | GET | Bearer |
 
 ---
 
@@ -179,7 +189,8 @@ Quy tắc: `404` nếu user/role không tồn tại; `400` nếu đã gán trùn
 ### POST `/internal-accounts` — tạo nhân viên + gán role *(Bearer)*
 
 Tạo `user` + mật khẩu băm (bảng `user_auth`, `auth_method='password'`, `is_primary=true`) + `user_roles` trong **1 transaction** (lỗi giữa chừng sẽ rollback).
-**`is_admin` được set cứng = `true`** (không nhận từ body).
+**`is_admin` được set cứng = `false`** (không nhận từ body). Nhân viên mới lấy
+toàn bộ quyền từ permission của `role_id` được gán — xem mục 4.
 
 Body:
 ```json
@@ -210,7 +221,7 @@ Lỗi: `400` (thiếu/sai field, email|phone trùng), `404` (role không tồn t
   "email": "a.nguyen@gmail.com",
   "phone": "0900000000",
   "is_active": true,
-  "is_admin": true,
+  "is_admin": false,
   "created_at": "...",
   "user_roles": [
     { "id": "uuid", "user_id": "uuid", "role_id": "uuid",
@@ -223,7 +234,75 @@ Lỗi: `400` (thiếu/sai field, email|phone trùng), `404` (role không tồn t
 
 ---
 
-## 4. curl mẫu
+## 4. Permissions (phân quyền thật)
+
+Bảng `permissions` (`id`, `code`, `name`, `module`) + bảng nối `role_permissions`
+(`role_id`, `permission_id`). Catalog gồm **27 permission code** khớp 1-1 với
+union `Permission` ở `src/types/permissions.ts`; `name` là nhãn tiếng Việt lấy từ
+`PERMISSION_LABELS`; `module` là tiền tố của code.
+
+6 module: `admin` (9 code), `accountant` (4), `cskh` (6), `marketing` (3),
+`receptionist` (3), `user` (2).
+
+> Ba endpoint đầu yêu cầu **super admin** (`is_active && is_admin`), nếu không sẽ trả `403`.
+
+### 4.1 GET `/permissions` — catalog toàn bộ quyền *(Bearer, super admin)*
+
+```
+GET /api/v1.0/permissions
+```
+
+`responseData` (mảng phẳng, không phân trang):
+```json
+[
+  { "id": "uuid", "code": "admin.all", "name": "Toàn quyền hệ thống", "module": "admin" },
+  { "id": "uuid", "code": "user.assign_role", "name": "Gán vai trò cho user", "module": "user" }
+]
+```
+
+### 4.2 GET `/roles/{id}/permissions` — quyền của 1 vai trò *(Bearer, super admin)*
+
+`responseData`:
+```json
+{ "role_id": "uuid", "permission_codes": ["cskh.chat", "cskh.survey"] }
+```
+`404` nếu role không tồn tại.
+
+### 4.3 PUT `/roles/{id}/permissions` — thay thế toàn bộ quyền *(Bearer, super admin)*
+
+Ghi **atomic replace**: danh sách gửi lên thay thế hoàn toàn danh sách cũ
+(gửi mảng rỗng = gỡ hết quyền).
+
+Body:
+```json
+{ "permission_codes": ["cskh.chat", "cskh.survey", "cskh.report_survey"] }
+```
+
+| Field | Bắt buộc | Quy tắc |
+|---|---|---|
+| `permission_codes` | ✅ | mảng string; mỗi phần tử phải là `code` có trong catalog |
+
+Lỗi: `400` code không hợp lệ / sai định dạng body; `404` role không tồn tại.
+
+### 4.4 GET `/users/me/permissions` — quyền của chính mình *(Bearer, mọi token hợp lệ)*
+
+Endpoint FE dùng để dựng menu và gate UI. Không yêu cầu super admin.
+
+`responseData`:
+```json
+{
+  "is_active": true,
+  "is_admin": false,
+  "permission_codes": ["cskh.chat", "cskh.survey"]
+}
+```
+
+- `is_admin: true` → super admin, bỏ qua mọi kiểm tra quyền (FE short-circuit).
+- `permission_codes` là hợp của permission từ tất cả role được gán cho user.
+
+---
+
+## 5. curl mẫu
 
 ```bash
 TOKEN="<token>"; BASE="http://localhost:3000/api/v1.0"
@@ -245,4 +324,11 @@ curl -s -X DELETE "$BASE/user-roles/<id>" -H "Authorization: Bearer $TOKEN"
 # Internal account
 curl -s -X POST "$BASE/internal-accounts" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"full_name":"Nguyễn Văn A","email":"a@gmail.com","phone":"0900000000","password":"MatKhau@123","role_id":"<uuid>"}'
+
+# Permissions
+curl -s "$BASE/permissions" -H "Authorization: Bearer $TOKEN"
+curl -s "$BASE/roles/<role-id>/permissions" -H "Authorization: Bearer $TOKEN"
+curl -s -X PUT "$BASE/roles/<role-id>/permissions" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"permission_codes":["cskh.chat","cskh.survey"]}'
+curl -s "$BASE/users/me/permissions" -H "Authorization: Bearer $TOKEN"
 ```

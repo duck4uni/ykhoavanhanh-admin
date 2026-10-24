@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { LoadingPage } from "@/components/ui/Spinner";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { IdleLogoutGuard } from "@/components/auth/IdleLogoutGuard";
 import { useIsSignedIn, useAuthLoading } from "@/store/authStore";
 import { useGetMyInfo } from "@/api/authApi";
 
@@ -39,6 +40,10 @@ export default function DashboardLayout({
 
   return (
     <ToastProvider>
+      {/* Tự đăng xuất sau 30 phút không hoạt động. Đặt ở đây nên chỉ chạy trong khu vực đã
+          đăng nhập, và nằm ngoài hai nhánh layout bên dưới để hộp cảnh báo hiện ở cả hai. */}
+      <IdleLogoutGuard />
+
       {/* ── Tablet / mobile block ── */}
       <div className="flex lg:hidden min-h-dvh items-center justify-center bg-gradient-to-br from-primary-950 to-primary-900 p-8">
         <div className="flex flex-col items-center text-center max-w-sm">

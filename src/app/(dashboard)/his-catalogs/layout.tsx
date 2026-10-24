@@ -18,7 +18,7 @@ export default function HisCatalogsLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
 
   return (
-    <PermissionGuard permission="admin.all" fallback={<AccessDenied message="Bạn không có quyền quản lý danh mục HIS" />}>
+    <PermissionGuard superAdminOnly fallback={<AccessDenied message="Bạn không có quyền quản lý danh mục HIS" />}>
       <div className="space-y-6 p-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Danh mục HIS</h1>

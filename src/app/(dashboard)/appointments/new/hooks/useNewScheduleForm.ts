@@ -293,6 +293,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
       toast.error("Vui lòng chọn chuyên khoa, khu vực và dịch vụ khám.");
       return;
     }
+    if (!scopeDraft.room_id) {
+      toast.error("Vui lòng chọn phòng khám.");
+      return;
+    }
     // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ + loại/mức giá.
     const isDuplicate = isDuplicateScope(scopes, { ...scopeDraft, clientId: "" }, editingScopeId);
     if (isDuplicate) {
@@ -589,6 +593,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     if (timeSlots.some((s) => s.dates.length === 0)) list.push("Có khung giờ chưa chọn ngày cụ thể");
     if (timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)))
       list.push("Có khung giờ chứa thứ không thuộc khoảng ngày");
+    if (scopes.some((s) => !s.room_id)) list.push("Có phạm vi khám chưa chọn phòng");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
     if (timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0))
       list.push("Có khung giờ chưa chọn phạm vi áp dụng");
@@ -603,6 +608,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     Boolean(form.end_date) &&
     dateRangeValid &&
     scopes.length > 0 &&
+    !scopes.some((s) => !s.room_id) &&
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
     !timeSlots.some((s) => s.dates.length === 0) &&

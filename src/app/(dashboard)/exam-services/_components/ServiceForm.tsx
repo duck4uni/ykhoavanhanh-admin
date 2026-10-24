@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { StatusSwitch } from "@/components/ui/StatusSwitch";
 import { toast } from "@/components/ui/Toast";
 import { TextEditor } from "@/components/shares/rich-text-editor";
+import { RichTextContent } from "@/components/shares/RichTextContent";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { examAreasHooks } from "@/api/examAreasApi";
 import type { HisServicePriceLevel } from "@/api/hisServicesApi";
@@ -555,9 +556,9 @@ export function ServiceForm({
               {form.room_visit_instruction.trim() && (
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Hướng dẫn vào phòng khám</p>
-                  <div
+                  <RichTextContent
                     className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
-                    dangerouslySetInnerHTML={{ __html: form.room_visit_instruction }}
+                    html={form.room_visit_instruction}
                   />
                 </div>
               )}

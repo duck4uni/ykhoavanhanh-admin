@@ -118,6 +118,40 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleType, Permission[]> = {
   ],
 };
 
+/**
+ * Mã quyền ĐÃ được backend thực sự kiểm tra bằng `requirePermission(...)`.
+ * Mọi mã khác trong `Permission` hiện chỉ ảnh hưởng menu/UI của FE — API tương
+ * ứng vẫn nằm dưới `verifyAdmin` nên nhân viên gọi vào sẽ bị 403.
+ *
+ * PHẢI cập nhật danh sách này mỗi khi một route backend được chuyển sang
+ * `requirePermission` (nguồn: các call site `requirePermission` trong backend).
+ */
+export const BACKEND_ENFORCED_PERMISSIONS: readonly Permission[] = [
+  "accountant.report_bank", // GET /appointment-booking-payments, /appointment-booking-refunds
+  "accountant.refund", // POST /payment/vcb/refund; + bắt buộc khi huỷ phiếu ĐÃ thanh toán
+  "accountant.cancel_exam", // DELETE /appointments/{id}, PATCH /appointments/{id}/cancel
+];
+
+/** `true` nếu mã quyền đã có route backend kiểm tra. */
+export function isBackendEnforced(code: Permission | string): boolean {
+  return (BACKEND_ENFORCED_PERMISSIONS as readonly string[]).includes(code);
+}
+
+/**
+ * Mã quyền KHÔNG được cấp qua UI phân quyền.
+ *
+ * `admin.all` với backend chỉ là mã quyền thường (không bỏ qua kiểm tra gì —
+ * chỉ cờ `is_admin` mới làm super admin), nên để nó trong bộ chọn sẽ khiến người
+ * dùng hiểu sai "cấp mã này = thành admin tổng". Vai trò nào đang giữ sẵn mã này
+ * vẫn được giữ nguyên khi lưu (xem UI /roles).
+ */
+export const NON_GRANTABLE_PERMISSIONS: readonly Permission[] = ["admin.all"];
+
+/** `true` nếu mã quyền không được phép cấp mới qua UI. */
+export function isNonGrantable(code: Permission | string): boolean {
+  return (NON_GRANTABLE_PERMISSIONS as readonly string[]).includes(code);
+}
+
 // Mô tả vai trò bằng tiếng Việt
 export const ROLE_LABELS: Record<RoleType, string> = {
   admin: "Quản trị viên",

@@ -13,7 +13,7 @@ import { USERS_PAGE_SIZE, type UsersPageController } from "../hooks/useUsersPage
 
 /** Bảng người dùng admin + phân trang + trạng thái rỗng. */
 export function UsersTable({ ctrl }: { ctrl: UsersPageController }) {
-  const { users, currentPage, totalItems, totalPages, isFetching, isLoading, handlePageChange, handleDeleteClick, handleCreateUser } = ctrl;
+  const { users, roleNamesByUserId, currentPage, totalItems, totalPages, isFetching, isLoading, handlePageChange, handleDeleteClick, handleCreateUser } = ctrl;
 
   return (
     <Card>
@@ -41,7 +41,9 @@ export function UsersTable({ ctrl }: { ctrl: UsersPageController }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {users.map((user) => {
+                const roleNames = roleNamesByUserId.get(user.id) ?? [];
+                return (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -51,9 +53,18 @@ export function UsersTable({ ctrl }: { ctrl: UsersPageController }) {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{user.email || "-"}</TableCell>
                   <TableCell>
-                    <Badge variant={user.is_admin ? "info" : "default"}>
-                      {user.is_admin ? "Admin" : "Nguoi dung"}
-                    </Badge>
+                    {/* Tên vai trò thật; is_admin chỉ còn nghĩa "super admin". */}
+                    {user.is_admin ? (
+                      <Badge variant="info">Super Admin</Badge>
+                    ) : roleNames.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {roleNames.map((name) => (
+                          <Badge key={name} variant="default">{name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge variant="default">Chua phan vai tro</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.is_active ? "success" : "default"}>
@@ -81,7 +92,8 @@ export function UsersTable({ ctrl }: { ctrl: UsersPageController }) {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
 
