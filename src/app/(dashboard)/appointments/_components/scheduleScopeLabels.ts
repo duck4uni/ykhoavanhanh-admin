@@ -155,8 +155,29 @@ export type ServicePriceLines = {
 };
 
 /**
+ * Mã dịch vụ HIS (ID nội bộ) của một scope — BV phản hồi 06/11 mục 4 yêu cầu hiện cạnh giá.
+ * BE đã bơm sẵn `scope.service_code` (doctorWorkScheduleEnrichmentService.ts:69); các nhánh sau
+ * là dự phòng cho payload chưa qua enrichment.
+ *
+ * CHÚ Ý: `scope.service_id` và `service.id` là UUID nội bộ, KHÔNG phải mã HIS. Mã HIS nằm ở
+ * cột `his_services.service_id`, tức `scope.service.service_id` — chỉ đọc bên trong bản ghi
+ * dịch vụ, đừng lấy `service_id` ở cấp scope.
+ */
+function extractServiceCode(scope: UnknownRecord): string | undefined {
+  const service = isRecord(scope.service) ? scope.service : undefined;
+  const serviceRaw = isRecord(service?.raw_data) ? service.raw_data : undefined;
+  return (
+    text(scope.service_code)
+    ?? text(service?.service_id)
+    ?? text(service?.serviceid)
+    ?? text(serviceRaw?.serviceid)
+  );
+}
+
+/**
  * Gom các mức giá (price_levels) của từng dịch vụ trong scopes lịch khám —
- * ví dụ "Dịch vụ: 230.000đ", "BHYT: 185.000đ" — để hiển thị dưới tên dịch vụ.
+ * ví dụ "Dịch vụ: 230.000đ (1999)", "BHYT: 185.000đ (1999)" — để hiển thị dưới tên dịch vụ.
+ * Mã trong ngoặc là mã dịch vụ HIS; bỏ ngoặc khi payload không trả mã.
  */
 export function getScheduleServicePriceLines(rawDataOrItem: unknown): ServicePriceLines[] {
   const scopes = extractScopes(rawDataOrItem);
@@ -183,8 +204,9 @@ export function getScheduleServicePriceLines(rawDataOrItem: unknown): ServicePri
     const priceLevels = Array.isArray(serviceRaw?.price_levels) ? serviceRaw.price_levels.filter(isRecord) : [];
     const matchedLevel = code ? priceLevels.find((level) => text(level.code) === code) : undefined;
     const label = (matchedLevel && text(matchedLevel.label)) ?? code ?? "Giá";
+    const serviceCode = extractServiceCode(scope);
 
-    const line = `${label}: ${formatCurrency(fee)}`;
+    const line = `${label}: ${formatCurrency(fee)}${serviceCode ? ` (${serviceCode})` : ""}`;
     const existing = linesByService.get(name) ?? [];
     if (!existing.includes(line)) existing.push(line);
     if (!linesByService.has(name)) order.push(name);

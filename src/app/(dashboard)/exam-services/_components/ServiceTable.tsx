@@ -42,8 +42,18 @@ export function ServiceTable({ ctrl }: { ctrl: ExamServiceListController }) {
                     <td className="max-w-sm px-5 py-4 font-semibold text-slate-800">{service.servicename}</td>
                     <td className="px-5 py-4 text-slate-700">{getSpecialtyName(service)}</td>
                     <td className="px-5 py-4 text-slate-700">{service.servicetype}</td>
+                    {/* Mã dịch vụ (ID nội bộ) cạnh giá — BV phản hồi 06/11, mục 4, "giống Medpro".
+                        CÓ CHỦ Ý nhân đôi với cột "Mã dịch vụ" ở đầu bảng: bảng rộng, phải cuộn
+                        ngang mới thấy cả hai, nên nhân viên đọc giá không phải cuộn về đầu dòng.
+                        Mã chỉ thuộc về dịch vụ, không thuộc từng mức giá, nên chỉ hiện 1 lần ở
+                        giá mặc định — đừng lặp lại xuống dòng mức giá phụ bên dưới. */}
                     <td className="px-5 py-4">
-                      <div className="font-semibold text-slate-800">{formatCurrency(Number(service.price) || 0)}</div>
+                      <div className="font-semibold text-slate-800">
+                        {formatCurrency(Number(service.price) || 0)}
+                        {service.serviceid && (
+                          <span className="ml-1.5 font-mono text-xs font-medium text-primary-600">({service.serviceid})</span>
+                        )}
+                      </div>
                       {getExtraPriceLevels(service).length > 0 && (
                         <div className="mt-0.5 text-xs text-muted-foreground">
                           {getExtraPriceLevels(service).map((level) => `${level.label}: ${formatCurrency(level.price)}`).join(" · ")}

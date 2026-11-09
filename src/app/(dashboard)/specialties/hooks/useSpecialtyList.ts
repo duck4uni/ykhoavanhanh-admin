@@ -30,11 +30,12 @@ export function useSpecialtyList() {
     setCurrentPage(1);
   }, [debouncedSearch, statusFilter, bookingGroupFilter]);
 
+  // KHÔNG gửi sortField: BE mặc định sắp theo display_priority ASC (NULLS LAST) rồi name — đúng
+  // thứ tự app hiện ở "Chuyên khoa nổi bật". Nhờ vậy nhân viên BV khai STT ưu tiên ở cột "Ưu tiên"
+  // là thấy ngay thứ tự thật trên app, không phải mở app để đối chiếu (BV phản hồi 06/11, mục 3).
   const { data, isLoading } = specialtiesHooks.useList({
     currentPage,
     pageSize,
-    sortField: "created_at",
-    sortOrder: "DESC",
     filters: serverFilters,
   });
 
