@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getScheduleScopeLabels, summarizeScopeLabels } from "./scheduleScopeLabels";
+import { formatCurrency } from "@/lib/utils";
+import { getScheduleScopeLabels, getScheduleServicePriceLines, summarizeScopeLabels } from "./scheduleScopeLabels";
 
 test("extracts and deduplicates service names from raw scopes", () => {
   const result = getScheduleScopeLabels({
@@ -79,6 +80,37 @@ test("uses the legacy room id and handles missing scope data", () => {
     roomLabels: [],
     serviceLabels: [],
   });
+});
+
+// BV phản hồi 06/11, mục 4: mã dịch vụ (ID nội bộ) phải hiện cạnh giá.
+test("hiện mã dịch vụ HIS cạnh giá, lấy từ service_code do BE bơm sẵn", () => {
+  const lines = getScheduleServicePriceLines({
+    scopes: [
+      {
+        service_name: "Khám nội",
+        fee: 100003,
+        price_level_code: "VIP",
+        service_code: "1999",
+        service: {
+          id: "uuid-noi-bo-khong-duoc-dung-lam-ma",
+          service_id: "1999",
+          raw_data: { price_levels: [{ code: "VIP", label: "Khám VIP" }] },
+        },
+      },
+    ],
+  });
+
+  // Dùng formatCurrency chứ không viết cứng chuỗi giá: Intl chèn khoảng trắng không ngắt (U+00A0)
+  // trước "₫", viết tay bằng space thường là test đỏ vì lý do không liên quan.
+  assert.deepEqual(lines, [{ name: "Khám nội", lines: [`Khám VIP: ${formatCurrency(100003)} (1999)`] }]);
+});
+
+test("không có mã dịch vụ thì chỉ hiện giá, không hiện ngoặc rỗng", () => {
+  const lines = getScheduleServicePriceLines({
+    scopes: [{ service_name: "Khám nội", fee: 150000, service: { id: "uuid-noi-bo" } }],
+  });
+
+  assert.deepEqual(lines, [{ name: "Khám nội", lines: [`Giá: ${formatCurrency(150000)}`] }]);
 });
 
 test("summarizes the first label and exposes the full list", () => {

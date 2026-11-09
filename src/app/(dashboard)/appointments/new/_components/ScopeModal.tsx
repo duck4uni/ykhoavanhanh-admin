@@ -53,14 +53,17 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
     roomName,
     serviceOptionLabel,
     rememberLabel,
+    findService,
+    rememberService,
     onDraftServiceChange,
     onDraftPriceLevelChange,
     onDraftServiceOptionChange,
   } = ctrl;
 
-  const selectedService = scopeDraft.service_id
-    ? draftServiceOptions.find((s) => s.id === scopeDraft.service_id)
-    : undefined;
+  // `findService` chứ không phải `draftServiceOptions.find`: ở chế độ sửa, dịch vụ của scope
+  // thường không nằm trong trang đang tải, khi đó nó chỉ có trong serviceCache. Thiếu bản ghi thì
+  // nhãn tụt xuống chỉ còn tên dịch vụ (BV phản hồi 06/11, mục 5 — mũi tên xanh chỉ vào ô này).
+  const selectedService = scopeDraft.service_id ? findService(scopeDraft.service_id) : undefined;
   const priceLevels = selectedService ? activePriceLevels(selectedService) : [];
   // Mỗi mức giá (loại bảo hiểm) của dịch vụ là một dòng riêng trong dropdown chọn dịch vụ.
   const serviceOptionRows = draftServiceOptions.flatMap((service) => {
@@ -191,6 +194,9 @@ export function ScopeModal({ ctrl }: { ctrl: ScheduleEditorController }) {
               const [serviceId, priceLevelCode, priceStr] = value.split("|||");
               const item = draftServiceOptions.find((s) => s.id === serviceId);
               rememberLabel(serviceId, item?.servicename ?? "");
+              // Giữ lại bản ghi: người dùng gõ tìm tiếp là dịch vụ vừa chọn rời khỏi
+              // `draftServiceOptions`, nhãn sẽ tụt xuống còn mỗi tên nếu không có cache.
+              if (item) rememberService(item);
               onDraftServiceOptionChange(serviceId, priceLevelCode, Number(priceStr));
             }}
             onClear={() => onDraftServiceChange("")}
