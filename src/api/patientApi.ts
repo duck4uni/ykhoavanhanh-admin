@@ -111,6 +111,78 @@ async function mergePatients(args: {
   throw new Error(res.data.message || "Gộp bệnh nhân thất bại");
 }
 
+export interface PatientSyncToHisResultRow {
+  patient_id: string;
+  his_patient_id?: string | null;
+  status: "success" | "error" | "skipped";
+  error?: string;
+}
+
+export interface PatientSyncToHisResult {
+  message: string;
+  total: number;
+  success: number;
+  error: number;
+  skipped: number;
+  results: PatientSyncToHisResultRow[];
+}
+
+/**
+ * POST /patient/sync-to-his — đẩy các bệnh nhân đã chọn (theo `id` local,
+ * KHÔNG phải `his_patient_id`) lên HIS. BE trả HTTP 200 ngay cả khi có lỗi
+ * cục bộ ở một vài bệnh nhân — phải đọc `responseData` (total/success/error/
+ * skipped/results) chứ không chỉ dựa vào HTTP status.
+ */
+async function syncPatientsToHis(patientIds: string[]): Promise<PatientSyncToHisResult> {
+  const res = await apiPost<{
+    total: number;
+    success: number;
+    error: number;
+    skipped: number;
+    results: PatientSyncToHisResultRow[];
+  }>("/patient/sync-to-his", { patient_ids: patientIds });
+  const responseData = res.data.responseData;
+  if (responseData) {
+    return {
+      message: res.data.message || "",
+      total: responseData.total,
+      success: responseData.success,
+      error: responseData.error,
+      skipped: responseData.skipped,
+      results: responseData.results ?? [],
+    };
+  }
+  throw new Error(res.data.message || "Đồng bộ lên HIS thất bại");
+}
+
+/**
+ * POST /patient/sync-to-his/all — đẩy tất cả bệnh nhân đang chờ đồng bộ
+ * (`is_from_his=false`, `synced_to_his_at=null`) lên HIS. `idbv` lọc theo 1
+ * cơ sở (bỏ trống = tất cả cơ sở), `limit` giới hạn số bản ghi xử lý mỗi lần
+ * gọi (ưu tiên `created_at` cũ nhất trước).
+ */
+async function syncAllPatientsToHis(params?: { idbv?: string; limit?: number }): Promise<PatientSyncToHisResult> {
+  const res = await apiPost<{
+    total: number;
+    success: number;
+    error: number;
+    skipped: number;
+    results: PatientSyncToHisResultRow[];
+  }>("/patient/sync-to-his/all", undefined, { params });
+  const responseData = res.data.responseData;
+  if (responseData) {
+    return {
+      message: res.data.message || "",
+      total: responseData.total,
+      success: responseData.success,
+      error: responseData.error,
+      skipped: responseData.skipped,
+      results: responseData.results ?? [],
+    };
+  }
+  throw new Error(res.data.message || "Đồng bộ lên HIS thất bại");
+}
+
 // ─── Hooks ─────────────────────────────────────────────────────────────────
 
 export function useSearchPatients(
@@ -209,6 +281,38 @@ export function useMergePatients(options?: {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: mergePatients,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: patientKeys.all });
+      options?.onSuccess?.(data);
+    },
+    onError: (error) => options?.onError?.(error),
+  });
+}
+
+/** Đồng bộ 1 (hoặc nhiều) bệnh nhân lên HIS — dùng cho action "Đồng bộ HIS" ở từng dòng. */
+export function useSyncPatientsToHis(options?: {
+  onSuccess?: (data: PatientSyncToHisResult) => void;
+  onError?: (error: Error) => void;
+}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: syncPatientsToHis,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: patientKeys.all });
+      options?.onSuccess?.(data);
+    },
+    onError: (error) => options?.onError?.(error),
+  });
+}
+
+/** Đồng bộ tất cả bệnh nhân đang chờ lên HIS — dùng cho nút "Đồng bộ tất cả". */
+export function useSyncAllPatientsToHis(options?: {
+  onSuccess?: (data: PatientSyncToHisResult) => void;
+  onError?: (error: Error) => void;
+}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params?: { idbv?: string; limit?: number }) => syncAllPatientsToHis(params),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: patientKeys.all });
       options?.onSuccess?.(data);

@@ -5,6 +5,7 @@ import { devtools, persist } from 'zustand/middleware'
 
 // App
 import { createStorage } from '@/utils/storage'
+import { clearIdleMarker } from '@/utils/idleTimeout'
 
 // Types
 import { AdminUser } from '@/types/user'
@@ -108,6 +109,17 @@ const authStore: StateCreator<AuthStore> = (set) => ({
     })
 })
 
+/**
+ * `devtools` CHỈ bật ở môi trường dev.
+ *
+ * Middleware này cài hook `__REDUX_DEVTOOLS_EXTENSION__`, nên ở production ai có extension
+ * Redux DevTools là xem được accessToken/refreshToken và sửa thẳng state đang chạy. Người đã
+ * đăng nhập thì vốn đã có token của chính họ (không rò gì mới), nhưng đây là bề mặt không cần
+ * thiết trên máy dùng chung ở quầy — tắt đi thì không mất gì.
+ *
+ * Lưu ý: tắt cái này KHÔNG phải để "chặn devtools". Không có cách nào chặn được devtools, và
+ * sửa state ở client cũng không vượt được backend (xem comment ở middleware.ts).
+ */
 // Create store with middleware
 export const useAuthStore = create<AuthStore>()(
   devtools(
@@ -129,7 +141,8 @@ export const useAuthStore = create<AuthStore>()(
           state.setLoading(false)
         }
       }
-    })
+    }),
+    { name: authStoreName, enabled: process.env.NODE_ENV === 'development' }
   )
 )
 
@@ -151,4 +164,13 @@ export const isTokenExpired = () => {
   return Date.now() >= tokenExpiresAt - 30000 // 30 seconds buffer
 }
 
-export const logout = () => useAuthStore.getState().resetStore()
+/**
+ * Đăng xuất phía client. Dùng bởi `handleLogout()` trong lib/axios.ts khi refresh token thất bại.
+ *
+ * Phải xoá cả mốc hoạt động: `resetStore()` chỉ ghi state chứ không gọi `removeItem` của tầng
+ * persist, nên không xoá là lần đăng nhập sau đọc được mốc cũ và bị đăng xuất ngay.
+ */
+export const logout = () => {
+  useAuthStore.getState().resetStore()
+  clearIdleMarker()
+}

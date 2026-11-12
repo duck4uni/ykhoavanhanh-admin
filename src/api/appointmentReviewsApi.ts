@@ -92,10 +92,31 @@ export type CreateAppointmentReviewPayload = {
   raw_data?: unknown;
 };
 
-export type UpdateAppointmentReviewPayload = Partial<CreateAppointmentReviewPayload> & {
+/**
+ * PUT /appointment-reviews/:id lọc field theo vai trò của người gọi — chỉ
+ * field trong allowlist của vai trò đó mới được chấp nhận, field lạ (kể cả
+ * field hợp lệ nhưng thuộc vai trò khác) trả 400:
+ * - Owner (chủ review): overall_rating, doctor_rating, service_rating,
+ *   facility_rating, waiting_time_rating, comment, is_anonymous — BE tự set
+ *   status = "PENDING" sau khi owner sửa.
+ * - Active administrator: admin_reply, status — BE tự set
+ *   admin_replied_at = now() khi có admin_reply, KHÔNG được tự truyền
+ *   admin_replied_at.
+ * Trang quản trị (admin FE) chỉ đóng vai administrator nên chỉ dùng nhánh đó.
+ */
+export type OwnerUpdateAppointmentReviewPayload = Pick<
+  CreateAppointmentReviewPayload,
+  "overall_rating" | "doctor_rating" | "service_rating" | "facility_rating" | "waiting_time_rating" | "comment" | "is_anonymous"
+>;
+
+export type AdminUpdateAppointmentReviewPayload = {
   admin_reply?: string;
-  admin_replied_at?: string;
+  status?: "PENDING" | "APPROVED" | "REJECTED";
 };
+
+export type UpdateAppointmentReviewPayload =
+  | Partial<OwnerUpdateAppointmentReviewPayload>
+  | AdminUpdateAppointmentReviewPayload;
 
 // ─── Create API via factory ────────────────────────────────────────────────
 

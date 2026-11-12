@@ -9,7 +9,7 @@ const fieldClass =
 /** Thanh lọc bác sĩ: tìm kiếm + chuyên khoa + phòng khám + trạng thái + lịch khám. */
 export function DoctorFilters({ ctrl }: { ctrl: DoctorListController }) {
   const {
-    search, setSearch, setPage,
+    search, setSearch, internalIdSearch, setInternalIdSearch, setPage,
     specialtyFilter, setSpecialtyFilter, clinicFilter, setClinicFilter,
     statusFilter, setStatusFilter,
     resetFilters,
@@ -19,10 +19,17 @@ export function DoctorFilters({ ctrl }: { ctrl: DoctorListController }) {
     <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto_auto] xl:items-end">
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Tên bác sĩ</label>
           <div className="relative">
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Tìm tên, mã bác sĩ..." className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 pr-10 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10" />
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Tìm theo tên bác sĩ..." className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 pr-10 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10" />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">ID nội bộ</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={internalIdSearch} onChange={(e) => { setInternalIdSearch(e.target.value); setPage(1); }} placeholder="Tìm theo ID nội bộ..." className="h-11 w-full rounded-xl border border-slate-200 bg-surface-secondary px-3 pr-10 text-sm outline-none transition focus:border-primary-500 focus:bg-white focus:ring-4 focus:ring-primary-500/10" />
           </div>
         </div>
         <div>

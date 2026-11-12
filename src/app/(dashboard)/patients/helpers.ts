@@ -21,17 +21,18 @@ export function getBirthday(p: Patient): string {
   return p.birthday || p.birth_year || "—";
 }
 
-// Nguồn tạo hồ sơ — suy ra từ dữ liệu thật (HIS nếu có his_patient_id + synced_at)
+// Nguồn tạo hồ sơ — BE trả trực tiếp qua `is_from_his`.
 export function getSource(p: Patient): { label: string; className: string } {
-  if (p.his_patient_id && p.synced_at) return { label: "HIS", className: "bg-primary-100 text-primary-600" };
+  if (p.is_from_his) return { label: "HIS", className: "bg-primary-100 text-primary-600" };
   return { label: "Admin", className: "bg-purple-100 text-purple-600" };
 }
 
-// Trạng thái đồng bộ HIS — suy ra từ synced_at / his_updated_at
+// Trạng thái đẩy bệnh nhân lên HIS — chỉ `synced_to_his_at` xác nhận đã đồng bộ thành công.
 export function getSyncStatus(p: Patient): { label: string; className: string } {
-  if (p.synced_at) return { label: "Chưa đồng bộ", className: "bg-success-light text-success" };
-  if (p.his_patient_id) return { label: "Chờ đồng bộ", className: "bg-warning-light text-warning" };
-  return { label: "Chưa đồng bộ", className: "bg-error-light text-error" };
+  if (p.synced_to_his_at) {
+    return { label: "Đã đồng bộ", className: "bg-success-light text-success" };
+  }
+  return { label: "Chưa đồng bộ", className: "bg-warning-light text-warning" };
 }
 
 /**

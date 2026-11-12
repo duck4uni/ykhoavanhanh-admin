@@ -7,6 +7,7 @@ import { ArrowLeft, GraduationCap, ImageIcon, Mail, Phone, Stethoscope, Trash2, 
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { TextEditor } from "@/components/shares/rich-text-editor";
+import { RichTextContent } from "@/components/shares/RichTextContent";
 import { specialtiesHooks } from "@/api/specialtiesApi";
 import { filesHooks } from "@/api/filesApi";
 import { toast } from "@/components/ui/Toast";
@@ -322,9 +323,9 @@ export function DoctorForm({ title, subtitle, submitLabel, initialForm, isSubmit
               {form.description.trim() && (
                 <div className="border-t border-slate-100 pt-3">
                   <p className="text-xs text-muted-foreground">Mô tả</p>
-                  <div
+                  <RichTextContent
                     className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
-                    dangerouslySetInnerHTML={{ __html: form.description }}
+                    html={form.description}
                   />
                 </div>
               )}

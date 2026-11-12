@@ -155,7 +155,11 @@ export function AppointmentScheduleTable({
                       </td>
                       <td className="w-[190px] whitespace-nowrap px-2 py-3 text-slate-600">
                         {getScheduleDateText(item)}
-                        {weekdayText && <div className="text-[10px] text-muted-foreground">{weekdayText}</div>}
+                        {weekdayText && (
+                          <div className="whitespace-normal text-[10px] text-muted-foreground" title={weekdayText}>
+                            {weekdayText}
+                          </div>
+                        )}
                       </td>
                       <td className="w-[150px] whitespace-nowrap px-2 py-3 text-slate-600">{getScheduleTimeText(item)}</td>
                       <td className="w-24 whitespace-nowrap px-2 py-3 font-medium text-slate-700">{item.booked_count ?? 0}/{capacity}</td>

@@ -32,6 +32,7 @@ export function NotificationFilters({ ctrl }: { ctrl: NotificationListController
             <option value="ALL">Tất cả loại</option>
             <option value="APPOINTMENT">Lịch hẹn</option>
             <option value="SYSTEM">Hệ thống</option>
+            <option value="CHAT">Chat CSKH</option>
           </select>
           <select
             value={filterRead}

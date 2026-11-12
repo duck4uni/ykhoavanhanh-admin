@@ -6,6 +6,7 @@ import { useExamServiceList } from "./hooks/useExamServiceList";
 import { ServiceStatsCards } from "./_components/ServiceStatsCards";
 import { ServiceFilters } from "./_components/ServiceFilters";
 import { ServiceTable } from "./_components/ServiceTable";
+import { HisServiceSyncButton } from "./_components/HisServiceSyncButton";
 
 export default function ExamServicesPage() {
   const ctrl = useExamServiceList();
@@ -21,6 +22,7 @@ export default function ExamServicesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <HisServiceSyncButton />
           <button onClick={() => ctrl.router.push("/exam-services/new")} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90">
             <Plus className="h-4 w-4" /> Thêm dịch vụ khám
           </button>

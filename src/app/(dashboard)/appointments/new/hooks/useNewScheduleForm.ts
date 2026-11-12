@@ -6,7 +6,7 @@ import {
 import { examAreasHooks, examAreasService } from "@/api/examAreasApi";
 import { specialtiesHooks, specialtiesService } from "@/api/specialtiesApi";
 import { roomsHooks, roomsService } from "@/api/roomsApi";
-import { hisServicesHooks, hisServicesService } from "@/api/hisServicesApi";
+import { hisServicesHooks, hisServicesService, type HisService } from "@/api/hisServicesApi";
 import { doctorsHooks, type HisDoctor } from "@/api/doctorsApi";
 import type { ApiError } from "@/lib/axios";
 import { formatApiViolations } from "@/lib/utils";
@@ -25,6 +25,7 @@ import {
   createInitialForm,
   defaultServicePrice,
   emptyScopeDraft,
+  filterRoomsBySpecialty,
   formatServiceOptionLabel,
   getDatesByWeekday,
   hydrateScheduleEditor,
@@ -148,12 +149,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   );
   // API rooms không hỗ trợ filter theo chuyên khoa (his_room_specialties là bảng nối, không lọc
   // được ở server) — lọc bổ sung phía client theo chuyên khoa đã chọn, dựa vào quan hệ đã include sẵn.
-  const rooms = useMemo(() => {
-    if (!scopeDraft.specialty_id) return roomsFetched;
-    return roomsFetched.filter((r) =>
-      (r.his_room_specialties ?? []).some((rel) => rel.specialty_id === scopeDraft.specialty_id)
-    );
-  }, [roomsFetched, scopeDraft.specialty_id]);
+  // Đây chỉ là gợi ý thu hẹp: nếu không phòng nào khớp (quan hệ chưa được gán, hoặc người dùng
+  // chọn Chuyên khoa trước Khu vực/Phòng) thì filterRoomsBySpecialty tự fallback về danh sách đầy
+  // đủ để không chặn việc chọn phòng.
+  const rooms = useMemo(
+    () => filterRoomsBySpecialty(roomsFetched, scopeDraft.specialty_id),
+    [roomsFetched, scopeDraft.specialty_id]
+  );
   const hasMoreRooms = (roomPageData?.currentPage ?? roomPicker.page) < (roomPageData?.totalPages ?? 1);
   // Về trang 1 khi khu vực áp dụng cho bộ lọc phòng thay đổi.
   useEffect(() => {
@@ -186,6 +188,11 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const [labelCache, setLabelCache] = useState<Record<string, string>>({});
   const rememberLabel = (id: string, label: string) =>
     setLabelCache((prev) => (id && prev[id] !== label ? { ...prev, [id]: label } : prev));
+  // Riêng dịch vụ khám giữ nguyên bản ghi: nhãn của nó cần cả đối tượng, giá và mã dịch vụ, không
+  // dựng lại được từ một chuỗi tên (xem loadMissingServices).
+  const [serviceCache, setServiceCache] = useState<Record<string, HisService>>({});
+  const rememberService = (service: HisService) =>
+    setServiceCache((prev) => (prev[service.id] === service ? prev : { ...prev, [service.id]: service }));
 
   // ── Doctor combobox: search + phân trang, lọc qua API (không lọc mảng phía client) ──
   const doctorPicker = usePickerState();
@@ -236,16 +243,41 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
           scope.room_id && !hydrated.labels[scope.room_id]
             ? roomsService.getById(scope.room_id).then((item) => [scope.room_id, item.roomname] as const).catch(() => null)
             : null,
-          scope.service_id && !hydrated.labels[scope.service_id]
-            ? hisServicesService.getById(scope.service_id).then((item) => [scope.service_id, item.servicename] as const).catch(() => null)
-            : null,
         ].filter((request): request is Promise<readonly [string, string] | null> => request !== null))
       );
       const labels = Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null));
       if (Object.keys(labels).length > 0) setLabelCache((current) => ({ ...current, ...labels }));
     };
 
+    /**
+     * Dịch vụ khám cache CẢ BẢN GHI, không chỉ tên — ô "Dịch vụ khám" phải hiện đủ
+     * "tên - đối tượng - giá - (mã)" (BV phản hồi 06/11, mục 5). Ở chế độ sửa, dịch vụ của scope
+     * thường không nằm trong trang `services` đang tải nên nhãn rơi xuống cache; cache chỉ có tên
+     * thì ô hiện trơ mỗi "Khám nội" trong khi các dòng dropdown bên dưới đủ 4 phần.
+     */
+    const loadMissingServices = async () => {
+      // Không lọc theo `serviceCache` ở đây: effect chỉ chạy một lần cho mỗi `scheduleId` nên đọc
+      // state cũ chỉ thêm dependency mà không tiết kiệm được request nào (giống `loadMissingLabels`
+      // đọc `hydrated.labels` chứ không đọc `labelCache`).
+      const ids = Array.from(
+        new Set(hydrated.scopes.map((scope) => scope.service_id).filter((id): id is string => !!id))
+      );
+      if (ids.length === 0) return;
+
+      const fetched = await Promise.all(
+        ids.map((id) =>
+          hisServicesService
+            .getById(id)
+            .then((item) => [id, item] as const)
+            .catch(() => null)
+        )
+      );
+      const found = fetched.filter((entry): entry is readonly [string, HisService] => entry !== null);
+      if (found.length > 0) setServiceCache((current) => ({ ...current, ...Object.fromEntries(found) }));
+    };
+
     void loadMissingLabels();
+    void loadMissingServices();
   }, [detailQuery.data, mode, scheduleId]);
 
   const hasMoreDoctors = (doctorsData?.currentPage ?? doctorPicker.page) < (doctorsData?.totalPages ?? 1);
@@ -255,13 +287,18 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   const specialtyName = (id: string) => specialties.find((s) => s.id === id)?.name ?? labelCache[id] ?? "—";
   const areaName = (id: string) => examAreas.find((a) => a.id === id)?.name ?? labelCache[id] ?? "—";
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.roomname ?? labelCache[id] ?? "";
-  const serviceName = (id: string) => services.find((s) => s.id === id)?.servicename ?? labelCache[id] ?? "—";
+  // Dịch vụ đã chọn có thể không còn trong trang `services` đang tải (combobox phân trang + tìm
+  // kiếm) — serviceCache giữ lại bản ghi để nhãn không bị rút gọn còn mỗi tên.
+  const findService = (id: string) => services.find((s) => s.id === id) ?? serviceCache[id];
+  const serviceName = (id: string) => findService(id)?.servicename ?? labelCache[id] ?? "—";
+  /** Mã dịch vụ HIS (ID nội bộ) — BV phản hồi 06/11 mục 4 yêu cầu hiện cạnh giá. "" nếu chưa tải được. */
+  const serviceCode = (id: string) => findService(id)?.serviceid ?? "";
   const serviceOptionLabel = (id: string) => {
-    const service = services.find((s) => s.id === id);
+    const service = findService(id);
     return service ? formatServiceOptionLabel(service) : serviceName(id);
   };
   const servicePriceLevelLabel = (serviceId: string, priceLevelCode: string) => {
-    const service = services.find((item) => item.id === serviceId);
+    const service = findService(serviceId);
     return activePriceLevels(service ?? { price_levels: [] }).find((level) => level.code === priceLevelCode)?.label
       ?? priceLevelCode;
   };
@@ -289,6 +326,10 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
   function saveScope() {
     if (!scopeDraft.specialty_id || !scopeDraft.area_id || !scopeDraft.service_id) {
       toast.error("Vui lòng chọn chuyên khoa, khu vực và dịch vụ khám.");
+      return;
+    }
+    if (!scopeDraft.room_id) {
+      toast.error("Vui lòng chọn phòng khám.");
       return;
     }
     // Chặn trùng tổ hợp chuyên khoa + khu vực + phòng + dịch vụ + loại/mức giá.
@@ -587,6 +628,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     if (timeSlots.some((s) => s.dates.length === 0)) list.push("Có khung giờ chưa chọn ngày cụ thể");
     if (timeSlots.some((s) => s.weekdays.some((weekday) => datesByWeekday[weekday].length === 0)))
       list.push("Có khung giờ chứa thứ không thuộc khoảng ngày");
+    if (scopes.some((s) => !s.room_id)) list.push("Có phạm vi khám chưa chọn phòng");
     if (scopes.some((s) => s.fee <= 0)) list.push("Có dịch vụ chưa cấu hình phí khám");
     if (timeSlots.some((s) => s.scopeMode === "custom" && s.scope_ids.length === 0))
       list.push("Có khung giờ chưa chọn phạm vi áp dụng");
@@ -601,6 +643,7 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     Boolean(form.end_date) &&
     dateRangeValid &&
     scopes.length > 0 &&
+    !scopes.some((s) => !s.room_id) &&
     timeSlots.length > 0 &&
     !timeSlots.some((s) => s.weekdays.length === 0) &&
     !timeSlots.some((s) => s.dates.length === 0) &&
@@ -682,10 +725,13 @@ export function useScheduleForm({ mode, scheduleId }: { mode: ScheduleEditorMode
     areaName,
     roomName,
     serviceName,
+    serviceCode,
     serviceOptionLabel,
     servicePriceLevelLabel,
     scopeShortLabel,
     rememberLabel,
+    findService,
+    rememberService,
     // scope modal
     scopeModalOpen,
     setScopeModalOpen,

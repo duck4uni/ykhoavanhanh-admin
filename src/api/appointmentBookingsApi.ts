@@ -1,6 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/axios";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiPost } from "@/lib/axios";
 import type { PaginationParams } from "@/types/api-response";
+
+export type AppointmentHisSyncStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "SYNCED"
+  | "FAILED"
+  | "REVIEW_REQUIRED";
 
 export interface AppointmentBooking {
   id: string;
@@ -10,6 +17,11 @@ export interface AppointmentBooking {
   his_patient_id: string | null;
   his_booking_id: string | null;
   his_mavaovien: string | null;
+  his_stt?: string | null;
+  his_sync_status?: AppointmentHisSyncStatus | null;
+  synced_to_his_at?: string | null;
+  last_his_sync_error?: string | null;
+  last_his_sync_attempt_at?: string | null;
   request_booking_id: string | null;
   schedule_id: string | null;
   appointment_date: string | null;
@@ -21,12 +33,17 @@ export interface AppointmentBooking {
   queue_number: number | null;
   price: string | number | null;
   exam_object_code: string | null;
+  /** Đối tượng khám (vd "BHYT" | "DV" | "Khám thường"). */
+  exam_type: string | null;
   service_id: string | null;
   request_mavaovien: string | null;
   request_stt: string | null;
   confirmed_stt: string | null;
   booking_type: string | null;
   source: string | null;
+  /** Trạng thái booking hiện hành (vd PENDING_PAYMENT/PAID/CANCELLED) — field thật BE trả về. */
+  status: string | null;
+  /** @deprecated Field cũ theo tài liệu trước đây; BE hiện trả `status`, không phải field này. */
   local_status: string | null;
   his_action: string | null;
   his_status: string | null;
@@ -36,6 +53,19 @@ export interface AppointmentBooking {
   last_sync_at: string | null;
   note: string | null;
   created_by: string | null;
+  updated_by?: string | null;
+  booking_group_id?: string | null;
+  /** Ảnh chụp công thức tính giá lúc đặt lịch. */
+  pricing_snapshot?: {
+    exam_type?: string | null;
+    is_second_visit?: boolean;
+    bhyt_price?: number | string | null;
+    dv_price?: number | string | null;
+    formula?: string | null;
+    amount_payable?: number | string | null;
+  } | null;
+  reminder_1_sent_at?: string | null;
+  reminder_2_sent_at?: string | null;
   created_at: string;
   updated_at: string;
   patient?: {
@@ -103,6 +133,7 @@ export interface AppointmentBookingListParams extends PaginationParams {
   room_id?: string;
   service_id?: string;
   status?: string;
+  his_sync_status?: AppointmentHisSyncStatus;
   source?: string;
   from_date?: string;
   to_date?: string;
@@ -113,6 +144,30 @@ export interface PaginatedAppointmentBookings {
   rows: AppointmentBooking[];
   totalPages: number;
   currentPage: number;
+}
+
+export interface AppointmentSyncToHisResultRow {
+  appointment_id: string;
+  status: "success" | "error" | "skipped";
+  his_booking_id?: string | null;
+  his_mavaovien?: string | null;
+  his_stt?: string | null;
+  message?: string;
+}
+
+export interface AppointmentSyncToHisResult {
+  total: number;
+  success: number;
+  error: number;
+  skipped: number;
+  results: AppointmentSyncToHisResultRow[];
+}
+
+export interface AppointmentSyncAllParams {
+  idbv?: string;
+  limit?: number;
+  from_date?: string;
+  to_date?: string;
 }
 
 type AppointmentBookingsResponse = {
@@ -141,6 +196,26 @@ export const appointmentBookingsService = {
 
     throw new Error(data.message || "Không thể lấy danh sách lịch đặt khám");
   },
+
+  /** Đồng bộ các lịch được chọn bằng UUID local (`appointment_bookings.id`). */
+  syncToHis: async (appointmentIds: string[]): Promise<AppointmentSyncToHisResult> => {
+    const res = await apiPost<AppointmentSyncToHisResult>("/appointments/sync-to-his", {
+      appointment_ids: appointmentIds,
+    });
+    if (res.data.responseData) return res.data.responseData;
+    throw new Error(res.data.message || "Đồng bộ lịch khám lên HIS thất bại");
+  },
+
+  /** Đồng bộ hàng loạt lịch PAID chưa SYNCED, có thể giới hạn theo ngày/cơ sở. */
+  syncAllToHis: async (params?: AppointmentSyncAllParams): Promise<AppointmentSyncToHisResult> => {
+    const res = await apiPost<AppointmentSyncToHisResult>(
+      "/appointments/sync-to-his/all",
+      undefined,
+      { params },
+    );
+    if (res.data.responseData) return res.data.responseData;
+    throw new Error(res.data.message || "Đồng bộ tất cả lịch khám lên HIS thất bại");
+  },
 };
 
 export const appointmentBookingsHooks = {
@@ -153,6 +228,36 @@ export const appointmentBookingsHooks = {
       queryFn: () => appointmentBookingsService.getList(params),
       staleTime: options?.staleTime ?? 1000 * 60 * 2,
       enabled: options?.enabled ?? true,
+    });
+  },
+
+  useSyncToHis: (options?: {
+    onSuccess?: (data: AppointmentSyncToHisResult) => void;
+    onError?: (error: Error) => void;
+  }) => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: (appointmentIds: string[]) => appointmentBookingsService.syncToHis(appointmentIds),
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: appointmentBookingsKeys.all });
+        options?.onSuccess?.(data);
+      },
+      onError: (error) => options?.onError?.(error),
+    });
+  },
+
+  useSyncAllToHis: (options?: {
+    onSuccess?: (data: AppointmentSyncToHisResult) => void;
+    onError?: (error: Error) => void;
+  }) => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: (params?: AppointmentSyncAllParams) => appointmentBookingsService.syncAllToHis(params),
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: appointmentBookingsKeys.all });
+        options?.onSuccess?.(data);
+      },
+      onError: (error) => options?.onError?.(error),
     });
   },
 };

@@ -18,8 +18,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { authService } from "@/api/authApi";
 import { notificationsHooks, type Notification as ApiNotification } from "@/api/notificationsApi";
 import { useCurrentUser } from "@/store/authStore";
+import { useChatStore } from "@/store/chatStore";
 import { AdminRole, AdminUser } from "@/types/user";
-import { ROLE_LABELS, type RoleType } from "@/types/permissions";
 import {
   Bell,
   ChevronDown,
@@ -38,34 +38,26 @@ import { LoadingSection } from "@/components/ui/Spinner";
 // ── Role display helper ──────────────────────────────────────────────────────
 
 function getUserDisplayRole(user: AdminUser): { label: string; color: string } {
-  // Super Admin (is_admin = true) → hiển thị Quản trị viên
+  // Super Admin (is_admin = true) → tài khoản quản trị cấp cao duy nhất
   if (user.is_admin === true) {
     return { label: "Super Admin", color: "bg-violet-100 text-violet-700" };
   }
 
-  // Lấy roles từ userRoles (đã map từ authApi)
-  const userRoles = user.userRoles || [];
-  const roleTypes: RoleType[] = [];
+  // Tên vai trò THẬT do backend trả về (đã map từ authApi). Không còn suy ra
+  // "admin" từ 4 cờ boolean — heuristic đó cấp sai nhãn quản trị viên.
+  const roleNames = [
+    ...new Set(
+      (user.userRoles ?? [])
+        .map((ur) => (ur.description || ur.roleName || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
-  for (const ur of userRoles) {
-    if (ur.accountant) roleTypes.push("accountant");
-    if (ur.customerService) roleTypes.push("cskh");
-    if (ur.marketing) roleTypes.push("marketing");
-    if (ur.receptionist) roleTypes.push("receptionist");
-    // Kiểm tra ADMIN role (có đủ 4 flags)
-    if (ur.accountant && ur.customerService && ur.marketing && ur.receptionist) {
-      roleTypes.push("admin");
-    }
+  if (roleNames.length > 0) {
+    return { label: roleNames.join(", "), color: "bg-primary-100 text-primary-700" };
   }
 
-  // Nếu có nhiều role, hiển thị tất cả
-  if (roleTypes.length > 0) {
-    const uniqueRoles = [...new Set(roleTypes)];
-    const label = uniqueRoles.map((r) => ROLE_LABELS[r]).join(", ");
-    return { label, color: "bg-primary-100 text-primary-700" };
-  }
-
-  // Fallback: dùng role cũ
+  // Fallback: union legacy (hiện chỉ còn super_admin được set) → "Nhân viên".
   const legacyLabels: Record<AdminRole, string> = {
     super_admin: "Quản trị viên",
     admin_content: "Biên tập nội dung",
@@ -82,8 +74,8 @@ function getUserDisplayRole(user: AdminUser): { label: string; color: string } {
   };
 
   return {
-    label: legacyLabels[user.role] || "Nhân viên",
-    color: legacyColors[user.role] || "bg-gray-100 text-gray-700",
+    label: (user.role && legacyLabels[user.role]) || "Nhân viên",
+    color: (user.role && legacyColors[user.role]) || "bg-gray-100 text-gray-700",
   };
 }
 
@@ -209,11 +201,15 @@ function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const { data, isFetching } = notificationsHooks.useList({ currentPage: 1, pageSize: 5 });
+  const { data, isFetching } = notificationsHooks.useList(
+    { currentPage: 1, pageSize: 5 },
+    { refetchInterval: 30_000 }
+  );
   const rows = data?.rows ?? [];
   const unreadCount = rows.filter((r) => !r.has_user_read).length;
 
   const markReadMutation = notificationsHooks.useMarkAsReadById();
+  const setSelectedConversationId = useChatStore((s) => s.setSelectedConversationId);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -227,6 +223,13 @@ function NotificationBell() {
     setOpen(false);
     if (!notif.has_user_read) {
       markReadMutation.mutate(notif.id);
+    }
+    // Thông báo chat: mở thẳng hội thoại trong trang /chats thay vì trang chi tiết thông báo.
+    const conversationId = notif.additional_data?.conversationId;
+    if (notif.category === "CHAT" && conversationId) {
+      setSelectedConversationId(conversationId);
+      router.push("/chats");
+      return;
     }
     router.push(`/notifications/${notif.id}`);
   };

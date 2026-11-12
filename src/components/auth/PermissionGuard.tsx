@@ -13,10 +13,15 @@ import { AlertTriangle } from "lucide-react";
 interface PermissionGuardProps {
   children: ReactNode;
   /**
-   * Yêu cầu một trong các quyền này (OR)
-   * Nếu có admin.all thì luôn cho phép
+   * Yêu cầu một trong các quyền này (OR).
+   * Chỉ `is_admin` (super admin) mới bỏ qua được kiểm tra này.
    */
   permission?: Permission | Permission[];
+  /**
+   * Chỉ super admin (`is_admin`) được vào — không mã quyền nào mở được.
+   * Dùng cho các route backend gate bằng `verifyAdmin`.
+   */
+  superAdminOnly?: boolean;
   /**
    * Yêu cầu tất cả các quyền này (AND)
    */
@@ -41,19 +46,40 @@ interface PermissionGuardProps {
    * Hiển thị cảnh báo khi không có quyền (thay vì ẩn)
    */
   showWarning?: boolean;
+  /**
+   * Nội dung hiển thị trong lúc đang tải quyền từ server.
+   * Mặc định: không render gì — tuyệt đối KHÔNG hiện "không có quyền" khi chưa
+   * biết user có quyền gì (tránh nháy cảnh báo rồi mới hiện nội dung).
+   */
+  loadingFallback?: ReactNode;
 }
 
 export function PermissionGuard({
   children,
   permission,
+  superAdminOnly = false,
   requireAllPermissions,
   role,
   requireAllRoles,
   fallback = null,
   hidden = false,
   showWarning = false,
+  loadingFallback = null,
 }: PermissionGuardProps) {
-  const { hasPermission, hasAllPermissions, hasRole, hasAllRoles } = usePermission();
+  const {
+    hasPermission,
+    hasAllPermissions,
+    hasRole,
+    hasAllRoles,
+    isSuperAdmin,
+    isLoadingPermissions,
+  } = usePermission();
+
+  // Chưa biết quyền → chưa kết luận gì. Render loadingFallback thay vì fallback
+  // / cảnh báo "không có quyền".
+  if (isLoadingPermissions) {
+    return <>{loadingFallback}</>;
+  }
 
   // Chuyển đổi single value thành array
   const permissions = permission
@@ -70,6 +96,11 @@ export function PermissionGuard({
 
   // Kiểm tra quyền
   let hasAccess = true;
+
+  // Chỉ super admin (backend gate `verifyAdmin`)
+  if (superAdminOnly) {
+    hasAccess = hasAccess && isSuperAdmin;
+  }
 
   // Kiểm tra quyền đơn lẻ (OR)
   if (permissions && permissions.length > 0) {

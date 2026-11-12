@@ -13,15 +13,19 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Database,
   Home,
   LayoutGrid,
   MessageSquare,
+  RefreshCw,
   Settings,
+  Smartphone,
   Stethoscope,
+  TriangleAlert,
   Users,
-  Wrench,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { Permission, RoleType } from "@/types/permissions";
 
 // ── Navigation schema ─────────────────────────────────────────────────────────
@@ -31,6 +35,8 @@ interface NavChild {
   href: string;
   permission?: Permission;
   roles?: RoleType[];
+  /** Backend gate `verifyAdmin` (is_admin) — không mã quyền nào mở được. */
+  superAdminOnly?: boolean;
 }
 
 interface NavGroup {
@@ -41,6 +47,8 @@ interface NavGroup {
   children?: NavChild[];
   permission?: Permission;
   roles?: RoleType[];
+  /** Backend gate `verifyAdmin` (is_admin) — không mã quyền nào mở được. */
+  superAdminOnly?: boolean;
 }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -59,7 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Danh sách bệnh nhân", href: "/patients" },
       { name: "Danh sách lịch khám", href: "/patients/appointment-bookings" },
-      { name: "Hồ sơ bệnh án", href: "/medical-records" },
+      // { name: "Hồ sơ bệnh án", href: "/medical-records" },
     ],
   },
 
@@ -70,6 +78,8 @@ const NAV_GROUPS: NavGroup[] = [
     children: [
       { name: "Lịch khám", href: "/appointments" },
       // TODO: { name: "Lịch nghỉ phép BS", href: "/doctor-leaves" },
+      // Cấu hình nhắc lịch khám qua OneSignal - BE gate is_admin
+      { name: "Cấu hình nhắc lịch", href: "/appointments/reminder-config", superAdminOnly: true },
     ],
   },
 
@@ -105,6 +115,7 @@ const NAV_GROUPS: NavGroup[] = [
     roles: ["accountant", "admin"],
     children: [
       { name: "Thanh toán", href: "/payments" },
+      { name: "Danh sách lịch khám", href: "/accountant/appointment-bookings" },
       // TODO: { name: "Đối soát ngân hàng", href: "/reconciliation/bank" },
       // TODO: { name: "Đối soát HIS", href: "/reconciliation/his" },
     ],
@@ -128,14 +139,34 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Dịch vụ khám", href: "/exam-services", permission: "admin.declare_service_price" },
     ],
   },
-  { id: "admin-operations", label: "Vận hành", icon: Wrench, href: "/operations", permission: "admin.all" },
+  // { id: "admin-operations", label: "Vận hành", icon: Wrench, href: "/operations", permission: "admin.all" },
 
-  // Tài khoản nội bộ - Admin only
+  // Danh mục dùng chung đồng bộ từ HIS - BE gate is_admin (các route sync)
+  {
+    id: "his-catalogs", label: "Danh mục HIS", icon: Database,
+    superAdminOnly: true,
+    children: [
+      { name: "Quốc gia", href: "/his-catalogs/countries" },
+      { name: "Tỉnh/Thành", href: "/his-catalogs/provinces" },
+      { name: "Quận/Huyện", href: "/his-catalogs/districts" },
+      { name: "Phường/Xã", href: "/his-catalogs/wards" },
+      { name: "Dân tộc", href: "/his-catalogs/nations" },
+      { name: "Nghề nghiệp", href: "/his-catalogs/professions" },
+    ],
+  },
+
+  // Cấu hình đồng bộ tự động (nightly) lên HIS - BE gate is_admin
+  { id: "his-auto-sync", label: "Đồng bộ tự động HIS", icon: RefreshCw, href: "/his-auto-sync", superAdminOnly: true },
+
+  // Tài khoản nội bộ & phân quyền — BE để /internal-accounts, /users, /roles,
+  // /user-roles, /permissions dưới `verifyAdmin` (is_admin), không hỏi quyền nào.
+  // Gate theo quyền ở đây sẽ cho nhân viên vào trang rồi nhận 403 ở mọi call.
   {
     id: "internal-accounts", label: "Tài khoản nội bộ", icon: LayoutGrid,
-    permission: "user.manage",
+    superAdminOnly: true,
     children: [
-      { name: "Người dùng", href: "/internal-accounts", permission: "user.manage" },
+      { name: "Người dùng", href: "/internal-accounts", superAdminOnly: true },
+      { name: "Vai trò & quyền", href: "/roles", superAdminOnly: true },
     ],
   },
 
@@ -146,8 +177,12 @@ const NAV_GROUPS: NavGroup[] = [
       { name: "Tin tức", href: "/content/news" },
       { name: "Danh mục bài viết", href: "/content/categories" },
       { name: "Banner", href: "/content/banners" },
+      { name: "Chính sách sử dụng", href: "/content/policies" },
     ],
   },
+
+  // Quản lý bản cập nhật ứng dụng di động - chỉ dành cho super admin
+  { id: "app-versions", label: "Bản cập nhật ứng dụng", icon: Smartphone, href: "/app-versions", superAdminOnly: true },
 
   // Thông báo - Ai cũng thấy
   { id: "notifications", label: "Thông báo", icon: Bell, href: "/notifications" },
@@ -174,13 +209,21 @@ function isGroupActive(pathname: string, group: NavGroup): boolean {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { hasPermission, hasRole } = usePermission();
+  const {
+    hasPermission,
+    hasRole,
+    isSuperAdmin,
+    isLoadingPermissions,
+    permissionsError,
+    refetchPermissions,
+  } = usePermission();
   const [collapsed, setCollapsed] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // Check access function
+  // Check access function. Super admin đi qua tất cả (qua `hasPermission` /
+  // `hasRole`), nhưng `superAdminOnly` thì KHÔNG mã quyền nào mở được.
   const checkAccess = (group: NavGroup | NavChild): boolean => {
-    if (hasPermission("admin.all")) return true;
+    if (group.superAdminOnly) return isSuperAdmin;
     if (group.permission) return hasPermission(group.permission);
     if (group.roles && group.roles.length > 0) {
       return group.roles.some((role) => hasRole(role));
@@ -267,7 +310,40 @@ export function AppSidebar() {
         className="flex-1 overflow-y-auto px-3 py-2 space-y-1 scrollbar-none"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {visibleGroups.map((group) => {
+        {/* Chưa biết quyền → hiện skeleton, không hiện menu trống (tránh nháy
+            "mất hết menu" rồi mới hiện lại khi /users/me/permissions trả về). */}
+        {isLoadingPermissions ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-2">
+              <Skeleton className="size-4 shrink-0 rounded" />
+              {!collapsed && <Skeleton className="h-3 flex-1 rounded" />}
+            </div>
+          ))
+        ) : permissionsError ? (
+          /* Lỗi tải quyền → báo lỗi rõ ràng + cho thử lại. KHÔNG hiện menu rỗng
+             (trông như "bạn không có quyền") và cũng không tin dữ liệu đã lưu. */
+          <div className="px-2 py-3 text-center" role="alert">
+            <TriangleAlert className="mx-auto size-5 text-destructive" />
+            {!collapsed && (
+              <>
+                <p className="mt-2 text-xs font-medium text-foreground">
+                  Không tải được quyền
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  Chưa xác định được quyền của bạn nên menu đang tạm ẩn.
+                </p>
+                <button
+                  onClick={() => void refetchPermissions()}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  <RefreshCw className="size-3" />
+                  Thử lại
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          visibleGroups.map((group) => {
           const Icon = group.icon;
           const active = isGroupActive(pathname, group);
           const isExpanded = expandedIds.has(group.id);
@@ -369,7 +445,8 @@ export function AppSidebar() {
               {!collapsed && <span className="truncate">{group.label}</span>}
             </Link>
           );
-        })}
+          })
+        )}
       </nav>
     </aside>
   );

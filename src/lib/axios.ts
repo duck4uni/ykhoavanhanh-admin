@@ -4,7 +4,7 @@ import axios, {
   type AxiosRequestConfig,
   type InternalAxiosRequestConfig,
 } from "axios";
-import { useAuthStore, getAccessToken, logout } from "@/store/authStore";
+import { useAuthStore, getAccessToken, logout, isTokenExpired } from "@/store/authStore";
 import type { ApiResponse, RefreshTokenResponse } from "@/types/api-response";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -28,7 +28,10 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly violations?: Array<{ field?: string; message: string }>
+    public readonly violations?: Array<{ field?: string; message: string }>,
+    /** `responseData` của body lỗi (vd 409 `requires_group_cancel` khi hủy lịch). */
+    public readonly data?: unknown,
+    public readonly messageEn?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -123,11 +126,40 @@ async function refreshAccessToken(): Promise<string | null> {
 // ─── Request Interceptor ──────────────────────────────────────────────────────
 
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     // Skip token for public auth routes
     if (isPublicRoute(config.url)) return config;
 
-    const token = getAccessToken();
+    let token = getAccessToken();
+
+    // Làm mới CHỦ ĐỘNG khi token sắp/đã hết hạn (isTokenExpired có đệm 30s), thay vì chờ
+    // backend trả 401 rồi mới retry. Lý do: cách phản ứng theo 401 khiến mọi request ở thời
+    // điểm token hết hạn đều phải đi 2 vòng, và các request KHÔNG idempotent (POST tạo lịch,
+    // POST hoàn tiền) bị gửi lại lần hai — rủi ro tạo/hoàn trùng. Làm mới trước thì request
+    // thật chỉ đi một lần. Nhánh xử lý 401 ở response interceptor vẫn giữ làm lưới an toàn
+    // cho trường hợp server thu hồi token sớm hoặc lệch giờ giữa client và server.
+    if (token && isTokenExpired() && useAuthStore.getState().refreshToken) {
+      if (isRefreshing) {
+        // Đã có request khác đang làm mới -> xếp hàng, không gọi genNewAccessToken song song
+        // (nhiều lần gọi cùng lúc có thể khiến backend vô hiệu hoá refreshToken vừa dùng).
+        token = await new Promise<string>((resolve, reject) =>
+          subscribeTokenRefresh(resolve, reject)
+        ).catch(() => token);
+      } else {
+        isRefreshing = true;
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          onRefreshed(newToken);
+          token = newToken;
+        } else {
+          // Làm mới thất bại thì KHÔNG đăng xuất ngay ở đây: cứ gửi token cũ đi, để response
+          // interceptor quyết định theo phản hồi thật của server. Tránh việc một lần mạng
+          // chập chờn lại đẩy người dùng ra màn hình đăng nhập giữa lúc đang nhập liệu.
+          onRefreshFailed(new Error("Proactive token refresh failed"));
+        }
+      }
+    }
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -146,13 +178,24 @@ api.interceptors.response.use(
   async (error: AxiosError<ApiResponse<unknown>>) => {
     const originalRequest = error.config as RetryableConfig;
 
+    // Request `responseType: "blob"` (xuất Excel) nhận cả body lỗi dưới dạng Blob,
+    // nên phải giải mã JSON ở đây — nếu không mọi lỗi export đều mất `message` và
+    // chỉ còn statusText ("Bad Request").
+    if (error.response?.data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await error.response.data.text());
+      } catch {
+        // Body không phải JSON (lỗi proxy/gateway) — giữ nguyên để dùng statusText.
+      }
+    }
+
     // Skip auth routes - don't handle 401 for login/register
     if (isPublicRoute(originalRequest.url)) {
       if (error.response?.data) {
-        const { message, message_en, violations } = error.response.data;
+        const { message, message_en, violations, responseData } = error.response.data;
         const errorMessage =
           message || message_en || error.response.statusText || "Đã xảy ra lỗi";
-        return Promise.reject(new ApiError(errorMessage, error.response.status, violations));
+        return Promise.reject(new ApiError(errorMessage, error.response.status, violations, responseData, message_en));
       }
       return Promise.reject(error);
     }
@@ -160,10 +203,10 @@ api.interceptors.response.use(
     // Only handle 401
     if (error.response?.status !== 401) {
       if (error.response?.data) {
-        const { message, message_en, violations } = error.response.data;
+        const { message, message_en, violations, responseData } = error.response.data;
         const errorMessage =
           message || message_en || error.response.statusText || "Đã xảy ra lỗi";
-        return Promise.reject(new ApiError(errorMessage, error.response.status, violations));
+        return Promise.reject(new ApiError(errorMessage, error.response.status, violations, responseData, message_en));
       }
 
       if (!error.response) {

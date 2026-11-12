@@ -15,11 +15,13 @@ import { LoadingSection, Spinner } from "@/components/ui/Spinner";
 const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   APPOINTMENT: "Lịch hẹn",
   SYSTEM: "Hệ thống",
+  CHAT: "Chat CSKH",
 };
 
 const CATEGORY_COLORS: Record<NotificationCategory, string> = {
   APPOINTMENT: "bg-blue-50 text-blue-600",
   SYSTEM: "bg-slate-100 text-slate-600",
+  CHAT: "bg-emerald-50 text-emerald-600",
 };
 
 export default function NotificationDetailPage({ params }: { params: { notificationId: string } }) {

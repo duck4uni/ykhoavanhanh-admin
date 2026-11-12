@@ -6,6 +6,7 @@ import { ArrowLeft, Building2, DoorOpen, MapPin, Tag } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { TextEditor } from "@/components/shares/rich-text-editor";
+import { RichTextContent } from "@/components/shares/RichTextContent";
 import { examAreasHooks } from "@/api/examAreasApi";
 import type { AdminSpecialty } from "@/types/hospital-admin";
 import { useSpecialtyPicker } from "../hooks/useSpecialtyPicker";
@@ -333,9 +334,9 @@ export function ClinicForm({
                   <p className="text-xs text-muted-foreground">
                     Hướng dẫn vào khám
                   </p>
-                  <div
+                  <RichTextContent
                     className="mt-1 text-sm text-slate-700 [overflow-wrap:anywhere]"
-                    dangerouslySetInnerHTML={{ __html: form.visit_instruction }}
+                    html={form.visit_instruction}
                   />
                 </div>
               )}

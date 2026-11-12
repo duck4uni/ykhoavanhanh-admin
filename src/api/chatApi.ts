@@ -46,6 +46,13 @@ const IS_MOCK = false;
 const delay = (ms = 400) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+interface BackendConversationPage {
+  count: number;
+  rows: Conversation[];
+  totalPages: number;
+  currentPage: number;
+}
+
 // ─── Service Functions ────────────────────────────────────────────────────────
 
 async function fetchConversations(
@@ -82,12 +89,24 @@ async function fetchConversations(
     };
   }
 
-  const res = await apiGet<ConversationListResponse>(
-    "/chats/conversations",
-    { params }
-  );
+  // Backend dùng currentPage/pageSize và trả { count, rows, totalPages, currentPage }.
+  const res = await apiGet<BackendConversationPage>("/chats/conversations", {
+    params: {
+      status: params?.status,
+      assigned_to_id: params?.assigned_to_id,
+      search: params?.search,
+      currentPage: params?.page,
+      pageSize: params?.per_page,
+    },
+  });
   if (res.data.status === "success" && res.data.responseData) {
-    return res.data.responseData;
+    const page = res.data.responseData;
+    return {
+      items: page.rows,
+      total: page.count,
+      page: page.currentPage,
+      per_page: params?.per_page ?? 20,
+    };
   }
   throw new Error(
     res.data.message || "Không thể lấy danh sách cuộc hội thoại"

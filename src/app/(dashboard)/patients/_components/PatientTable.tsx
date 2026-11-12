@@ -1,16 +1,44 @@
+import { useState } from "react";
 import Link from "next/link";
-import { FiEye, FiChevronDown, FiGrid, FiDownload } from "react-icons/fi";
+import { FiEye, FiGrid, FiDownload } from "react-icons/fi";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { LoadingSection } from "@/components/ui/Spinner";
+import { toast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
-import { getBirthday, getFullName, getGender, getSource, getSyncStatus } from "../helpers";
+import { useSyncPatientsToHis } from "@/api/patientApi";
+import { getBirthday, getFullName, getGender, getSyncStatus } from "../helpers";
 import type { PatientListController } from "../hooks/usePatientList";
+import { PatientRowMenu } from "./PatientRowMenu";
 
 /** Bảng danh sách bệnh nhân + phân trang. */
 export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
   const { isLoading, filtered, total, totalPages, currentPage, setPage, pageSize, setPageSize } = ctrl;
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const syncToHis = useSyncPatientsToHis({
+    onSuccess: (data) => {
+      setSyncingId(null);
+      const row = data.results[0];
+      if (row?.status === "error") {
+        toast.error(row.error || "Đồng bộ HIS thất bại");
+      } else if (row?.status === "skipped") {
+        toast.info("Bệnh nhân này đã được đồng bộ lên HIS trước đó");
+      } else {
+        toast.success("Đồng bộ HIS thành công");
+      }
+    },
+    onError: (err) => {
+      setSyncingId(null);
+      toast.error(err.message || "Đồng bộ HIS thất bại");
+    },
+  });
+
+  function handleSyncOne(patientId: string) {
+    setSyncingId(patientId);
+    syncToHis.mutate([patientId]);
+  }
 
   return (
     <Card className="overflow-hidden p-0">
@@ -40,7 +68,6 @@ export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
                   <th className="px-5 py-3.5">Giới tính</th>
                   <th className="px-5 py-3.5">Điện thoại</th>
                   <th className="px-5 py-3.5">BHYT</th>
-                  <th className="px-5 py-3.5">Nguồn</th>
                   <th className="px-5 py-3.5">Trạng thái</th>
                   <th className="px-5 py-3.5">Cập nhật lần cuối</th>
                   <th className="px-5 py-3.5 text-center">Thao tác</th>
@@ -49,13 +76,12 @@ export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-5 py-12 text-center text-muted-foreground">
+                    <td colSpan={9} className="px-5 py-12 text-center text-muted-foreground">
                       Không tìm thấy bệnh nhân phù hợp.
                     </td>
                   </tr>
                 ) : (
                   filtered.map((p) => {
-                    const src = getSource(p);
                     const sync = getSyncStatus(p);
                     const g = getGender(p);
                     return (
@@ -72,11 +98,6 @@ export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
                         <td className="px-5 py-4 text-muted-foreground">{p.phone_number ?? "—"}</td>
                         <td className="px-5 py-4 text-muted-foreground">{p.insurance_number ?? "—"}</td>
                         <td className="px-5 py-4">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${src.className}`}>
-                            {src.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${sync.className}`}>
                             {sync.label}
                           </span>
@@ -91,9 +112,10 @@ export function PatientTable({ ctrl }: { ctrl: PatientListController }) {
                                 <FiEye className="h-3.5 w-3.5" /> Chi tiết
                               </Button>
                             </Link>
-                            <button className="rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-surface-secondary" aria-label="Thêm thao tác">
-                              <FiChevronDown className="h-3.5 w-3.5" />
-                            </button>
+                            <PatientRowMenu
+                              onSyncToHis={() => handleSyncOne(p.id)}
+                              isSyncing={syncingId === p.id}
+                            />
                           </div>
                         </td>
                       </tr>

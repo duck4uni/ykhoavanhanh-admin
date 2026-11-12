@@ -6,7 +6,7 @@ import type { ScheduleEditorController } from "../hooks/useNewScheduleForm";
 
 /** Khối 2: Phạm vi khám áp dụng (bảng scopes). */
 export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
-  const { scopes, specialtyName, areaName, roomName, serviceName, servicePriceLevelLabel, openAddScope, openEditScope, removeScope } = ctrl;
+  const { scopes, specialtyName, areaName, roomName, serviceName, serviceCode, servicePriceLevelLabel, openAddScope, openEditScope, removeScope } = ctrl;
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)]">
@@ -25,7 +25,7 @@ export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
 
       <div className="p-6">
         <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="grid grid-cols-[1.2fr_1.2fr_1.4fr_100px_110px_84px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+          <div className="grid grid-cols-[1.2fr_1.2fr_1.4fr_140px_110px_84px] bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
             <span>Chuyên khoa</span>
             <span>Khu vực / phòng</span>
             <span>Dịch vụ khám</span>
@@ -35,7 +35,7 @@ export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
           </div>
           <div className="divide-y divide-slate-100">
             {scopes.map((scope) => (
-              <div key={scope.clientId} className="grid grid-cols-[1.2fr_1.2fr_1.4fr_100px_110px_84px] items-center gap-2 px-3 py-2.5 text-sm">
+              <div key={scope.clientId} className="grid grid-cols-[1.2fr_1.2fr_1.4fr_140px_110px_84px] items-center gap-2 px-3 py-2.5 text-sm">
                 <span className="truncate text-slate-800">{specialtyName(scope.specialty_id)}</span>
                 <span className="truncate text-slate-700">
                   {areaName(scope.area_id)}
@@ -45,7 +45,14 @@ export function ScopeSection({ ctrl }: { ctrl: ScheduleEditorController }) {
                   {serviceName(scope.service_id)}
                   {scope.price_level_code ? ` · ${servicePriceLevelLabel(scope.service_id, scope.price_level_code)}` : ""}
                 </span>
-                <span className="text-right font-medium text-slate-800">{formatFee(scope.fee)}</span>
+                {/* Mã dịch vụ (ID nội bộ) cạnh giá — BV phản hồi 06/11, mục 4. Rỗng khi dịch vụ
+                    chưa tải xong thì chỉ hiện giá, không hiện "(—)" gây hiểu nhầm là thiếu mã. */}
+                <span className="text-right">
+                  <span className="block font-medium text-slate-800">{formatFee(scope.fee)}</span>
+                  {serviceCode(scope.service_id) && (
+                    <span className="block font-mono text-[10px] text-primary-600">({serviceCode(scope.service_id)})</span>
+                  )}
+                </span>
                 <span>
                   <Badge variant={scope.status === "ACTIVE" ? "success" : "default"}>
                     {scope.status === "ACTIVE" ? "Hoạt động" : "Tạm tắt"}
