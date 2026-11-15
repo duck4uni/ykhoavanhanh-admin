@@ -44,6 +44,7 @@ export function RetryImage({
   }, [currentState.attempt, retryCount, retryDelay, src]);
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- cần onError để tự thử lại, URL ảnh động
     <img
       {...rest}
       src={currentState.reloadSrc}

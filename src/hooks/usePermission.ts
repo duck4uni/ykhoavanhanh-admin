@@ -19,6 +19,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useMyPermissions } from "@/api/permissionsApi";
 import type { Permission, RoleType } from "@/types/permissions";
 import { DEFAULT_ROLE_PERMISSIONS } from "@/types/permissions";
+import type { AdminUserRole } from "@/types/user";
+
+/** Các cờ vai trò mà `getRoleTypesFromFlags` đọc (tập con của `AdminUserRole`). */
+type UserRoleFlags = Partial<Pick<AdminUserRole, "accountant" | "customerService" | "marketing" | "receptionist">>;
 
 /**
  * Tiền tố `code` của backend (`module`) ↔ RoleType của FE.
@@ -44,7 +48,7 @@ const MODULE_TO_ROLE_TYPE: Record<string, RoleType> = {
  * `{ id, roleId, roleName, description, receptionist, membership, marketing,
  *    accountant, customerService }`
  */
-function getRoleTypesFromFlags(userRoles: any[]): RoleType[] {
+function getRoleTypesFromFlags(userRoles: UserRoleFlags[]): RoleType[] {
   if (!userRoles || !Array.isArray(userRoles)) return [];
 
   const roleTypes: RoleType[] = [];
@@ -211,7 +215,7 @@ export function usePermission() {
  * là wildcard ở đây — nó chỉ khớp đúng chính nó.
  */
 export function checkPermission(
-  userRoles: any[] | undefined,
+  userRoles: UserRoleFlags[] | undefined,
   permission: Permission
 ): boolean {
   const roleTypes = getRoleTypesFromFlags(userRoles || []);
@@ -225,7 +229,7 @@ export function checkPermission(
  * CHƯA CÓ call site — xem ghi chú ở `checkPermission`.
  */
 export function checkRole(
-  userRoles: any[] | undefined,
+  userRoles: UserRoleFlags[] | undefined,
   roleType: RoleType
 ): boolean {
   return getRoleTypesFromFlags(userRoles || []).includes(roleType);
