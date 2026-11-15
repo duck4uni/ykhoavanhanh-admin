@@ -70,6 +70,7 @@ export function UploadImage({
         <div className="flex flex-wrap gap-3">
           {existingUrls.map((url) => (
             <div key={url} className="relative group w-24 h-24">
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL ảnh động từ backend, chưa khai báo remotePatterns cho next/image */}
               <img
                 src={Link.imgEndpoid + url}
                 alt="preview"
@@ -87,6 +88,7 @@ export function UploadImage({
           ))}
           {previews.map((url, idx) => (
             <div key={url} className="relative group w-24 h-24">
+              {/* eslint-disable-next-line @next/next/no-img-element -- ảnh xem trước dạng blob URL, next/image không hỗ trợ */}
               <img
                 src={url}
                 alt="preview"

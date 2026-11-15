@@ -145,8 +145,8 @@ interface SelectProps {
   placeholder?: string
   value?: string
   onValueChange?: (value: string) => void
-  /** Backward-compat: accepts any event or synthetic */
-  onChange?: (event: any) => void // noqa
+  /** Backward-compat: nhận event thật (native <select>) hoặc event giả `{ target: { value } }` (Radix). */
+  onChange?: (event: React.ChangeEvent<HTMLSelectElement> | { target: { value: string } }) => void
   disabled?: boolean
   className?: string
   /** When children provided, renders as native <select> for backward compat */
@@ -181,7 +181,7 @@ export function Select({
           value={value}
           disabled={disabled}
           required={required}
-          onChange={onChange as React.ChangeEventHandler<HTMLSelectElement>}
+          onChange={onChange}
           className={cn(
             "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
             error && "border-red-500 focus-visible:ring-red-500/50",
