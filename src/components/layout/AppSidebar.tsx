@@ -80,6 +80,8 @@ const NAV_GROUPS: NavGroup[] = [
       // TODO: { name: "Lịch nghỉ phép BS", href: "/doctor-leaves" },
       // Cấu hình nhắc lịch khám qua OneSignal - BE gate is_admin
       { name: "Cấu hình nhắc lịch", href: "/appointments/reminder-config", superAdminOnly: true },
+      // Công tắc đóng/mở đặt lịch trên app bệnh nhân - BE gate is_admin
+      { name: "Đóng/mở đặt lịch", href: "/appointments/booking-config", superAdminOnly: true },
     ],
   },
 
